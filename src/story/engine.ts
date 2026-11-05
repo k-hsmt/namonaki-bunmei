@@ -3,7 +3,7 @@ import {proposeCivicConstruction} from './civic-progression.js';
 import {appendConfirmedCivicConstruction} from './civic-architecture.js';
 import {housingAt} from './housing-history.js';
 import {proposeHousingConstruction} from './housing-progression.js';
-import {facilityHousingConflicts} from '../scene/housing-ground.js';
+import {facilityHousingConflicts,facilityCivicConflicts} from '../scene/housing-ground.js';
 import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
@@ -97,7 +97,9 @@ function finishYear(s:CivilizationState):void {
     const siteId=(['river-bank','hill-side','coast-inlet'] as const)[siteIndex];
     if(!siteId)return false;
     const existing=housingAt(s.housing!,s.year,siteId).blocks;
-    return facilityHousingConflicts(candidate,existing).length===0;
+    const site=ledger.sites?.[siteIndex]?.view;
+    return facilityHousingConflicts(candidate,existing).length===0&&
+      facilityCivicConflicts(candidate,site?.buildings??[]).length===0;
    }
   :undefined;
  updateSettlements(ledger.sites,s.society,local,s.year,record,canBuild);
