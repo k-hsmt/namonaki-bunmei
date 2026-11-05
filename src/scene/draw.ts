@@ -8,15 +8,74 @@ function rect(c:C,x:number,y:number,w:number,h:number,col:string){c.fillStyle=co
 function poly(c:C,points:number[],col:string){c.fillStyle=col;c.beginPath();c.moveTo(points[0]!,points[1]!);for(let i=2;i<points.length;i+=2)c.lineTo(points[i]!,points[i+1]!);c.closePath();c.fill();}
 function rng(seed:number){let z=seed>>>0;return ()=>{z=(Math.imul(1664525,z)+1013904223)>>>0;return z/4294967296;};}
 function tree(c:C,x:number,y:number,k=1){rect(c,x-1*k,y-8*k,3*k,12*k,'#625745');rect(c,x-6*k,y-20*k,13*k,11*k,'#607b57');rect(c,x-10*k,y-17*k,8*k,9*k,'#77916a');rect(c,x+4*k,y-16*k,7*k,9*k,'#4d7055');rect(c,x-4*k,y-24*k,9*k,6*k,'#849672');}
-/** A recorded building's geometry depends only on that building, never settlement scale. */
+/** H4-D1: 建設時の施設種別だけで輪郭を決める。規模・年・人口に依存しない。 */
 export function drawBuildingSprite(c:C,o:SiteObject,stone:boolean):void {
- const x=o.x,y=o.y;
- if(o.condition==='ruined'){rect(c,x-9,y-6,5,8,P.stone);rect(c,x+6,y-9,4,11,P.stone);rect(c,x-4,y-3,11,4,'#9e9680');rect(c,x-11,y+2,24,2,P.dark);return;}
- rect(c,x-10,y-12,21,14,stone?'#a6a18b':'#aa8f6d');
- rect(c,x-12,y-13,25,3,P.roof);
- poly(c,[x-13,y-13,x,y-22,x+14,y-13],stone?'#77716b':P.roof);
- rect(c,x-2,y-6,5,8,P.dark);
- rect(c,x-8,y-7,4,3,'#c7bd94');rect(c,x+7,y-7,3,3,'#c7bd94');
+ const {x,y}=o;
+ if(o.condition==='ruined'){
+  // 廃墟でも元の種別を捨てず、輪郭の一部を残す。
+  const wide=o.kind==='hall'?31:o.kind==='granary'?17:o.kind==='workshop'?25:21;
+  const left=x-Math.floor(wide/2);
+  rect(c,left,y-4,wide,6,'#978e78');
+  rect(c,left,y-9,o.kind==='hall'?5:3,10,'#9e9680');
+  rect(c,left+wide-4,y-11,4,12,P.stone);
+  rect(c,left+5,y-6,Math.max(2,wide-12),3,'#6a7166');
+  if(o.kind==='granary')for(const dx of [-5,3])rect(c,x+dx,y+2,3,3,P.wood);
+  return;
+ }
+ const wall=stone?'#aea58e':'#ab9173';
+ switch(o.kind){
+  case 'hall':{
+   // 広い間口・高い二段屋根・中央の入口（共同施設）。
+   rect(c,x-17,y-14,35,16,'#b5a58a');
+   rect(c,x-18,y-18,37,5,'#8d7564');
+   poly(c,[x-20,y-18,x,y-31,x+20,y-18],'#77756b');
+   rect(c,x-3,y-11,7,13,P.dark);
+   for(const dx of [-13,10])rect(c,x+dx,y-9,4,5,'#d1bfa0');
+   rect(c,x-20,y+1,41,2,'#897b65');
+   break;
+  }
+  case 'granary':{
+   // 高床・縦長・窓の少ない箱形。
+   for(const dx of [-8,6])rect(c,x+dx,y-3,3,8,P.wood);
+   rect(c,x-10,y-20,21,18,'#a99d7e');
+   rect(c,x-12,y-22,25,4,'#746f62');
+   poly(c,[x-13,y-22,x,y-30,x+14,y-22],'#84735e');
+   rect(c,x-2,y-14,4,5,P.dark);
+   rect(c,x-12,y+3,25,2,'#6b6457');
+   break;
+  }
+  case 'workshop':{
+   // 横長の作業場・低い張り出し屋根と煙突。
+   rect(c,x-14,y-13,29,15,wall);
+   poly(c,[x-16,y-13,x-2,y-22,x+17,y-13],'#8e6957');
+   rect(c,x+9,y-28,5,14,'#929083');
+   rect(c,x+10,y-30,3,2,'#c4b9a3');
+   rect(c,x-17,y-8,10,4,'#a58a66');
+   rect(c,x-16,y-4,2,7,P.wood);
+   rect(c,x-7,y-4,2,7,P.wood);
+   rect(c,x+2,y-6,7,8,'#615747');
+   break;
+  }
+  case 'house':
+  case 'ruin':
+  default:{
+   // 規模で変化しない小さな住宅。IDごとの安定した屋根の向き。
+   let h=2166136261;
+   for(const ch of o.id)h=Math.imul(h^ch.charCodeAt(0),16777619);
+   const extended=(h>>>0)%3===0;
+   const wide=extended?25:20;
+   rect(c,x-Math.floor(wide/2),y-11,wide,13,wall);
+   if(extended){
+    rect(c,x-Math.floor(wide/2)-1,y-16,wide+2,5,'#886859');
+    rect(c,x+4,y-19,6,3,'#a18b74');
+   }else{
+    poly(c,[x-12,y-11,x,y-21,x+12,y-11],P.roof);
+   }
+   rect(c,x-2,y-5,4,7,P.dark);
+   rect(c,x-8,y-7,3,3,'#c6ba99');
+   break;
+  }
+ }
 }
 function cloud(c:C,x:number,y:number,dim=false){const a=dim?'#a6afa4':'#e9e1cb';rect(c,x+4,y,19,3,a);rect(c,x,y+3,31,5,a);rect(c,x+8,y-4,10,4,a);rect(c,x+2,y+8,25,2,'#c2c5b3');}
 function reeds(c:C,x:number,y:number){rect(c,x,y-7,1,9,'#546e4b');rect(c,x+3,y-5,1,7,'#72885a');rect(c,x+6,y-9,1,11,'#5c7958');rect(c,x-1,y-8,3,2,'#9c8c61');}
@@ -174,10 +233,20 @@ function drawResidentialRoofs(c:C,scene:SceneComposition,depth:'far'|'middle'|'n
   const roof=p.styleId==='terraced'?'#777e79':p.styleId==='courtyard'?'#9d7665':'#836657';
   rect(c,x-width/2,y-height+2,width,height-2,wall);
   if(p.styleId==='terraced'){
+   // 連棟屋根：水平方向の屋根面と段差を強調する。
    rect(c,x-width/2-1,y-height,width+2,3,roof);
    rect(c,x-width/2,y-height-2,Math.max(3,width-2),2,'#a39c89');
+   if(depth!=='far')rect(c,x+width/2-3,y-height+3,2,Math.max(2,height-4),'#82796a');
+  }else if(p.styleId==='courtyard'){
+   // 中庭型：緩い平屋根と中心の明るい抜け。
+   rect(c,x-width/2-1,y-height,width+2,3,roof);
+   if(width>=9)rect(c,x-2,y-height+1,4,2,'#c0ae91');
+   rect(c,x-width/2,y-height-2,2,2,'#8a6e5b');
+   rect(c,x+width/2-2,y-height-2,2,2,'#8a6e5b');
   }else{
+   // 小屋型：同じ街区IDのまま切妻の高さに微差を持つ。
    poly(c,[x-width/2-1,y-height+2,x,y-height-3-(p.variant%2),x+width/2+1,y-height+2],roof);
+   if(depth!=='far'&&p.variant===2)rect(c,x-1,y-height-4,2,2,'#a6957e');
   }
   if(depth!=='far'){
    rect(c,x-width/2+2,y-3,2,2,p.use==='vacant'?'#555a54':'#665849');
@@ -232,13 +301,14 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,ho
   }else if(o.kind==='memorial'){
    rect(c,o.x,o.y-8,4,10,P.stone);rect(c,o.x-2,o.y-9,8,2,P.dark);
   }else if(o.kind==='market'){
-   rect(c,o.x-12,o.y-8,24,5,'#b7865e');
-   for(let j=0;j<4;j++)rect(c,o.x-11+j*6,o.y-8,3,5,P.bright);
-   rect(c,o.x-10,o.y-3,2,8,P.wood);rect(c,o.x+8,o.y-3,2,8,P.wood);
+   // 開放的な長屋根と連続する柱。確定済みmarket 1件の外観のみ。
+   rect(c,o.x-16,o.y-13,33,4,'#97765e');
+   poly(c,[o.x-19,o.y-13,o.x,o.y-21,o.x+19,o.y-13],'#ad7c5c');
+   for(let j=0;j<5;j++)rect(c,o.x-15+j*7,o.y-12,3,3,j%2?'#e2c9a1':'#ba9875');
+   for(const dx of [-13,0,13])rect(c,o.x+dx,o.y-9,2,15,P.wood);
+   rect(c,o.x-15,o.y+2,31,2,'#826c55');
   }else{
    drawBuildingSprite(c,o,stone||o.kind==='hall'||o.kind==='granary');
-   if(o.kind==='workshop')rect(c,o.x+6,o.y-24,4,11,P.stone);
-   if(o.kind==='granary')rect(c,o.x-10,o.y+1,21,3,P.stone);
   }
   if(o.condition==='damaged')rect(c,o.x-10,o.y-2,8,3,P.dark);
  }
