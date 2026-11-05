@@ -30,8 +30,13 @@ test('住宅の実在する近接街区間にだけ歩行の痕跡を描き、�
 });
 test('空き家・廃墟・河川・施設を介した通路を描かない',()=>{
  const occupied=block('a',15);
- const vacant=block('b',39,112,'vacant');
- assert.deepEqual(projectStreetscape(composeScene(snapshot(),history([occupied,vacant])),[]),[]);
+ const built=block('b',39);
+ // H1は「vacantとして建設」を禁じるため、まず合法な建設履歴を投影し
+ // 描画専用の利用状態テストを行う。歴史に不正なbuiltを入れない。
+ const initial=composeScene(snapshot(),history([occupied,built]));
+ const withVacancy={...initial,residentialBlocks:initial.residentialBlocks.map(b=>
+  b.blockId==='b'?{...b,use:'vacant'}:b)};
+ assert.deepEqual(projectStreetscape(withVacancy,[]),[]);
  assert.equal(isUnoccupiedGround({x:138,y:119,width:6,depth:2},[],[],0),false);
  const facility={id:'work',kind:'workshop',x:36,y:124,builtYear:5,condition:'intact'};
  // 既存施設の地表が歩行表現に接する箇所を含むので、地表塗りを止める。
