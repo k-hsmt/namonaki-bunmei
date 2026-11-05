@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches: [main, feat/v06-scene-composition-b]
   pull_request:
     branches: [main, feat/v06-visual-enhancement-a]
 
