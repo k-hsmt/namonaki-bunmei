@@ -43,7 +43,7 @@ test('H4-D4-B: 寄り合いの継続・実在hall・余力が必要、単なる�
  const withoutCouncil=make();
  withoutCouncil[0].practiceChanges=[];withoutCouncil[0].view.practices=[];
  reason(propose({history:withoutCouncil}),'no-council');
- const recent=make();recent[0].practiceChanges[0].year=30;
+ const recent=make();recent[0].practiceChanges.at(-1).year=30;
  reason(propose({history:recent}),'no-council');
  const missingHall=make();
  missingHall[0].buildingChanges=missingHall[0].buildingChanges.filter(e=>e.building.kind!=='hall');
