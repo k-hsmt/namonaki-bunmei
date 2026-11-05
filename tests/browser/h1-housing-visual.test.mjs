@@ -21,6 +21,8 @@ const events=positions.map(([x,y,width,depth],i)=>{
 });
 events.push({year:540,seq:0,kind:'underused',blockId:events[2].blockId,
  after:{...events[2].after,use:'underused'}});
+events.push({year:590,seq:0,kind:'damaged',blockId:events[4].blockId,
+ after:{...events[4].after,condition:'damaged'}});
 events.push({year:600,seq:0,kind:'ruined',blockId:events[4].blockId,
  after:{...events[4].after,use:'vacant',condition:'ruined'}});
 const history={introducedYear:0,legacyUntracked:false,events};
