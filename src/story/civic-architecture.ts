@@ -142,7 +142,7 @@ export function validateCivicLedger(sites:unknown,records:unknown,confirmedYear:
      JSON.stringify(b.civic)!==JSON.stringify(previous.civic)||
      b.builtYear!==previous.builtYear||b.x!==previous.x||b.y!==previous.y)
      throw Error('大型公共建築: 現在の施設と確定履歴が一致しない');
-   }else if(previous&&previous!==false)
+   }else if(previous)
     throw Error('大型公共建築: 現在の施設から建築正本が消えた');
   }
  }
