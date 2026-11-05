@@ -3,7 +3,7 @@ on:
   push:
     branches: [main, feat/v06-scene-composition-b]
   pull_request:
-    branches: [main, feat/v06-visual-enhancement-a]
+    branches: [main, feat/v06-visual-enhancement-a, feat/v06-dependency-main-review]
 
 permissions:
   contents: read
