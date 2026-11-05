@@ -55,6 +55,18 @@ const plots = [
   { x: 210, y: 141, kind: 'workshop', demand: 10200 },
   { x: 302, y: 145, kind: 'house', demand: 13500 },
 ] as const;
+/** 固定区画方式の将来の建設候補地（実際の建設履歴ではない）。
+ * 大型施設がここを先取りすると、後年の市場・工房等が建設不能になり、
+ * 景観と社会的な規模分類を意図せず変えてしまう。地表予約判定だけに使う。
+ */
+export function fixedFacilityLotReservations(siteIndex:number):readonly {
+ readonly id:string;readonly kind:Kind;readonly x:number;readonly y:number;
+}[]{
+ const settlement=settlements[siteIndex];
+ return settlement?plots.map((p,i)=>({
+  id:settlement.id+'-'+i,kind:p.kind,x:p.x,y:p.y,
+ })):[];
+}
 const kindNames: Record<Kind, string> = {
   house: '家屋', field: '畑', hall: '集会所', workshop: '仕事場',
   market: '市', bridge: '橋', granary: '穀物庫',
