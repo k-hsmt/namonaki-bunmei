@@ -6,13 +6,15 @@ function rect(c:C,x:number,y:number,w:number,h:number,col:string){c.fillStyle=co
 function poly(c:C,points:number[],col:string){c.fillStyle=col;c.beginPath();c.moveTo(points[0]!,points[1]!);for(let i=2;i<points.length;i+=2)c.lineTo(points[i]!,points[i+1]!);c.closePath();c.fill();}
 function rng(seed:number){let z=seed>>>0;return ()=>{z=(Math.imul(1664525,z)+1013904223)>>>0;return z/4294967296;};}
 function tree(c:C,x:number,y:number,k=1){rect(c,x-1*k,y-8*k,3*k,12*k,'#625745');rect(c,x-6*k,y-20*k,13*k,11*k,'#607b57');rect(c,x-10*k,y-17*k,8*k,9*k,'#77916a');rect(c,x+4*k,y-16*k,7*k,9*k,'#4d7055');rect(c,x-4*k,y-24*k,9*k,6*k,'#849672');}
-function house(c:C,o:SiteObject,stone:boolean,visual?:VisualProfile){let x=o.x,y=o.y;if(o.condition==='ruined'){rect(c,x-9,y-6,5,8,P.stone);rect(c,x+6,y-9,4,11,P.stone);rect(c,x-4,y-3,11,4,'#9e9680');rect(c,x-11,y+2,24,2,P.dark);return;}
- const height=visual?.heightLevel??0;
- const extra=o.kind==='house'?height*4:height*2;
- const width=height>=2?23:21;
- rect(c,x-10,y-12-extra,width,14+extra,stone?'#a6a18b':'#aa8f6d');rect(c,x-12,y-13-extra,25,3,P.roof);poly(c,[x-13,y-13-extra,x,y-22-extra,x+14,y-13-extra],stone?'#77716b':P.roof);rect(c,x-2,y-6,5,8,P.dark);rect(c,x-8,y-7,4,3,'#c7bd94');rect(c,x+7,y-7,3,3,'#c7bd94');
- if(extra>=8){rect(c,x-8,y-14,3,3,P.dark);rect(c,x+6,y-14,3,3,P.dark);}
- if(extra>=12){rect(c,x-8,y-18,3,2,P.bright);rect(c,x+6,y-18,3,2,P.bright);}
+/** A recorded building's geometry depends only on that building, never settlement scale. */
+export function drawBuildingSprite(c:C,o:SiteObject,stone:boolean):void {
+ const x=o.x,y=o.y;
+ if(o.condition==='ruined'){rect(c,x-9,y-6,5,8,P.stone);rect(c,x+6,y-9,4,11,P.stone);rect(c,x-4,y-3,11,4,'#9e9680');rect(c,x-11,y+2,24,2,P.dark);return;}
+ rect(c,x-10,y-12,21,14,stone?'#a6a18b':'#aa8f6d');
+ rect(c,x-12,y-13,25,3,P.roof);
+ poly(c,[x-13,y-13,x,y-22,x+14,y-13],stone?'#77716b':P.roof);
+ rect(c,x-2,y-6,5,8,P.dark);
+ rect(c,x-8,y-7,4,3,'#c7bd94');rect(c,x+7,y-7,3,3,'#c7bd94');
 }
 function cloud(c:C,x:number,y:number,dim=false){const a=dim?'#a6afa4':'#e9e1cb';rect(c,x+4,y,19,3,a);rect(c,x,y+3,31,5,a);rect(c,x+8,y-4,10,4,a);rect(c,x+2,y+8,25,2,'#c2c5b3');}
 function reeds(c:C,x:number,y:number){rect(c,x,y-7,1,9,'#546e4b');rect(c,x+3,y-5,1,7,'#72885a');rect(c,x+6,y-9,1,11,'#5c7958');rect(c,x-1,y-8,3,2,'#9c8c61');}
@@ -47,6 +49,57 @@ function builtGround(c:C,profile:VisualProfile,index:number):void {
   if(shore>=3){rect(c,230,141,36,3,'#b9a68a');rect(c,235,139,3,2,'#8d7a61');}
  }
 }
+/** Street blocks are surface markings around documented building footprints.
+ * No visual building copies are introduced. All marks stay on dry land.
+ */
+function neighborhood(c:C,buildings:readonly SiteObject[],profile:VisualProfile,index:number):void {
+ const density=profile.densityLevel;
+ if(density===0)return;
+ const isDry=(x:number,y:number):boolean=>{
+  if(x<3||x>316||y<104||y>146)return false;
+  // River observation: channel occupies the middle; use conservative dry-bank masks.
+  if(index===0)return (x>=33&&x<=115&&y>=109&&y<=144)||(x>=208&&x<=288&&y>=107&&y<=137);
+  // Avoid claiming artificial blocks in the hills or the lakeside.
+  return index===1?y<=132:false;
+ };
+ const occupied=buildings.filter(o=>o.kind!=='field'&&o.kind!=='bridge'&&o.kind!=='memorial'&&o.condition!=='ruined');
+ for(const o of occupied){
+  const x=o.x,y=o.y;
+  const left=x-16,right=x+16,top=y-25,bottom=y+4;
+  // Plot edges and compact paving only, below and beside real building roofs.
+  for(let dx=-16;dx<=16;dx+=2){
+   if(isDry(x+dx,bottom))rect(c,x+dx,bottom,2,1,'#877e64');
+  }
+  if(density>=2){
+   for(const edge of [left,right]){
+    for(let dy=-9;dy<=2;dy+=3)if(isDry(edge,y+dy))rect(c,edge,y+dy,1,2,'#a99b7c');
+   }
+   for(let dx=-12;dx<=12;dx+=6)if(isDry(x+dx,y+5))rect(c,x+dx,y+5,3,2,'#b9a98b');
+  }
+  if(density>=3){
+   // Narrow gridded courtyards on existing lots; no extra building silhouettes.
+   for(const side of [-1,1]){
+    for(let k=0;k<3;k++){
+     const px=x+side*(17+k*3),py=y-7+(k%2)*4;
+     if(isDry(px,py))rect(c,px,py,2,2,k===1?'#c1b192':'#847b65');
+    }
+   }
+   for(let dx=-14;dx<=14;dx+=4){
+    if(isDry(x+dx,y+8))rect(c,x+dx,y+8,2,1,'#817965');
+   }
+  }
+ }
+ // Closely spaced land divisions only where anchored by two existing buildings.
+ if(density>=3){
+  const ordered=[...occupied].sort((a,b)=>a.x-b.x);
+  for(let i=1;i<ordered.length;i++){
+   const a=ordered[i-1]!,b=ordered[i]!;
+   if(b.x-a.x>55||Math.abs(b.y-a.y)>23)continue;
+   const y=Math.max(a.y,b.y)+10;
+   for(let x=a.x+18;x<b.x-16;x+=5)if(isDry(x,y))rect(c,x,y,3,1,'#ab9b7e');
+  }
+ }
+}
 export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):void {
  const c=canvas.getContext('2d');if(!c)return;canvas.width=W;canvas.height=H;c.imageSmoothingEnabled=false;
  const index=s.local?.index??0;
@@ -75,11 +128,11 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):v
  // Landmark tree remains recognizable, even after many generations.
  tree(c,28,104,2);tree(c,294,102,1);tree(c,310,124,1);for(let i=0;i<9;i++){const x=11+(i*33)%310,y=104+(i%3)*6;if(x>125&&x<180)continue;tree(c,x,y,i%4===0?0.8:0.55);}reeds(c,120,138);reeds(c,200,154);reeds(c,175,129);
  for(let i=0;i<7;i++){const x=8+Math.floor(random()*100),y=120+Math.floor(random()*30);rect(c,x,y,9,3,dry?'#a69a65':'#667d54');}
- if(s.visual)builtGround(c,s.visual,index);
+ if(s.visual){builtGround(c,s.visual,index);neighborhood(c,s.objects,s.visual,index);}
  const stone=!s.local&&(s.objects.filter(o=>o.kind==='memorial').length>2 || population>47000);
  for(const o of s.objects){
   if(o.kind==='bridge')continue;
-  if(o.condition==='ruined'){house(c,o,false,s.visual);continue;}
+  if(o.condition==='ruined'){drawBuildingSprite(c,o,false);continue;}
   if(o.kind==='field'){
    for(let j=0;j<5;j++)rect(c,o.x-12,o.y-12+j*3,26,1,dry?'#ad956c':'#536f49');
    fieldDetails(c,o.x-11,o.y-14,dry);
@@ -90,7 +143,7 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):v
    for(let j=0;j<4;j++)rect(c,o.x-11+j*6,o.y-8,3,5,P.bright);
    rect(c,o.x-10,o.y-3,2,8,P.wood);rect(c,o.x+8,o.y-3,2,8,P.wood);
   }else{
-   house(c,o,stone||o.kind==='hall'||o.kind==='granary',s.visual);
+   drawBuildingSprite(c,o,stone||o.kind==='hall'||o.kind==='granary');
    if(o.kind==='workshop')rect(c,o.x+6,o.y-24,4,11,P.stone);
    if(o.kind==='granary')rect(c,o.x-10,o.y+1,21,3,P.stone);
   }
