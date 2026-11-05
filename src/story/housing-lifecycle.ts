@@ -84,10 +84,10 @@ export function proposeHousingLifecycle(input:HousingLifecycleInput):HousingLife
  * 同一年の住宅建設イベントに続く場合もseqを単調増加させる。
  * H1のevent reducerで検査可能な形だけを返す。
  */
-export function appendHousingLifecycle(
- history:HousingHistory,year:number,proposal:HousingLifecycleProposal,
+export function appendHousingLifecycle<H extends HousingHistory>(
+ history:H,year:number,proposal:HousingLifecycleProposal,
  causeRecordId:string,
-):HousingHistory{
+):H{
  if(history.events.some(e=>e.year===year&&e.blockId===proposal.blockId))
   throw Error('同一年の住宅街区状態変更が重複');
  const sameYear=history.events.filter(e=>e.year===year);
@@ -97,7 +97,7 @@ export function appendHousingLifecycle(
   year,seq,kind:proposal.kind,blockId:proposal.blockId,after:proposal.after,
   causeRecordId,
  };
- const next={...history,events:[...history.events,event]};
+ const next={...history,events:[...history.events,event]} as H;
  housingAt(next,year); // 年次・変更許可属性・廃墟原子性を確定前に検証
  return next;
 }
