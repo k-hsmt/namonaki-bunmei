@@ -1,4 +1,6 @@
 import {proposeHousingLifecycle,appendHousingLifecycle} from './housing-lifecycle.js';
+import {proposeCivicConstruction} from './civic-progression.js';
+import {appendConfirmedCivicConstruction} from './civic-architecture.js';
 import {housingAt} from './housing-history.js';
 import {proposeHousingConstruction} from './housing-progression.js';
 import {facilityHousingConflicts} from '../scene/housing-ground.js';
@@ -102,6 +104,35 @@ function finishYear(s:CivilizationState):void {
  // 施設建設が確定した同一年の台帳を先に観測し、その後住宅候補を検査する。
  // 丘陵・入り江は地形未検証につき建設をHOLD。
  if(s.version===4&&s.housing){
+  // H4-D4-B: 社会史・旧施設・住宅と河川の敷地が確定した後にだけ提案。
+  // 未来の記録IDを予測して純粋な候補判定を行い、全ゲート成功時に
+  // 施設台帳と歴史イベントを一括して確定する。乱数列・旧セーブは変更しない。
+  const anticipatedId=s.year+'-'+s.history.length;
+  const civic=proposeCivicConstruction({
+   siteIndex:0,year:s.year,seed:s.seed,history:ledger.sites,
+   housing:s.housing,population:local[0]?.population??0,
+   coverage:local[0]?.coverage??0,shortageYears:local[0]?.shortageYears??0,
+   tradeYears:local[0]?.tradeYears??0,recordId:anticipatedId,
+  });
+  if(civic.status==='built'){
+   const event:RecordEntry={
+    id:anticipatedId,year:s.year,tag:'地域',important:true,
+    kind:'building-built',buildingId:civic.candidate.id,
+    title:civic.candidate.civic.architectureStyle==='great-hall'
+     ?'河畔に大きな共同会堂が建てられる':'河畔に中庭を囲む共同施設が建てられる',
+    body:'寄り合いの営みと維持の余力が続き、使える土地に共同の建築が築かれた。',
+    causes:['長く続いた寄り合い','維持するための食糧と交易','空いていた地表敷地'],
+    relatedIds:[...new Set(civic.relatedIds)],
+   };
+   // appendが失敗しても、歴史イベントの片側だけを保存しない。
+   const nextSites=appendConfirmedCivicConstruction({
+    history:ledger.sites,siteIndex:0,year:s.year,
+    candidate:civic.candidate,housingBlocks:housingAt(s.housing,s.year,'river-bank').blocks,
+    records:[...s.history,event],
+   });
+   s.history.push(event);
+   ledger.sites=nextSites;
+  }
   const river=siteAt(ledger.sites,0,s.year);
   const proposal=proposeHousingConstruction({
    history:s.housing,year:s.year,seed:s.seed,siteIndex:0,
