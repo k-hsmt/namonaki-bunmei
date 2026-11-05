@@ -21,7 +21,7 @@ function keysOnly(x:Record<string,unknown>,allowed:readonly string[]):void{
  for(const key of Object.keys(x))if(!allowed.includes(key))fail('未知の住宅属性: '+key);
 }
 function validateHousing(input:unknown,confirmedYear:number):PersistedHousingHistory{
- if(!isRecord(input))return fail('住宅履歴が欠損');
+ if(!isRecord(input))throw Error('住宅保存形式: 住宅履歴が欠損');
  keysOnly(input,['schemaVersion','introducedYear','legacyUntracked','events']);
  if(input.schemaVersion!==1||!integer(input.introducedYear)||
  typeof input.legacyUntracked!=='boolean'||!Array.isArray(input.events))fail('住宅履歴ヘッダーが不正');
@@ -29,7 +29,7 @@ function validateHousing(input:unknown,confirmedYear:number):PersistedHousingHis
  if(introducedYear>confirmedYear+1)fail('住宅追跡開始年が未来すぎる');
  const events:ResidentialBlockEvent[]=[];
  for(const raw of input.events as unknown[]){
-  if(!isRecord(raw))fail('住宅イベントが不正');
+  if(!isRecord(raw))throw Error('住宅保存形式: 住宅イベントが不正');
   keysOnly(raw,['year','seq','kind','blockId','after','causeRecordId']);
   if(!integer(raw.year)||!integer(raw.seq)||typeof raw.blockId!=='string'||
    typeof raw.kind!=='string'||!isRecord(raw.after)||Number(raw.year)>confirmedYear)fail('イベント確定年・形式が不正');
@@ -48,7 +48,7 @@ function validateHousing(input:unknown,confirmedYear:number):PersistedHousingHis
  return housing;
 }
 function validateCommon(input:unknown):asserts input is BaseSaveState{
- if(!isRecord(input))fail('保存データが不正');
+ if(!isRecord(input))throw Error('住宅保存形式: 保存データが不正');
  if(![2,3,4].includes(Number(input.version)))fail('未対応の保存バージョン');
  if(!integer(input.year)||!integer(input.seed)||
  !integer(input.rngState)||!Number.isSafeInteger(input.population)||
@@ -63,8 +63,8 @@ function confirmedYear(state:BaseSaveState):number{
  const observation=state.observation!;
  const y=observation.lastYear??observation.legacy?.year;
  if(!integer(y))fail('観測境界が不正');
- if(y>state.year)fail('観測年が現在年より未来');
- return y;
+ if(y===undefined||y>state.year)fail('観測年が現在年より未来');
+ return y as number;
 }
 /** 入力を変更せず新規v4状態を作る。旧住宅を逆算・補完しない。 */
 export function prepareHousingSave(raw:unknown):HousingSaveState{
