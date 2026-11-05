@@ -44,4 +44,5 @@ jobs:
           path: |
             artifacts/visual-a/*.png
             artifacts/history-b/*
+            artifacts/h1-housing/*
           if-no-files-found: warn
