@@ -42,30 +42,48 @@ export function proposeCivicConstruction(input:{
   return {status:'hold',reason:'no-capacity'};
  const style:CivicStyle=hash01(seed,14,0)<.5?'great-hall':'courtyard-hall';
  const width=style==='great-hall'?44:56,depth=style==='great-hall'?22:30;
- // 候補帯は固定の河畔敷地座標。地区スケールによって座標を動かさない。
- // 検証済みの地表ゲートがすべての候補を拒否したら建てない。
- const slots=[
-  [5,142],[65,140],[233,145],[5,107],[260,105],[65,105],
-  [204,98],[5,120],[75,150],[244,95],[20,90],[82,94],
- ] as const;
- const offset=Math.floor(hash01(seed,year,3)*slots.length);
+ // H4-D5: 左手前の「最初に空いていた固定区画」へ偏らないよう、
+ // 両岸の地表を走査し、履歴上のhall・住宅群との関係で合法候補を評価する。
+ // 画面内の見栄えだけで敷地を許可せず、必ずD4-Aの物理ゲートを通す。
  const id='civic-river-bank-'+year+'-'+style;
  const event:CivicConstructionRecord={id:recordId,year,kind:'building-built',buildingId:id};
- for(let n=0;n<slots.length;n++){
-  const [x,y]=slots[(n+offset)%slots.length]!;
-  if(x+width>320||y+depth>180)continue;
-  const candidate:CivicBuilding={
-   id,kind:'hall',x:x+Math.floor(width/2),y:y+depth-5,builtYear:year,
-   condition:'intact',recordId,civic:{
-    architectureStyle:style,footprint:{x,y,width,depth},constructionRecordId:recordId,
-   },
-  };
-  const result=reviewCivicConstruction({
-   siteIndex,year,candidate,buildings:site.buildings,
-   housingBlocks:inhabited.blocks,records:[event],
-  });
-  if(result.status==='clear')return {status:'built',candidate,event,
-   relatedIds:[now.recordId,earlier.recordId,hall.recordId].filter((id):id is string=>Boolean(id))};
+ const candidates:{candidate:CivicBuilding;score:number}[]=[];
+ const center=(x:number,y:number)=>({x,y});
+ const neighbors=inhabited.blocks.map(b=>center(
+  b.footprint.x+b.footprint.width/2,b.footprint.y+b.footprint.depth/2));
+ const d=(a:{x:number;y:number},b:{x:number;y:number})=>
+  Math.abs(a.x-b.x)+Math.abs(a.y-b.y);
+ for(const y of [112,124,136,148]){
+  for(const x of [6,22,38,54,70,86,102,208,224,240,256,272]){
+   if(x+width>320||y+depth>180)continue;
+   const candidate:CivicBuilding={
+    id,kind:'hall',x:x+Math.floor(width/2),y:y+depth-5,builtYear:year,
+    condition:'intact',recordId,civic:{
+     architectureStyle:style,footprint:{x,y,width,depth},constructionRecordId:recordId,
+    },
+   };
+   const gate=reviewCivicConstruction({
+    siteIndex,year,candidate,buildings:site.buildings,
+    housingBlocks:inhabited.blocks,records:[event],
+   });
+   if(gate.status!=='clear')continue;
+   const position=center(candidate.x,candidate.y);
+   const hallDistance=d(position,center(hall.x,hall.y));
+   const residenceDistance=neighbors.length
+    ?Math.min(...neighbors.map(n=>d(position,n))):80;
+   // 集会所への接続と住宅の近さを基本とし、手前へ出過ぎる場所には
+   // 弱いペナルティ。seedは同程度の候補の選択にだけ影響する。
+   const urbanFit=hallDistance*.25+residenceDistance*.45+
+    Math.max(0,y-132)*.65;
+   const tie=hash01(seed,year,Math.imul(x+1,131)+(y+1))*12;
+   candidates.push({candidate,score:urbanFit+tie});
+  }
  }
- return {status:'hold',reason:'no-safe-plot'};
+ candidates.sort((a,b)=>a.score-b.score||
+  a.candidate.civic.footprint.y-b.candidate.civic.footprint.y||
+  a.candidate.civic.footprint.x-b.candidate.civic.footprint.x);
+ const best=candidates[0]?.candidate;
+ if(!best)return {status:'hold',reason:'no-safe-plot'};
+ return {status:'built',candidate:best,event,
+  relatedIds:[now.recordId,earlier.recordId,hall.recordId].filter((id):id is string=>Boolean(id))};
 }
