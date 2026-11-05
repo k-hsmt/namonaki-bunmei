@@ -133,6 +133,7 @@ export function updateSettlements(
   local: readonly LocalConditions[],
   year: number,
   record: (event: SocialRecord) => string,
+  canBuild?: (siteIndex:number,candidate:Building)=>boolean,
 ): void {
   history.forEach((site, i) => {
     const { population, coverage, tradeYears, shortageYears, hazard, shortageId } = local[i]!;
@@ -206,6 +207,9 @@ export function updateSettlements(
           !view.buildings.some(b => b.id === `${settlements[i]!.id}-${j}`));
         if (plot >= 0) {
           const building = buildingAt(i, plot, year);
+          // H3: 建設候補が住宅敷地と衝突した場合は施設建設をHOLD。
+          // 次の候補地点への無断移設、既存街区の移動・削除はしない。
+          if (!canBuild || canBuild(i,building)) {
           building.recordId = record({
             title: `${siteNames[i]}に${kindNames[building.kind]}が造られる`,
             body: '暮らしの変化に合わせて、一つの区画に手が加えられた。',
@@ -214,6 +218,7 @@ export function updateSettlements(
           });
           view.buildings.push(building);
           site.lastWork = year;
+          }
         }
       }
     }

@@ -16,7 +16,7 @@ function inPolygon(x:number,y:number,polygon:readonly (readonly [number,number])
  }
  return inside;
 }
-function existingGround(o:SiteObject):HousingPlot{
+export function existingGround(o:SiteObject):HousingPlot{
  if(o.kind==='bridge')return {x:o.x-28,y:o.y-3,width:56,depth:7};
  if(o.kind==='field')return {x:o.x-13,y:o.y-8,width:26,depth:14};
  return {x:o.x-9,y:o.y-4,width:18,depth:7};
@@ -58,4 +58,14 @@ export function findHousingGroundConflicts(
   }
  }
  return conflicts;
+}
+
+/** H3: 後発施設の建設を確定する前に、住宅の既存敷地を確認する。
+ * 廃墟も敷地を占有し続ける。屋根の表示外接矩形は判定に使わない。
+ */
+export function facilityHousingConflicts(
+ candidate:SiteObject,blocks:readonly ResidentialBlock[],
+):readonly string[]{
+ const plot=existingGround(candidate);
+ return blocks.filter(b=>intersects(plot,b.footprint)).map(b=>b.blockId);
 }
