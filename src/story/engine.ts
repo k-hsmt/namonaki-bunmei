@@ -1,10 +1,13 @@
+import {housingAt} from './housing-history.js';
+import {proposeHousingConstruction} from './housing-progression.js';
+import {facilityHousingConflicts} from '../scene/housing-ground.js';
 import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, type ObservationLedger } from './observations.js';
 import { createRegionalEconomy, tradeYearsFor, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
 import { createSociety, practiceNames, updateSociety, type Society } from './society.js';
-import { createSettlementHistory, updateSettlements } from './settlement-history.js';
+import { createSettlementHistory, updateSettlements, siteAt } from './settlement-history.js';
 export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'森林の採集';
 export type Dimension = 'population'|'food'|'cohesion'|'knowledge'|'exchange'|'culture';
 export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; buildingId?:string; relatedIds?:string[]; important?:boolean; }
@@ -84,7 +87,34 @@ function finishYear(s:CivilizationState):void {
    hazard:hazard?.kind?{id:hazard.id,kind:hazard.kind}:undefined,
    shortageId:s.economy!.districts[i]!.shortageRecord??undefined};
  });
- updateSettlements(ledger.sites,s.society,local,s.year,record);
+ // 確定済み住宅の敷地を後発施設が無断占有しないためのゲート。
+ // 旧v2/v3には適用せず、既存セーブの再現結果を変更しない。
+ const canBuild=s.version===4&&s.housing
+  ?(siteIndex:number,candidate:import('./settlement-history.js').Building)=>{
+    const siteId=(['river-bank','hill-side','coast-inlet'] as const)[siteIndex];
+    if(!siteId)return false;
+    const existing=housingAt(s.housing!,s.year,siteId).blocks;
+    return facilityHousingConflicts(candidate,existing).length===0;
+   }
+  :undefined;
+ updateSettlements(ledger.sites,s.society,local,s.year,record,canBuild);
+ // 施設建設が確定した同一年の台帳を先に観測し、その後住宅候補を検査する。
+ // 丘陵・入り江は地形未検証につき建設をHOLD。
+ if(s.version===4&&s.housing){
+  const river=siteAt(ledger.sites,0,s.year);
+  const proposal=proposeHousingConstruction({
+   history:s.housing,year:s.year,seed:s.seed,siteIndex:0,
+   population:local[0]?.population??0,buildings:river?.buildings??[],
+  });
+  if(proposal.status==='built'){
+   const event=proposal.event;
+   const id=entry(s,'地域','河畔に住宅街区が築かれる',
+    'それまでの土地の使い方を残しつつ、住まいが新しく建てられた。',
+    ['住宅の必要性','確定済み施設と河川を避けた敷地'],true,
+    undefined,'housing-built',event.blockId);
+   s.housing={...s.housing,events:[...s.housing.events,{...event,causeRecordId:id}]};
+  }
+ }
  commitObservation(ledger,s.year);
  if(s.year%10===0)s.samples.push({year:s.year,population:s.population});
 }
