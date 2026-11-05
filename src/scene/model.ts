@@ -2,8 +2,9 @@ import {lastObservedYear,type CivilizationState} from '../story/engine.js';
 import {observationAt} from '../story/observations.js';
 import {scaleNames, siteAt} from '../story/settlement-history.js';
 import {siteNames} from '../story/society.js';
+import type {CivicFoundation} from '../story/civic-architecture.js';
 
-export interface SiteObject {id:string; kind:'house'|'hall'|'bridge'|'field'|'ruin'|'memorial'|'market'|'workshop'|'granary';x:number;y:number;builtYear:number;condition:'intact'|'damaged'|'ruined';}
+export interface SiteObject {id:string; kind:'house'|'hall'|'bridge'|'field'|'ruin'|'memorial'|'market'|'workshop'|'granary';x:number;y:number;builtYear:number;condition:'intact'|'damaged'|'ruined';civic?:CivicFoundation;}
 export type VisualLevel = 0 | 1 | 2 | 3;
 export interface VisualProfile {
  scale:VisualLevel; trend:'expanding'|'stable'|'contracting'|'reorganizing';
