@@ -1,9 +1,9 @@
 name: CI
 on:
   push:
-    branches: [main, feat/v06-scene-composition-b]
+    branches: [main]
   pull_request:
-    branches: [main, feat/v06-visual-enhancement-a, feat/v06-dependency-main-review]
+    branches: [main]
 
 permissions:
   contents: read
