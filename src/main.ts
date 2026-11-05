@@ -58,14 +58,14 @@ function label(v:number,good:string,bad:string){return v>=55?good:v>=30?'揺ら�
 function inspect(year:number,record?:RecordEntry){stop();viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
 function render(){
  const confirmedYear=lastObservedYear(state);
- const viewingPast=viewedYear!==null&&viewedYear<state.year;
+ const viewingPast=viewedYear!==null;
  const y=viewingPast?viewedYear!:confirmedYear;
  const legacy=state.observation?.legacy;
  const estimating=legacy!==null&&legacy!==undefined&&y<=legacy.year;
  const history=estimating?state.history.slice(0,legacy.historyCount):state.history;
  const confirmedRecords=history.filter(e=>e.year<=confirmedYear);
  const observedRecords=confirmedRecords.filter(e=>e.year<=y);
- if(!viewingPast||!observedRecords.includes(active))active=observedRecords.at(-1)??state.history[0]!;
+ if(viewedYear===null||!observedRecords.includes(active))active=observedRecords.at(-1)??state.history[0]!;
  const awaitingChoice=!viewingPast&&Boolean(state.pending);
  const historicalStats=viewingPast||awaitingChoice||estimating;
  const scene=snapshotAt(state,y);
@@ -84,6 +84,18 @@ function render(){
  el('story').textContent=!viewingPast&&state.pending?'この時代に暮らす人々には、それぞれ違う考えがある。どの選択にも、確かな未来は約束されていない。':active.body;
  el('event-number').textContent=`記録 ${String(state.history.indexOf(active)+1).padStart(2,'0')}`;
  el('causes').replaceChildren();if(viewingPast||!state.pending)for(const c of active.causes){const s=document.createElement('span');s.textContent=c;el('causes').append(s);}
+ if(viewingPast||!state.pending){
+  for(const id of active.relatedIds??[]){
+   const related=observedRecords.find(record=>record.id===id);
+   if(!related)continue;
+   const link=document.createElement('button');
+   link.type='button';
+   link.className='textbutton';
+   link.textContent=`${format(related.year)}年 · ${related.title}`;
+   link.onclick=()=>inspect(related.year,related);
+   el('causes').append(link);
+  }
+ }
  slot.hidden=viewingPast||!state.pending;
  el('step').toggleAttribute('disabled',Boolean(state.pending)&&!viewingPast);
  el('play').toggleAttribute('disabled',false);
