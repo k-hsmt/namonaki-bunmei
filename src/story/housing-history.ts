@@ -73,25 +73,56 @@ export function housingAt(history:HousingHistory|undefined,year:number,siteId?:H
   const b=event.after,old=current.get(event.blockId);
   checkBlock(b);
   if(event.blockId!==b.blockId)fail('街区ID不一致');
+  if(b.lastRenovatedYear!==undefined&&b.lastRenovatedYear>event.year)fail('修繕年がイベント確定年より未来');
   if(event.kind==='built'){
-   if(old||b.builtYear!==event.year||b.condition!=='sound')fail('重複建設または建設時状態が不正');
+   if(old||b.builtYear!==event.year||b.condition!=='sound'||b.use!=='occupied'||b.lastRenovatedYear!==undefined)fail('重複建設または建設時状態が不正');
    for(const other of current.values())if(other.siteId===b.siteId&&overlaps(other.footprint,b.footprint))fail('住宅敷地が重複');
   }else{
    if(!old)throw new Error('住宅街区履歴: 未建設街区の更新');
    if(old.siteId!==b.siteId||old.builtYear!==b.builtYear||
     !same(old.footprint,b.footprint)||old.styleId!==b.styleId||old.styleSeed!==b.styleSeed)fail('街区の不変属性が変更された');
-   if(event.kind==='expanded'){
-    if(b.housingCount<=old.housingCount||b.condition!==old.condition||b.use!==old.use)fail('増築が不正');
-   }else if(b.housingCount!==old.housingCount)fail('住戸数を無断で変更');
-   if(event.kind==='underused'&&!(old.use==='occupied'&&b.use==='underused'&&b.condition===old.condition))fail('低利用の遷移が不正');
-   if(event.kind==='vacated'&&!(old.use!=='vacant'&&b.use==='vacant'&&b.condition===old.condition))fail('空き家化の遷移が不正');
-   if(event.kind==='damaged'&&!(old.condition==='sound'&&b.condition==='damaged'&&b.use===old.use))fail('損傷の遷移が不正');
-   if(event.kind==='ruined'&&!(old.condition!=='ruined'&&b.condition==='ruined'&&b.use==='vacant'))fail('廃墟化の遷移が不正');
-   if(event.kind==='repaired'&&!(old.condition!=='sound'&&b.condition==='sound'&&
-    (old.condition!=='ruined'||b.use==='vacant')&&b.use===old.use))fail('修繕の遷移が不正');
-   if(event.kind==='reused'&&!(old.condition==='sound'&&old.use==='vacant'&&
-    b.condition==='sound'&&(b.use==='underused'||b.use==='occupied')))fail('再利用の遷移が不正');
-   if(!['expanded','underused','vacated','damaged','ruined','repaired','reused'].includes(event.kind))fail('未知のイベント種別');
+   // 変更可能な属性はイベント種類ごとに限定する。
+   // blockId/siteId/footprint/builtYear/styleId/styleSeed は上で不変性を検証済み。
+   const changedStock=b.housingCount!==old.housingCount;
+   const changedCondition=b.condition!==old.condition;
+   const changedUse=b.use!==old.use;
+   const changedRenovation=b.lastRenovatedYear!==old.lastRenovatedYear;
+   switch(event.kind){
+    case 'expanded':
+     if(!changedStock||b.housingCount<=old.housingCount||
+        changedCondition||changedUse||changedRenovation)fail('増築が不正');
+     break;
+    case 'underused':
+     if(changedStock||changedCondition||changedRenovation||
+        old.use!=='occupied'||b.use!=='underused')fail('低利用の遷移が不正');
+     break;
+    case 'vacated':
+     if(changedStock||changedCondition||changedRenovation||
+        old.use==='vacant'||b.use!=='vacant')fail('空き家化の遷移が不正');
+     break;
+    case 'damaged':
+     if(changedStock||changedUse||changedRenovation||
+        old.condition!=='sound'||b.condition!=='damaged')fail('損傷の遷移が不正');
+     break;
+    case 'ruined':
+     // H1では長期損傷の履歴を経た街区のみ、明示イベントで廃墟化する。
+     // 利用状態のvacantへの切替は同一イベントで原子的に確定する。
+     if(changedStock||changedRenovation||
+        old.condition!=='damaged'||b.condition!=='ruined'||b.use!=='vacant')fail('廃墟化の遷移が不正');
+     break;
+    case 'repaired':
+     if(changedStock||changedUse||
+        !['damaged','ruined'].includes(old.condition)||b.condition!=='sound'||
+        (old.condition==='ruined'&&b.use!=='vacant')||
+        b.lastRenovatedYear!==event.year)fail('修繕の遷移が不正');
+     break;
+    case 'reused':
+     if(changedStock||changedCondition||changedRenovation||
+        old.condition!=='sound'||old.use!=='vacant'||
+        !['underused','occupied'].includes(b.use))fail('再利用の遷移が不正');
+     break;
+    default: fail('未知のイベント種別');
+   }
   }
   current.set(b.blockId,{...b,footprint:{...b.footprint}});
  }
