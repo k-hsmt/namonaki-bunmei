@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCivilization,advance,clone} from '../dist/story/engine.js';
+import {createCivilization,advance,choose,clone} from '../dist/story/engine.js';
 import {snapshotAt,populationAt} from '../dist/scene/model.js';
-const progress=(seed,years)=>{const s=createCivilization(seed);while(s.year<years){if(s.pending){s.pending=null;}advance(s,1);}return s;};
+const progress=(seed,years)=>{const s=createCivilization(seed);while(s.year<years){advance(s,1);if(s.pending)choose(s,0);}return s;};
 test('past scene is immutable when later years are simulated',()=>{
- const s=progress(42,1100);const old=snapshotAt(s,500);const copy=clone(s);while(copy.year<1450){if(copy.pending)copy.pending=null;advance(copy,1);}
+ const s=progress(42,1100);const old=snapshotAt(s,500);const copy=clone(s);while(copy.year<1450){advance(copy,1);if(copy.pending)choose(copy,0);}
  assert.deepEqual(snapshotAt(copy,500),old);
 });
 test('past viewing never mutates the civilization',()=>{
