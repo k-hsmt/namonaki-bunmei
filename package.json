@@ -1,0 +1,17 @@
+{
+  "name": "namonaki-bunmei",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "文明を操作せず、世界の移ろいを眺める架空文明シミュレーター",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "dev": "npm run build && node scripts/serve.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "engines": {"node": ">=20"}
+}
