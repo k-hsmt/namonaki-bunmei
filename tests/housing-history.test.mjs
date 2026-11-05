@@ -39,6 +39,7 @@ test('住宅街区は過去時点のID・敷地・建設年が変わらない',(
 test('未記録の旧セーブと記録済みゼロは異なる',()=>{
  assert.equal(housingAt(undefined,10).status,'unknown');
  assert.equal(housingAt({introducedYear:300,legacyUntracked:true,events:[]},200).status,'unknown');
+ assert.equal(housingAt({introducedYear:300,legacyUntracked:true,events:[]},301).status,'partial');
  assert.deepEqual(housingAt({introducedYear:0,legacyUntracked:false,events:[]},200),{status:'known',blocks:[]});
 });
 test('廃墟化は利用状態も原子的にvacantへ変更する',()=>{
