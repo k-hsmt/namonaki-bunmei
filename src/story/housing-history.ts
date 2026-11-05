@@ -77,7 +77,7 @@ export function housingAt(history:HousingHistory|undefined,year:number,siteId?:H
    if(old||b.builtYear!==event.year)fail('重複建設');
    for(const other of current.values())if(other.siteId===b.siteId&&overlaps(other.footprint,b.footprint))fail('住宅敷地が重複');
   }else{
-   if(!old)fail('未建設街区の更新');
+   if(!old)throw new Error('住宅街区履歴: 未建設街区の更新');
    if(old.siteId!==b.siteId||old.builtYear!==b.builtYear||
     !same(old.footprint,b.footprint)||old.styleId!==b.styleId||old.styleSeed!==b.styleSeed)fail('街区の不変属性が変更された');
    if(event.kind==='expanded'){
