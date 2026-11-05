@@ -75,3 +75,21 @@ test('既存v3の自然進行は住宅のゲートを有効化せず、従来と
  assert.deepEqual(original,clone);
  assert.equal(original.housing,undefined);
 });
+
+
+test('施設建設HOLDでも同年の共同体変更を履歴へ確定する',async()=>{
+ const {createSettlementHistory,updateSettlements,siteAt}=await import('../dist/story/settlement-history.js');
+ const {createSociety}=await import('../dist/story/society.js');
+ const ledger=createSettlementHistory([2000,0,0,0],0),society=createSociety();
+ society.sites[0].communityId='review-community';
+ const population=[2000,0,0].map(n=>({
+  population:n,coverage:1,tradeYears:10,shortageYears:0,
+ }));
+ let attempts=0;
+ updateSettlements(ledger,society,population,8,()=> 'record-id',
+  (i,building)=>{if(i===0){attempts++;return false;}return true;});
+ assert.ok(attempts>=1);
+ const snapshot=siteAt(ledger,0,8);
+ assert.equal(snapshot.communityId,'review-community');
+ assert.equal(snapshot.buildings.length,1,'HOLDした施設を建てない');
+});
