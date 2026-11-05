@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches: [main, feat/v06-scene-composition-b]
   pull_request:
     branches: [main, feat/v06-visual-enhancement-a]
 
@@ -44,4 +44,5 @@ jobs:
           path: |
             artifacts/visual-a/*.png
             artifacts/history-b/*
+            artifacts/h1-housing/*
           if-no-files-found: warn

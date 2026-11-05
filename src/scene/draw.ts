@@ -1,3 +1,4 @@
+import type {HousingHistory} from '../story/housing-history.js';
 import type {SiteSnapshot,SiteObject,VisualProfile} from './model.js';
 import {composeScene,type SceneComposition} from './composition.js';
 const W=320,H=180;
@@ -129,7 +130,36 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
   for(let i=0;i<3;i++)rect(c,211+i*6,145,3,3,'#91785b');
  }
 }
-export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):void {
+/** H1: 履歴由来の住宅部品だけを描画する。屋根部品は独立施設ではない。 */
+function drawResidentialRoofs(c:C,scene:SceneComposition,depth:'far'|'middle'|'near'):void {
+ const roofs=scene.residentialBlocks.flatMap(b=>b.roofParts)
+  .filter(p=>p.depth===depth).sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId));
+ for(const p of roofs){
+  const width=depth==='far'?5:depth==='middle'?9:13;
+  const height=depth==='far'?4:depth==='middle'?7:10;
+  const x=p.x,y=p.y;
+  if(p.condition==='ruined'){
+   rect(c,x-width/2,y-2,width,2,'#857a66');
+   rect(c,x-width/2,y-height+2,2,height-3,'#8b8677');
+   rect(c,x+width/2-2,y-height+3,2,height-4,'#827a68');
+   continue;
+  }
+  const wall=p.use==='vacant'?'#8b8e7d':p.condition==='damaged'?'#a29a80':'#b3a286';
+  const roof=p.styleId==='terraced'?'#777e79':p.styleId==='courtyard'?'#9d7665':'#836657';
+  rect(c,x-width/2,y-height+2,width,height-2,wall);
+  if(p.styleId==='terraced'){
+   rect(c,x-width/2-1,y-height,width+2,3,roof);
+   rect(c,x-width/2,y-height-2,Math.max(3,width-2),2,'#a39c89');
+  }else{
+   poly(c,[x-width/2-1,y-height+2,x,y-height-3-(p.variant%2),x+width/2+1,y-height+2],roof);
+  }
+  if(depth!=='far'){
+   rect(c,x-width/2+2,y-3,2,2,p.use==='vacant'?'#555a54':'#665849');
+   if(p.condition==='damaged')rect(c,x-width/2,y-height+3,3,2,'#4d504b');
+  }
+ }
+}
+export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,housing?:HousingHistory):void {
  const c=canvas.getContext('2d');if(!c)return;canvas.width=W;canvas.height=H;c.imageSmoothingEnabled=false;
  const index=s.local?.index??0;
  const population=s.local?.population??s.population;
@@ -157,9 +187,11 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):v
  // Landmark tree remains recognizable, even after many generations.
  tree(c,28,104,2);tree(c,294,102,1);tree(c,310,124,1);for(let i=0;i<9;i++){const x=11+(i*33)%310,y=104+(i%3)*6;if(x>125&&x<180)continue;tree(c,x,y,i%4===0?0.8:0.55);}reeds(c,120,138);reeds(c,200,154);reeds(c,175,129);
  for(let i=0;i<7;i++){const x=8+Math.floor(random()*100),y=120+Math.floor(random()*30);rect(c,x,y,9,3,dry?'#a69a65':'#667d54');}
- const composition=composeScene(s);
+ const composition=composeScene(s,housing);
  if(s.visual){builtGround(c,s.visual,index);neighborhood(c,s.objects,s.visual,index);}
  drawHistorySurface(c,composition);
+ drawResidentialRoofs(c,composition,'far');
+ drawResidentialRoofs(c,composition,'middle');
  const stone=!s.local&&(s.objects.filter(o=>o.kind==='memorial').length>2 || population>47000);
  for(const o of s.objects){
   if(o.kind==='bridge')continue;
@@ -180,6 +212,7 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):v
   }
   if(o.condition==='damaged')rect(c,o.x-10,o.y-2,8,3,P.dark);
  }
+ drawResidentialRoofs(c,composition,'near');
  if(s.objects.some(o=>o.kind==='bridge'&&o.condition==='intact')){rect(c,120,141,51,4,'#8a755b');for(let j=0;j<5;j++)rect(c,124+j*10,139,2,6,P.wood);}
  if(s.objects.some(o=>o.kind==='bridge'&&o.condition!=='intact')){rect(c,119,143,17,3,P.wood);rect(c,156,144,13,3,P.wood);}
  if(!s.local&&population>12500&&!flood)boat(c,145,143);if(!s.local&&population>24000){rect(c,20,126,36,2,'#8d7b5e');for(let i=0;i<5;i++)rect(c,21+i*7,125,3,3,'#b7a070');}const count=population===0?0:epidemic?1:Math.min(9,Math.max(1,2+Math.floor(Math.log2(Math.max(1,population)/1800))));
