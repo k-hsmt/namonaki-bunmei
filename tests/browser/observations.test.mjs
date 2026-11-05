@@ -108,3 +108,21 @@ test('migrated pending choice preserves the estimated scene at the migration bou
   assert.match(await page.locator('#scene-year').textContent(), /推定情景/);
   assert.equal(await canvas.evaluate(element => element.toDataURL()), image);
 });
+
+test('a regional event opens its linked cause in the year it was recorded', async t => {
+  const state = createCivilization(7);
+  while (state.year < 2000 && !state.history.at(-1).relatedIds?.length) {
+    step(state);
+    if (state.pending) chooseAutomatically(state);
+  }
+  const event = state.history.at(-1);
+  const cause = state.history.find(record => record.id === event.relatedIds?.[0]);
+  assert.ok(cause);
+  const page = await openSave(t, saveKey, state);
+  assert.equal(await page.locator('#headline').textContent(), event.title);
+  await page.locator('#causes').getByRole('button', { name: new RegExp(cause.title) }).click();
+  assert.equal(await page.locator('#headline').textContent(), cause.title);
+  assert.equal(await page.locator('#scene-year').textContent(), `世界暦 ${format.format(cause.year)}年`);
+  await page.locator('#return-now').click();
+  assert.equal(await page.locator('#headline').textContent(), event.title);
+});

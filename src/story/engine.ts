@@ -1,21 +1,26 @@
-import { SeededRng } from '../engine/rng.js';
-import { changePopulation, initialPopulation, populationTotal } from './population.js';
+import { hash01, SeededRng } from '../engine/rng.js';
+import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, type ObservationLedger } from './observations.js';
+import { createRegionalEconomy, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
 export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'森林の採集';
 export type Dimension = 'population'|'food'|'cohesion'|'knowledge'|'exchange'|'culture';
-export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; important?:boolean; }
+export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; relatedIds?:string[]; important?:boolean; }
 export interface Choice { label:string; description:string; impacts:Partial<Record<Dimension,number>>; consequence:string; }
 export interface Decision { id:string; year:number; question:string; context:string; options:Choice[]; }
 export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'council'|'care'|'migration'|'fracture';
 export interface Legacy {kind:LegacyKind; established:number; strength:number; lastChanged:number; origin:string;}
 export type MemoryLog = {year:number;kind:LegacyKind;action:'formed'|'strengthened'|'weakened'|'lost';reason:string;strength:number;established:number};
 export interface CivilizationMemory {legacies:Partial<Record<LegacyKind,Legacy>>;log:MemoryLog[];}
-export interface CivilizationState { version:2|3; observation?:ObservationLedger; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
+export interface CivilizationState { version:2|3; observation?:ObservationLedger; economy?:RegionalEconomy; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
 const clamp=(v:number,a:number,b:number)=>Math.min(b,Math.max(a,v));
 const names=['アムラ','セイラ','ルグナ','オルフェ','サリュ','ナヴァ','イリス','ヘルメ','トルア','ヴェリ','ミルハ','シルダ'];
 const places=['碧い大河の流域','石灰岩の高原','霧深い湾岸','北方の針葉樹林','季節風の吹く丘陵','内海に面した湿地','二つの山脈の谷間','乾燥した草原の縁'];
 const traits:Trait[]=['川沿いの農耕','高原の放牧','沿岸の漁撈','森林の採集'];
-function entry(s:CivilizationState,tag:string,title:string,body:string,causes:string[]=[],important=false){s.history.push({id:`${s.year}-${s.history.length}`,year:s.year,tag,title,body,causes,important});}
+function entry(s:CivilizationState,tag:string,title:string,body:string,causes:string[]=[],important=false,relatedIds?:string[],kind?:string):string {
+ const id=`${s.year}-${s.history.length}`;
+ s.history.push({id,year:s.year,tag,title,body,causes,important,...(relatedIds?.length?{relatedIds}:{}),...(kind?{kind}:{})});
+ return id;
+}
 export function createCivilization(seed:number):CivilizationState {
  const n=(seed>>>0)||1; const r=new SeededRng(n); const homeland=places[r.int(0,places.length-1)]!; const trait=traits[r.int(0,traits.length-1)]!;
  const s:CivilizationState={version:2,seed:n,rngState:r.state,year:0,name:names[r.int(0,names.length-1)]!+'の民',homeland,trait,population:r.int(1800,7000),food:r.int(50,76),cohesion:r.int(52,74),knowledge:r.int(5,16),exchange:r.int(9,29),culture:r.int(25,52),drought:0,epidemic:0,lastKind:{},history:[],pending:null,decisions:[],samples:[],lastDecisionId:-1,memory:{legacies:{},log:[]}};
@@ -44,6 +49,16 @@ function setPopulation(s:CivilizationState,next:number):void {
 function finishYear(s:CivilizationState):void {
  const ledger=s.observation!;
  if(s.year===ledger.legacy?.year)return; // A choice already pending in the old save.
+ const floodYear=s.lastKind.flood??-Infinity;
+ const flood=s.year-floodYear<3?s.history.find(event=>event.year===floodYear&&event.kind==='flood'):undefined;
+ const harvestFactors=regions.map((_,i)=>{
+  const weather=hash01(s.year,i,s.seed);
+  return Math.max(.30,.77+weather*.48-Math.min(s.drought,.5)*.2);
+ });
+ s.economy??=createRegionalEconomy();
+ updateRegionalEconomy(s.economy,ledger.people,s.year,{
+  harvestFactors,blockedRegions:new Set(flood?['river']:[]),disruptionId:flood?.id,
+ },event=>entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds),ledger.legacy?.year);
  commitObservation(ledger,s.year);
  if(s.year%10===0)s.samples.push({year:s.year,population:s.population});
 }
@@ -244,7 +259,7 @@ export function step(s:CivilizationState){migrateCivilization(s);if(s.pending)re
    if(['famine','drought','flood'].includes(selected.kind))s.food=clamp(s.food+(beforeFood-s.food)*reserve*.35,0,100);
    if(['disease','famine'].includes(selected.kind))setPopulation(s,Math.round(s.population+(beforePopulation-s.population)*(selected.kind==='disease'?care*.40:reserve*.18)));
    if(['trade','arrival'].includes(selected.kind)&&trade>.35)bump(s,'culture',2);
-   s.lastKind[selected.kind]=s.year;entry(s,selected.tag,title,body,causes,selected.important);
+   s.lastKind[selected.kind]=s.year;entry(s,selected.tag,title,body,causes,selected.important,undefined,selected.kind);
    recordLegacy(s,selected.kind,title);
   }
  }
