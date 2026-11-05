@@ -32,6 +32,15 @@ test('fixed-observation visual comparison: four sizes and historical contraction
     {id:'workshop-2',kind:'workshop',x:210,y:141,builtYear:1100,condition:'intact'}
    ];
    const versions=[];
+   // Density must change pixels independently of roads, squares and building count.
+   const densityFrames=[];
+   const densityObjects=original.slice(0,7);
+   for(const densityLevel of [1,2,3]){
+    const visual={...visualProfile(2,'stable',true,densityObjects),densityLevel};
+    drawScene(canvas,{year:800,population:1500,phase:'fixture',atmosphere:'test',sceneEvent:null,objects:densityObjects,eventYear:null,scars:[],local:{index:0,population:1500},visual},42);
+    densityFrames.push(canvas.toDataURL());
+   }
+   if(new Set(densityFrames).size!==3)throw Error('density does not independently affect landscape');
    // The same recorded house must retain its silhouette across settlement changes.
    const roofFrames=[];
    for(let level=0;level<=3;level++){
