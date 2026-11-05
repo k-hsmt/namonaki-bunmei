@@ -105,7 +105,8 @@ test('H4-D4-A: v4保存往復・不正な新築出典/様式/敷地の拒否、�
  while(s.year<10){step(s);if(s.pending)chooseAutomatically(s);}
  const beforeSnapshot=snapshotAt(s,9,0);
  const serializedOld=serializeHousingSave(s);
- assert.deepEqual(parseHousingSave(serializedOld),s);
+ const preCivicSave=parseHousingSave(serializedOld);
+ assert.deepEqual(preCivicSave,s);
  const a=build();
  const builtRecord={...record(),tag:'地域',title:'共同の会堂が築かれる',
   body:'暮らしの中で使われ続ける場',causes:['共同維持の記録']};
@@ -135,5 +136,6 @@ test('H4-D4-A: v4保存往復・不正な新築出典/様式/敷地の拒否、�
  corrupt(x=>current(x).civic.footprint.x+=1);
  corrupt(x=>{x.history=x.history.filter(e=>e.id!==a.civic.constructionRecordId);});
  corrupt(x=>{target(x).builtYear=9;});
- assert.deepEqual(parseHousingSave(serializedOld),json(createHousingCivilization(42))===null?null:parseHousingSave(serializedOld));
+ assert.deepEqual(parseHousingSave(serializedOld),preCivicSave,
+  '新フィールドを持たない旧v4保存は補完・改変しない');
 });
