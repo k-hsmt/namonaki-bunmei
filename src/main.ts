@@ -81,7 +81,9 @@ function render(){
   el('site-residents').textContent=site.inhabited?`${population} · ${affiliation}`:population;
   el('site-practices').textContent=site.practices.map(p=>`${practiceNames[p.kind]}${p.active?'':'（途絶）'}`).join(' · ');
  }
- drawScene(canvas,scene,state.seed);
+ // H2-C: 同じ観測年・地点の確定住宅履歴だけを描画へ投影する。
+ // unknown / partial は建設履歴を推測で補完しない（H1のhousingAtに委譲）。
+ drawScene(canvas,scene,state.seed,state.housing);
  el('scene-year').textContent=`世界暦 ${format(y)}年${!scene.local?' · 推定情景':''}`;
  el('scene-phase').textContent=scene.phase;
  el('scene-atmosphere').textContent=scene.atmosphere;
