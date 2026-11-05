@@ -1,4 +1,5 @@
 import type {SiteSnapshot,SiteObject,VisualProfile} from './model.js';
+import {composeScene,type SceneComposition} from './composition.js';
 const W=320,H=180;
 type C=CanvasRenderingContext2D;
 const P={sky:'#b3c2b4',skyBottom:'#dfd3b1',far:'#8b9c85',hill:'#73896e',ground:'#9a9a70',front:'#76805b',bank:'#9d926c',river:'#658f92',riverLight:'#a0b5a1',wood:'#70594b',roof:'#8c6655',stone:'#aaa18a',bright:'#e6d6b2',dark:'#454e48',grass:'#5d7954'};
@@ -100,6 +101,34 @@ function neighborhood(c:C,buildings:readonly SiteObject[],profile:VisualProfile,
   }
  }
 }
+/** Visible use of land is derived from the buildings that actually existed at the observed year.
+ * It adds no extra structures, and an overgrown plot retains its original anchor.
+ */
+function drawHistorySurface(c:C,scene:SceneComposition):void {
+ const index=scene.siteIndex;
+ for(const lot of scene.blocks){
+  const {x,y,treatment}=lot;
+  // Avoid water and retained shoreline landmarks in the river observation.
+  if(index===0&&(x>120&&x<205))continue;
+  if(treatment==='overgrown'){
+   rect(c,x-12,y+3,25,2,'#71865c');
+   for(let i=0;i<5;i++)rect(c,x-9+i*5,y-1+(i%2),2,4,'#6b855d');
+  }else if(treatment==='paving'){
+   rect(c,x-14,y+3,29,3,'#c0af8f');
+   for(let i=0;i<5;i++)rect(c,x-12+i*6,y+4,3,1,'#8d8870');
+  }else if(treatment==='courtyard'){
+   rect(c,x-12,y+3,25,2,'#b9ab8a');
+   rect(c,x-8,y+5,17,2,'#b9ab8a');
+  }else{
+   rect(c,x-8,y+3,17,1,'#b5a17d');
+  }
+ }
+ // River work is only shown when historical trade structures exist.
+ if(index===0&&scene.riverUse==='working'){
+  rect(c,207,148,21,2,'#ae9d7c');
+  for(let i=0;i<3;i++)rect(c,211+i*6,145,3,3,'#91785b');
+ }
+}
 export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):void {
  const c=canvas.getContext('2d');if(!c)return;canvas.width=W;canvas.height=H;c.imageSmoothingEnabled=false;
  const index=s.local?.index??0;
@@ -128,7 +157,9 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number):v
  // Landmark tree remains recognizable, even after many generations.
  tree(c,28,104,2);tree(c,294,102,1);tree(c,310,124,1);for(let i=0;i<9;i++){const x=11+(i*33)%310,y=104+(i%3)*6;if(x>125&&x<180)continue;tree(c,x,y,i%4===0?0.8:0.55);}reeds(c,120,138);reeds(c,200,154);reeds(c,175,129);
  for(let i=0;i<7;i++){const x=8+Math.floor(random()*100),y=120+Math.floor(random()*30);rect(c,x,y,9,3,dry?'#a69a65':'#667d54');}
+ const composition=composeScene(s);
  if(s.visual){builtGround(c,s.visual,index);neighborhood(c,s.objects,s.visual,index);}
+ drawHistorySurface(c,composition);
  const stone=!s.local&&(s.objects.filter(o=>o.kind==='memorial').length>2 || population>47000);
  for(const o of s.objects){
   if(o.kind==='bridge')continue;
