@@ -34,9 +34,12 @@ function validateHousing(input:unknown,confirmedYear:number):PersistedHousingHis
   if(!integer(raw.year)||!integer(raw.seq)||typeof raw.blockId!=='string'||
    typeof raw.kind!=='string'||!isRecord(raw.after)||Number(raw.year)>confirmedYear)fail('イベント確定年・形式が不正');
   if(raw.causeRecordId!==undefined&&typeof raw.causeRecordId!=='string')fail('原因記録IDが不正');
-  keysOnly(raw.after,['blockId','siteId','footprint','builtYear','housingCount','condition','use','styleId','styleSeed','lastRenovatedYear']);
-  if(!isRecord(raw.after.footprint))fail('敷地が不正');
-  keysOnly(raw.after.footprint,['x','y','width','depth']);
+  const after=raw.after;
+  if(!isRecord(after))throw Error('住宅保存形式: 変更後状態が不正');
+  keysOnly(after,['blockId','siteId','footprint','builtYear','housingCount','condition','use','styleId','styleSeed','lastRenovatedYear']);
+  const footprint=after.footprint;
+  if(!isRecord(footprint))throw Error('住宅保存形式: 敷地が不正');
+  keysOnly(footprint,['x','y','width','depth']);
   events.push(raw as unknown as ResidentialBlockEvent);
  }
  const housing:PersistedHousingHistory={
