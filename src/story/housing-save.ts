@@ -8,6 +8,7 @@ import {housingAt,type HousingHistory,type ResidentialBlockEvent} from './housin
 export interface PersistedHousingHistory extends HousingHistory {
  readonly schemaVersion:1;
 }
+type BaseSaveState = Omit<CivilizationState,'version'> & {version:2|3|4};
 export type HousingSaveState = Omit<CivilizationState,'version'> & {
  version:4;
  housing:PersistedHousingHistory;
@@ -46,7 +47,7 @@ function validateHousing(input:unknown,confirmedYear:number):PersistedHousingHis
  housingAt(housing,Math.max(confirmedYear,introducedYear));
  return housing;
 }
-function validateCommon(input:unknown):asserts input is CivilizationState{
+function validateCommon(input:unknown):asserts input is BaseSaveState{
  if(!isRecord(input))fail('保存データが不正');
  if(![2,3,4].includes(Number(input.version)))fail('未対応の保存バージョン');
  if(!integer(input.year)||!integer(input.seed)||
@@ -57,7 +58,7 @@ function validateCommon(input:unknown):asserts input is CivilizationState{
  if((input.version===3||input.version===4)&&!isRecord(input.observation))fail('観測台帳が欠損');
 }
 /** 旧セーブの最後の確定年。既存の未確定年／旧境界を遡及変更しない。 */
-function confirmedYear(state:CivilizationState):number{
+function confirmedYear(state:BaseSaveState):number{
  if(state.version===2)return state.year; // v2の既存移行はその年をlegacy境界として扱う
  const observation=state.observation!;
  const y=observation.lastYear??observation.legacy?.year;
@@ -68,10 +69,10 @@ function confirmedYear(state:CivilizationState):number{
 /** 入力を変更せず新規v4状態を作る。旧住宅を逆算・補完しない。 */
 export function prepareHousingSave(raw:unknown):HousingSaveState{
  validateCommon(raw);
- const copy=structuredClone(raw);
+ const copy=structuredClone(raw) as BaseSaveState;
  if(copy.version===4){
   const current=copy as unknown as HousingSaveState;
-  const confirmed=confirmedYear(current as unknown as CivilizationState);
+  const confirmed=confirmedYear(current);
   current.housing=validateHousing(current.housing,confirmed);
   if(!current.housing.legacyUntracked&&current.housing.introducedYear!==0)fail('新規完全記録の導入年が0以外');
   return current;
@@ -90,6 +91,6 @@ export function prepareHousingSave(raw:unknown):HousingSaveState{
 /** H2-Bが使う保存前検証。任意の住宅記録を黙って生成しない。 */
 export function validateHousingSave(raw:unknown):HousingSaveState{
  validateCommon(raw);
- if((raw as CivilizationState).version!==4)fail('v4保存データが必要');
+ if(raw.version!==4)fail('v4保存データが必要');
  return prepareHousingSave(raw);
 }
