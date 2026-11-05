@@ -38,7 +38,7 @@ export interface HousingHistory {
  readonly events:readonly ResidentialBlockEvent[];
 }
 export interface HousingView {
- readonly status:'unknown'|'known';
+ readonly status:'unknown'|'partial'|'known';
  readonly blocks:readonly ResidentialBlock[];
 }
 const fail=(message:string):never=>{throw new Error('住宅街区履歴: '+message);};
@@ -74,7 +74,7 @@ export function housingAt(history:HousingHistory|undefined,year:number,siteId?:H
   checkBlock(b);
   if(event.blockId!==b.blockId)fail('街区ID不一致');
   if(event.kind==='built'){
-   if(old||b.builtYear!==event.year)fail('重複建設');
+   if(old||b.builtYear!==event.year||b.condition!=='sound')fail('重複建設または建設時状態が不正');
    for(const other of current.values())if(other.siteId===b.siteId&&overlaps(other.footprint,b.footprint))fail('住宅敷地が重複');
   }else{
    if(!old)throw new Error('住宅街区履歴: 未建設街区の更新');
@@ -95,5 +95,5 @@ export function housingAt(history:HousingHistory|undefined,year:number,siteId?:H
   }
   current.set(b.blockId,{...b,footprint:{...b.footprint}});
  }
- return {status:'known',blocks:[...current.values()].filter(b=>!siteId||b.siteId===siteId).sort((a,b)=>a.blockId.localeCompare(b.blockId))};
+ return {status:history.legacyUntracked?'partial':'known',blocks:[...current.values()].filter(b=>!siteId||b.siteId===siteId).sort((a,b)=>a.blockId.localeCompare(b.blockId))};
 }
