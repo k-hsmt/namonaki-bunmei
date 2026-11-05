@@ -55,10 +55,8 @@ test('H4-D4-B: 寄り合いの継続・実在hall・余力が必要、単なる�
 });
 test('H4-D4-B: 全候補の敷地が占有済みなら建設しない、既存台帳も不変',()=>{
  const h=make(),before=structuredClone(h);
- const allPlots=[
-  [5,142],[65,140],[233,145],[5,107],[260,105],[65,105],
-  [204,98],[5,120],[75,150],[244,95],[20,90],[82,94],
- ];
+ const allPlots=[112,124,136,148].flatMap(y=>
+  [6,22,38,54,70,86,102,208,224,240,256,272].map(x=>[x,y]));
  const events=allPlots.map(([x,y],i)=>({
   year:40,seq:i,kind:'built',
   blockId:'crowded-'+i,after:{
