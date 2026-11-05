@@ -7,9 +7,10 @@ import {hash01} from '../engine/rng.js';
 import type {HousingHistory} from './housing-history.js';
 import {housingAt} from './housing-history.js';
 import type {SettlementHistory} from './settlement-history.js';
-import {siteAt} from './settlement-history.js';
+import {siteAt,fixedFacilityLotReservations} from './settlement-history.js';
 import type {CivicBuilding,CivicConstructionRecord,CivicStyle} from './civic-architecture.js';
 import {reviewCivicConstruction} from './civic-architecture.js';
+import {existingGround} from '../scene/housing-ground.js';
 
 export type CivicProposal=
  | {readonly status:'built';readonly candidate:CivicBuilding;readonly event:CivicConstructionRecord;
@@ -48,6 +49,13 @@ export function proposeCivicConstruction(input:{
  const id='civic-river-bank-'+year+'-'+style;
  const event:CivicConstructionRecord={id:recordId,year,kind:'building-built',buildingId:id};
  const candidates:{candidate:CivicBuilding;score:number}[]=[];
+ // 固定区画方式の将来の使用箇所を、物理的な予約地として保護する。
+ // ここにはまだ建物がない場合もある。確定施設として描画・保存はしない。
+ const reserved=fixedFacilityLotReservations(siteIndex).map(lot=>
+  existingGround({...lot,builtYear:0,condition:'intact'}));
+ const overlaps=(a:{x:number;y:number;width:number;depth:number},
+  b:{x:number;y:number;width:number;depth:number})=>
+  a.x<b.x+b.width&&b.x<a.x+a.width&&a.y<b.y+b.depth&&b.y<a.y+a.depth;
  const center=(x:number,y:number)=>({x,y});
  const neighbors=inhabited.blocks.map(b=>center(
   b.footprint.x+b.footprint.width/2,b.footprint.y+b.footprint.depth/2));
@@ -62,6 +70,7 @@ export function proposeCivicConstruction(input:{
      architectureStyle:style,footprint:{x,y,width,depth},constructionRecordId:recordId,
     },
    };
+   if(reserved.some(plot=>overlaps(candidate.civic.footprint,plot)))continue;
    const gate=reviewCivicConstruction({
     siteIndex,year,candidate,buildings:site.buildings,
     housingBlocks:inhabited.blocks,records:[event],
