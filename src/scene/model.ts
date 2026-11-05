@@ -4,7 +4,13 @@ import {scaleNames, siteAt} from '../story/settlement-history.js';
 import {siteNames} from '../story/society.js';
 
 export interface SiteObject {id:string; kind:'house'|'hall'|'bridge'|'field'|'ruin'|'memorial'|'market'|'workshop'|'granary';x:number;y:number;builtYear:number;condition:'intact'|'damaged'|'ruined';}
-export interface SiteSnapshot {year:number; population:number; phase:string; atmosphere:string; sceneEvent:string|null; objects:SiteObject[]; eventYear:number|null; scars:string[]; local?:{index:number;population:number};}
+export type VisualLevel = 0 | 1 | 2 | 3;
+export interface VisualProfile {
+ scale:VisualLevel; trend:'expanding'|'stable'|'contracting'|'reorganizing';
+ roadLevel:VisualLevel; squareLevel:VisualLevel; riversideLevel:VisualLevel;
+ activityLevel:VisualLevel; densityLevel:VisualLevel; heightLevel:VisualLevel;
+}
+export interface SiteSnapshot {year:number; population:number; phase:string; atmosphere:string; sceneEvent:string|null; objects:SiteObject[]; eventYear:number|null; scars:string[]; local?:{index:number;population:number}; visual?:VisualProfile;}
 const lots=[{x:55,y:113},{x:86,y:100},{x:116,y:109},{x:159,y:98},{x:201,y:107},{x:231,y:93},{x:271,y:105},{x:96,y:129},{x:179,y:123},{x:257,y:131}];
 const mix=(seed:number,i:number)=>{let x=(seed ^ Math.imul(i+1,0x9e3779b9))>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;return x>>>0;};
 export function populationAt(s:CivilizationState,year:number):number {
@@ -25,6 +31,24 @@ export function populationAt(s:CivilizationState,year:number):number {
  const last=samples.at(-1);
  if(last&&endYear>last.year){const t=(year-last.year)/(endYear-last.year);return Math.round(last.population+(endPopulation-last.population)*t);}
  return endPopulation;
+}
+/** Pure presentation metadata: never updates the settlement ledger or the RNG. */
+export function visualProfile(scale:number, trend:VisualProfile['trend'], inhabited:boolean, buildings:readonly SiteObject[]):VisualProfile {
+ const level=Math.max(0,Math.min(3,Math.trunc(scale))) as VisualLevel;
+ // A deserted settlement keeps its physical landscape and documented buildings.
+ // Scale changes presentation only; building IDs, kinds and conditions remain authoritative.
+ const living=inhabited?level:0;
+ const usable=buildings.filter(b=>b.condition!=='ruined');
+ const working=usable.length>0;
+ return {
+  scale:level,trend,
+  roadLevel:working?living:0,
+  squareLevel:working?living:0,
+  riversideLevel:working?living:0,
+  activityLevel:inhabited?living:0,
+  densityLevel:living,
+  heightLevel:living,
+ };
 }
 export function snapshotAt(s:CivilizationState,year:number,siteIndex=0):SiteSnapshot {
  if(!Number.isInteger(year)||year<0||year>lastObservedYear(s))throw Error('観測年が不正です');
@@ -82,11 +106,16 @@ export function snapshotAt(s:CivilizationState,year:number,siteIndex=0):SiteSnap
  const town=past.some(e=>e.title==='村々の中心に大きな町が生まれる');const broken=past.some(e=>e.title==='長く続いた共同の決まりが解かれる');const phase=pop<7000?'小さな集落':broken&&pop<25000?'離れてゆく村々':town&&pop>23000?'河畔の町':pop<25000?'川辺の村':'広がる集落';
  const atmosphere=scars.includes('epidemic')?'人通りが少ない':scars.includes('flood')?'水が増している':scars.includes('drought')?'乾いた季節':scars.includes('festival')?'人々の集まり':scars.includes('fire')?'焼け跡の残る土地':'日々の暮らし';
  const summary={year,population:pop,phase,atmosphere,sceneEvent:lead?.title??null,objects,eventYear:lead?.year??null,scars};
- if(!site)return summary;
+ if(!site){
+  // Pre-ledger saves retain their pre-existing inferred scene without inventing facilities.
+  const level=pop<7000?0:pop<25000?1:pop<48000?2:3;
+  return {...summary,visual:visualProfile(level,'stable',pop>0,objects)};
+ }
  const local=observationAt(s.observation!,year)!.residents[siteIndex]!.population;
  const trends={stable:'日々の暮らし',expanding:'建設と往来が続く',contracting:'暮らしが縮みつつある',reorganizing:'暮らしの決まりが変わりつつある'};
  return {...summary,local:{index:siteIndex,population:local},
   phase:`${siteNames[siteIndex]} · ${site.inhabited?scaleNames[site.scale]:'無人の土地'}`,
   atmosphere:site.inhabited?trends[site.trend]:'人のいない風景',
-  objects:site.buildings.map(building=>({...building}))};
+  objects:site.buildings.map(building=>({...building})),
+  visual:visualProfile(site.scale,site.trend,site.inhabited,site.buildings)};
 }

@@ -22,3 +22,24 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm test
+
+  visual-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-a-comparison
+          path: artifacts/visual-a/*.png
+          if-no-files-found: warn
