@@ -69,3 +69,24 @@ export function facilityHousingConflicts(
  const plot=existingGround(candidate);
  return blocks.filter(b=>intersects(plot,b.footprint)).map(b=>b.blockId);
 }
+
+/** H4-D2: 絵として敷地外に地面の連続色を置く場合の保守的な安全判定。
+ * 道路建設イベントを表すものではない。既存地表・河川・施設を避ける。
+ */
+export function isUnoccupiedGround(
+ strip:HousingPlot,blocks:readonly ResidentialBlock[],buildings:readonly SiteObject[],
+ siteIndex:number,
+):boolean{
+ if(strip.width<=0||strip.depth<=0||strip.x<0||strip.y<0||
+    strip.x+strip.width>320||strip.y+strip.depth>180)return false;
+ if(blocks.some(b=>intersects(strip,b.footprint))||
+    buildings.some(b=>intersects(strip,existingGround(b))))return false;
+ if(siteIndex===0){
+  for(let y=strip.y;y<strip.y+strip.depth;y++){
+   for(let x=strip.x;x<strip.x+strip.width;x++){
+    if(inPolygon(x+.5,y+.5,riverBankPolygon))return false;
+   }
+  }
+ }
+ return true;
+}
