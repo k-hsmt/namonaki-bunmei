@@ -52,6 +52,7 @@ jobs:
             artifacts/history-b/*
             artifacts/h1-housing/*
             artifacts/h3-browser-storage.jsonl
+            artifacts/h4a-visual/*
           if-no-files-found: warn
 
   h3-longrun:
