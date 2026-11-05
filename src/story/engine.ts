@@ -6,7 +6,7 @@ import { createSociety, practiceNames, updateSociety, type Society } from './soc
 import { createSettlementHistory, updateSettlements } from './settlement-history.js';
 export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'森林の採集';
 export type Dimension = 'population'|'food'|'cohesion'|'knowledge'|'exchange'|'culture';
-export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; relatedIds?:string[]; important?:boolean; }
+export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; buildingId?:string; relatedIds?:string[]; important?:boolean; }
 export interface Choice { label:string; description:string; impacts:Partial<Record<Dimension,number>>; consequence:string; }
 export interface Decision { id:string; year:number; question:string; context:string; options:Choice[]; }
 export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'council'|'care'|'migration'|'fracture';
@@ -18,9 +18,9 @@ const clamp=(v:number,a:number,b:number)=>Math.min(b,Math.max(a,v));
 const names=['アムラ','セイラ','ルグナ','オルフェ','サリュ','ナヴァ','イリス','ヘルメ','トルア','ヴェリ','ミルハ','シルダ'];
 const places=['碧い大河の流域','石灰岩の高原','霧深い湾岸','北方の針葉樹林','季節風の吹く丘陵','内海に面した湿地','二つの山脈の谷間','乾燥した草原の縁'];
 const traits:Trait[]=['川沿いの農耕','高原の放牧','沿岸の漁撈','森林の採集'];
-function entry(s:CivilizationState,tag:string,title:string,body:string,causes:string[]=[],important=false,relatedIds?:string[],kind?:string):string {
+function entry(s:CivilizationState,tag:string,title:string,body:string,causes:string[]=[],important=false,relatedIds?:string[],kind?:string,buildingId?:string):string {
  const id=`${s.year}-${s.history.length}`;
- s.history.push({id,year:s.year,tag,title,body,causes,important,...(relatedIds?.length?{relatedIds}:{}),...(kind?{kind}:{})});
+ s.history.push({id,year:s.year,tag,title,body,causes,important,...(relatedIds?.length?{relatedIds}:{}),...(kind?{kind}:{}),...(buildingId?{buildingId}:{})});
  return id;
 }
 export function createCivilization(seed:number):CivilizationState {
@@ -72,7 +72,7 @@ function finishYear(s:CivilizationState):void {
  }
  const coverage=s.economy.districts.map(district=>district.coverage.at(-1)??1);
  s.society??=createSociety();
- const record=(event:import('./society.js').SocialRecord)=>entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds);
+ const record=(event:import('./society.js').SocialRecord)=>entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds,event.kind,event.buildingId);
  updateSociety(s.society,ledger.people,coverage,s.cohesion,s.year,sources,record);
  ledger.sites??=createSettlementHistory(ledger.people,s.year);
  const local=regions.map((region,i)=>{
@@ -196,7 +196,6 @@ const everydayVariants:{kind:string;tag:string;title:string;body:string;causes:s
  {kind:'pottery',tag:'知恵',title:'器を焼く窯が改良される',body:'長く火を保つ方法が伝わり、丈夫な器が日常に増えた。',causes:['ものづくりの蓄積'],knowledge:3,weight:s=>s.knowledge>20?5:2},
  {kind:'midwife',tag:'暮らし',title:'出産を助ける経験が語り継がれる',body:'年長者の経験が家々へ伝わり、家族のあり方にも小さな変化が生まれた。',causes:['世代間の知識の伝承'],cohesion:2,weight:()=>4},
  {kind:'well',tag:'暮らし',title:'共同井戸が掘られる',body:'水を汲むための場所ができ、朝には自然と人が集まるようになった。',causes:['水の確保'],food:3,weight:s=>s.food<60?6:2},
- {kind:'bridge_repair',tag:'暮らし',title:'古い橋が修繕される',body:'傷んだ橋板を取り換えた。旅をする人も、近くに暮らす人も、その小さな仕事に助けられた。',causes:['交通の維持'],exchange:3,weight:s=>s.exchange>25?6:2},
  {kind:'new_crops',tag:'暮らし',title:'遠来の種が畑に根づく',body:'持ち込まれた種は最初こそ珍しがられたが、やがて土地の食卓になじんだ。',causes:['人と作物の移動'],food:5,weight:s=>s.exchange>40?6:1},
  {kind:'marriage',tag:'人々',title:'離れた集落同士の婚姻が増える',body:'親族のつながりが広がり、境界の意味が少しずつ変わった。',causes:['社会関係の拡大'],cohesion:3,weight:()=>4},
  {kind:'cold',tag:'自然',title:'厳しい冬が家々を試す',body:'薪が足りず、人々は集まって冬を越した。春にはいくつかの家が空になっていた。',causes:['寒冷な季節'],food:-4,weight:()=>3},

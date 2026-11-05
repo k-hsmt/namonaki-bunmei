@@ -35,6 +35,8 @@ export interface SocialRecord {
   body: string;
   causes: string[];
   relatedIds?: string[];
+  kind?: string;
+  buildingId?: string;
 }
 
 export function createSociety(): Society {
