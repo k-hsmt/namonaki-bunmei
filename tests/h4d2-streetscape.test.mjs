@@ -45,7 +45,7 @@ test('公共施設の前庭はその施設が存在している時だけ／他�
  const marks=projectStreetscape(alone,[hall]);
  assert.deepEqual(marks,[{kind:'forecourt',x:81,y:124,width:18,depth:2,anchors:['hall-existing']}]);
  assert.deepEqual(projectStreetscape(composeScene(snapshot(),history([])),[]),[]);
- assert.deepEqual(projectStreetscape(composeScene(snapshot([{...hall,condition:'ruined'}]),history([])),[{...marks[0]}].filter(()=>false));
+ assert.deepEqual(projectStreetscape(composeScene(snapshot([{...hall,condition:'ruined'}]),history([])),[{...hall,condition:'ruined'}]),[]);
  assert.deepEqual(projectStreetscape(composeScene(snapshot([hall],1),history([])),[hall]),[]);
  assert.deepEqual(projectStreetscape(composeScene(snapshot([hall],2),history([])),[hall]),[]);
 });
