@@ -39,7 +39,7 @@ const intersects=(a:HousingPlot,b:HousingPlot)=>a.x<b.x+b.width&&b.x<a.x+a.width
 
 /** 様式なしは旧hall：勝手に改築しない。存在するcivicは必ず全フィールドを検査。 */
 export function validateCivicBuilding(raw:unknown):raw is CivicBuilding{
- if(!isObj(raw)||raw.kind!=='hall'||typeof raw.id!=='string'||!raw.id.startsWith('civic-')||
+ if(!isObj(raw)||raw.kind!=='hall'||typeof raw.id!=='string'||!raw.id.startsWith('civic-river-bank-')||
   !nat(raw.builtYear)||!nat(raw.x)||!nat(raw.y)||!['intact','damaged','ruined'].includes(String(raw.condition))||
   !isObj(raw.civic))return false;
  const c=raw.civic;
@@ -49,9 +49,11 @@ export function validateCivicBuilding(raw:unknown):raw is CivicBuilding{
   c.footprint.x<=Number(raw.x)&&Number(raw.x)<c.footprint.x+c.footprint.width&&
   c.footprint.y<=Number(raw.y)&&Number(raw.y)<c.footprint.y+c.footprint.depth;
 }
-const matchingRecord=(b:CivicBuilding,records:readonly CivicConstructionRecord[])=>
- records.some(r=>r.id===b.civic.constructionRecordId&&r.year===b.builtYear&&
- r.kind==='building-built'&&r.buildingId===b.id);
+const matchingRecord=(b:CivicBuilding,records:readonly CivicConstructionRecord[])=>{
+ const matches=records.filter(r=>r.id===b.civic.constructionRecordId);
+ return matches.length===1&&matches[0]!.year===b.builtYear&&
+  matches[0]!.kind==='building-built'&&matches[0]!.buildingId===b.id;
+};
 
 export function reviewCivicConstruction(params:{
  readonly siteIndex:number;readonly year:number;readonly candidate:unknown;
@@ -150,6 +152,12 @@ export function validateCivicLedger(sites:unknown,records:unknown,confirmedYear:
      throw Error('大型公共建築: 現在の施設と確定履歴が一致しない');
    }else if(previous)
     throw Error('大型公共建築: 現在の施設から建築正本が消えた');
+  }
+  // 新築済みhallを現在台帳から黙って削除すると、過去履歴と現況が乖離する。
+  // 廃墟であっても施設として残す。撤去は独立した確定イベント設計が必要。
+  for(const [id,confirmed] of byId){
+   if(confirmed&&!site.view.buildings.some((b:unknown)=>isObj(b)&&b.id===id))
+    throw Error('大型公共建築: 確定した施設が現在台帳から消えた');
   }
  }
 }
