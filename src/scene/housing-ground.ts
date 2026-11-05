@@ -74,12 +74,12 @@ export function facilityHousingConflicts(
  * 道路建設イベントを表すものではない。既存地表・河川・施設を避ける。
  */
 export function isUnoccupiedGround(
- strip:HousingPlot,blocks:readonly ResidentialBlock[],buildings:readonly SiteObject[],
+ strip:HousingPlot,occupiedPlots:readonly HousingPlot[],buildings:readonly SiteObject[],
  siteIndex:number,
 ):boolean{
  if(strip.width<=0||strip.depth<=0||strip.x<0||strip.y<0||
     strip.x+strip.width>320||strip.y+strip.depth>180)return false;
- if(blocks.some(b=>intersects(strip,b.footprint))||
+ if(occupiedPlots.some(b=>intersects(strip,b))||
     buildings.some(b=>intersects(strip,existingGround(b))))return false;
  if(siteIndex===0){
   for(let y=strip.y;y<strip.y+strip.depth;y++){
