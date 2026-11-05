@@ -17,7 +17,7 @@ test('fixed-observation visual comparison: four sizes and historical contraction
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+port);
   const result=await page.evaluate(async()=>{
-   const {drawScene}=await import('/scene/draw.js');
+   const {drawScene,drawBuildingSprite}=await import('/scene/draw.js');
    const {visualProfile}=await import('/scene/model.js');
    const canvas=document.querySelector('#scene');
    const original=[
@@ -32,6 +32,16 @@ test('fixed-observation visual comparison: four sizes and historical contraction
     {id:'workshop-2',kind:'workshop',x:210,y:141,builtYear:1100,condition:'intact'}
    ];
    const versions=[];
+   // The same recorded house must retain its silhouette across settlement changes.
+   const roofFrames=[];
+   for(let level=0;level<=3;level++){
+    const fixture=document.createElement('canvas');fixture.width=45;fixture.height=45;
+    const ctx=fixture.getContext('2d');
+    ctx.clearRect(0,0,45,45);
+    drawBuildingSprite(ctx,{...original[0],x:22,y:31},false);
+    roofFrames.push(fixture.toDataURL());
+   }
+   if(new Set(roofFrames).size!==1)throw Error('building silhouette changed');
    for(let scale=0;scale<5;scale++){
     // Fixtures deliberately hold historical building identities constant.
     const reduced=scale===4;
