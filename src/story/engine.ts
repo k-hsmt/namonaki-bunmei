@@ -1,3 +1,4 @@
+import {proposeHousingLifecycle,appendHousingLifecycle} from './housing-lifecycle.js';
 import {housingAt} from './housing-history.js';
 import {proposeHousingConstruction} from './housing-progression.js';
 import {facilityHousingConflicts} from '../scene/housing-ground.js';
@@ -113,6 +114,34 @@ function finishYear(s:CivilizationState):void {
     ['住宅の必要性','確定済み施設と河川を避けた敷地'],true,
     undefined,'housing-built',event.blockId);
    s.housing={...s.housing,events:[...s.housing.events,{...event,causeRecordId:id}]};
+  }
+  // H3-Bは既存の住宅イベントだけを扱う。同年の建設街区は更新しない。
+  // 住宅ストック・敷地と人口の計算は独立。確定記録があるときだけ履歴を追記。
+  const life=proposeHousingLifecycle({
+   history:s.housing,year:s.year,siteId:'river-bank',
+   population:local[0]?.population??0,
+   coverage:local[0]?.coverage??0,
+   shortageYears:local[0]?.shortageYears??0,
+   hazard:local[0]?.hazard,
+  });
+  if(life){
+   const titles={
+    underused:'住宅街区の利用が減る',vacated:'住宅街区が空き家になる',
+    damaged:'住宅街区が損傷する',ruined:'住宅街区が廃墟となる',
+    repaired:'住宅街区が修繕される',reused:'住宅街区が再利用される',
+    expanded:'住宅街区が増築される',built:'住宅街区が建設される',
+   };
+   const causes={
+    hazard:'確定された災害', 'prolonged-shortage':'長期の生活基盤の不足',
+    'repair-capacity':'修繕を支える環境の回復',
+    reoccupation:'住まいを再利用する条件の回復',
+   };
+   const id=entry(s,'地域',titles[life.kind],
+    '同じ場所に、以前からの住まいとその履歴が残っている。',
+    [causes[life.reason]],true,
+    life.causeRecordId?[life.causeRecordId]:undefined,
+    'housing-'+life.kind,life.blockId);
+   s.housing=appendHousingLifecycle(s.housing,s.year,life,id);
   }
  }
  commitObservation(ledger,s.year);

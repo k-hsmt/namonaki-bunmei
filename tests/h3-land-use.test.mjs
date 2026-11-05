@@ -52,7 +52,11 @@ test('新規v4の住宅自然建設は確定履歴にのみ追加し、同一see
  run(a,600);run(b,600);
  assert.deepEqual(a,b);
  assert.ok(a.housing.events.length>0,'少なくとも一件の建設履歴を確認');
- assert.ok(a.housing.events.every(e=>e.kind==='built'&&e.year<=a.observation.lastYear));
+ assert.ok(a.housing.events.some(e=>e.kind==='built'),'住宅の自然建設を確認');
+ assert.ok(a.housing.events.every(e=>e.year<=a.observation.lastYear),
+  '全住宅イベントは確定済み観測年以内');
+ assert.ok(a.housing.events.filter(e=>e.kind==='built').every(e=>e.after.builtYear===e.year),
+  '建設年は建設イベント年から変更されない');
  const houses=housingAt(a.housing,600,'river-bank').blocks;
  for(const block of houses){
   const site=siteAt(a.observation.sites,0,block.builtYear);
