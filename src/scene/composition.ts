@@ -62,7 +62,7 @@ export function composeScene(s:SiteSnapshot):SceneComposition {
  const working=facilities.some(o=>o.footprint==='trade');
  const bridge=facilities.some(o=>o.footprint==='bridge');
  // Do not imply a wharf exists merely because population crosses a threshold.
- const riverUse=working?'working':bridge?'footpath':'natural';
+ const riverUse:SceneComposition['riverUse']=working?'working':bridge?'footpath':'natural';
  return {year:s.year,siteIndex:s.local?.index??0,scale,trend,
   population:s.local?.population??s.population,structures,blocks,riverUse};
 }
