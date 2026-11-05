@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/v06-visual-enhancement-a]
+    branches: [main]
 
 permissions:
   contents: read
@@ -44,4 +44,5 @@ jobs:
           path: |
             artifacts/visual-a/*.png
             artifacts/history-b/*
+            artifacts/h1-housing/*
           if-no-files-found: warn
