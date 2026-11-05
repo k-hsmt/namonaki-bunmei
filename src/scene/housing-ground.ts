@@ -93,3 +93,12 @@ export function isUnoccupiedGround(
  }
  return true;
 }
+
+/** H4-D4-B: 既に確定した大型公共施設の敷地を、後発の固定区画が侵さない。 */
+export function facilityCivicConflicts(
+ candidate:SiteObject,existing:readonly SiteObject[],
+):readonly string[]{
+ const footprint=existingGround(candidate);
+ return existing.filter(b=>b.civic&&b.id!==candidate.id&&
+  intersects(footprint,existingGround(b))).map(b=>b.id);
+}
