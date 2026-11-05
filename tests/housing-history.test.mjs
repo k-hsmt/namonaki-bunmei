@@ -79,3 +79,51 @@ test('同じ確定履歴なら住宅表示の深度・部品が一致し施設�
  assert.deepEqual(composeScene(snapshot(150),history),first);
  assert.equal(later.residentialBlocks[0].builtYear,20);
 });
+
+
+test('損傷前の廃墟化とイベント年を超える未来の修繕年を拒否',()=>{
+ const direct={introducedYear:0,legacyUntracked:false,events:[
+  event(20,'built',a),event(25,'ruined',{...a,condition:'ruined',use:'vacant'})
+ ]};
+ assert.throws(()=>housingAt(direct,25),/廃墟化/);
+ const future={introducedYear:0,legacyUntracked:false,events:[
+  event(20,'built',a),event(25,'damaged',{...a,condition:'damaged',lastRenovatedYear:30})
+ ]};
+ assert.throws(()=>housingAt(future,25),/未来/);
+ const repairedMissingYear={introducedYear:0,legacyUntracked:false,events:[
+  event(20,'built',a),event(25,'damaged',{...a,condition:'damaged'}),
+  event(30,'repaired',{...a,condition:'sound'})
+ ]};
+ assert.throws(()=>housingAt(repairedMissingYear,30),/修繕/);
+});
+test('イベントに無関係な属性変更を拒否する',()=>{
+ const samples=[
+  {kind:'expanded',after:{...a,housingCount:3,use:'underused'},reason:/増築/},
+  {kind:'underused',after:{...a,use:'underused',condition:'damaged'},reason:/低利用/},
+  {kind:'vacated',after:{...a,use:'vacant',lastRenovatedYear:30},reason:/空き家化/},
+  {kind:'damaged',after:{...a,condition:'damaged',use:'vacant'},reason:/損傷/},
+  {kind:'ruined',setup:[event(25,'damaged',{...a,condition:'damaged'})],
+   after:{...a,condition:'ruined',use:'vacant',housingCount:1},reason:/住戸数を無断|廃墟化/},
+  {kind:'repaired',setup:[event(25,'damaged',{...a,condition:'damaged'})],
+   after:{...a,condition:'sound',use:'vacant',lastRenovatedYear:30},reason:/修繕/},
+  {kind:'reused',setup:[event(25,'vacated',{...a,use:'vacant'})],
+   after:{...a,use:'occupied',styleSeed:99},reason:/不変属性/},
+ ];
+ for(const item of samples){
+  const events=[event(20,'built',a),...(item.setup??[]),event(30,item.kind,item.after)];
+  assert.throws(()=>housingAt({introducedYear:0,legacyUntracked:false,events},30),item.reason,item.kind);
+ }
+});
+test('廃墟化と再利用の正しい順序を受理し、過去観測を維持',()=>{
+ const building=event(20,'built',a);
+ const damaged=event(25,'damaged',{...a,condition:'damaged'});
+ const ruined=event(30,'ruined',{...a,condition:'ruined',use:'vacant'});
+ const repaired=event(40,'repaired',{...a,condition:'sound',use:'vacant',lastRenovatedYear:40});
+ const reused=event(45,'reused',{...a,condition:'sound',use:'occupied',lastRenovatedYear:40});
+ const h={introducedYear:0,legacyUntracked:false,events:[building,damaged,ruined,repaired,reused]};
+ assert.equal(housingAt(h,28).blocks[0].condition,'damaged');
+ assert.equal(housingAt(h,35).blocks[0].use,'vacant');
+ assert.equal(housingAt(h,40).blocks[0].use,'vacant');
+ assert.equal(housingAt(h,45).blocks[0].use,'occupied');
+ assert.equal(housingAt(h,28).blocks[0].condition,'damaged');
+});
