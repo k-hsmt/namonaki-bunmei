@@ -54,6 +54,7 @@ jobs:
             artifacts/h3-browser-storage.jsonl
             artifacts/h4a-visual/*
             artifacts/h4d1-buildings/*
+            artifacts/h4c-natural/*
           if-no-files-found: warn
 
   h3-longrun:
