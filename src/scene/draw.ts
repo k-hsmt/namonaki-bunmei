@@ -130,6 +130,32 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
   for(let i=0;i<3;i++)rect(c,211+i*6,145,3,3,'#91785b');
  }
 }
+/**
+ * H4-B: 確定済み街区の敷地内にだけ、屋根をつなぐ生活面を描く。
+ * 道路・公共施設の履歴を捏造しない。水辺や既存施設への重複は
+ * composeSceneの地表占有検証に任せ、敷地外へ描画しない。
+ */
+function drawHousingPlotSurface(c:C,scene:SceneComposition):void{
+ for(const block of scene.residentialBlocks){
+  const f=block.footprint;
+  const x=Math.round(f.x),y=Math.round(f.y);
+  const w=Math.round(f.width),h=Math.round(f.depth);
+  if(w<2||h<2)continue;
+  const abandoned=block.condition==='ruined'||block.use==='vacant';
+  const path=abandoned?'#8b9077':block.use==='underused'?'#a49779':'#c0ae8c';
+  const edge=abandoned?'#708264':'#817660';
+  // 敷地の輪郭と一本の内側通路。規模の分類ではなく住宅の実在が条件。
+  rect(c,x,y+h-2,w,1,edge);
+  rect(c,x+1,y+h-4,Math.max(1,w-2),2,path);
+  for(let dx=1;dx<w-1;dx+=5){
+   rect(c,x+dx,y+h-1,2,1,edge);
+  }
+  if(block.roofPartCount>1&&h>=6){
+   rect(c,x+1,y+1,Math.max(1,w-2),1,abandoned?'#778762':'#b2a184');
+  }
+ }
+}
+
 /** H1: 履歴由来の住宅部品だけを描画する。屋根部品は独立施設ではない。 */
 function drawResidentialRoofs(c:C,scene:SceneComposition,depth:'far'|'middle'|'near'):void {
  const roofs=scene.residentialBlocks.flatMap(b=>b.roofParts)
@@ -190,8 +216,12 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,ho
  const composition=composeScene(s,housing);
  if(s.visual){builtGround(c,s.visual,index);neighborhood(c,s.objects,s.visual,index);}
  drawHistorySurface(c,composition);
+ drawHousingPlotSurface(c,composition);
+ // すべての住宅屋根を確定施設より先に描く。
+ // 前景住宅は住宅内では前に見えるが、歴史上の市場・集会所・仕事場を隠さない。
  drawResidentialRoofs(c,composition,'far');
  drawResidentialRoofs(c,composition,'middle');
+ drawResidentialRoofs(c,composition,'near');
  const stone=!s.local&&(s.objects.filter(o=>o.kind==='memorial').length>2 || population>47000);
  for(const o of s.objects){
   if(o.kind==='bridge')continue;
@@ -212,7 +242,6 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,ho
   }
   if(o.condition==='damaged')rect(c,o.x-10,o.y-2,8,3,P.dark);
  }
- drawResidentialRoofs(c,composition,'near');
  if(s.objects.some(o=>o.kind==='bridge'&&o.condition==='intact')){rect(c,120,141,51,4,'#8a755b');for(let j=0;j<5;j++)rect(c,124+j*10,139,2,6,P.wood);}
  if(s.objects.some(o=>o.kind==='bridge'&&o.condition!=='intact')){rect(c,119,143,17,3,P.wood);rect(c,156,144,13,3,P.wood);}
  if(!s.local&&population>12500&&!flood)boat(c,145,143);if(!s.local&&population>24000){rect(c,20,126,36,2,'#8d7b5e');for(let i=0;i<5;i++)rect(c,21+i*7,125,3,3,'#b7a070');}const count=population===0?0:epidemic?1:Math.min(9,Math.max(1,2+Math.floor(Math.log2(Math.max(1,population)/1800))));
