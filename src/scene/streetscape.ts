@@ -40,7 +40,10 @@ export function projectStreetscape(scene:SceneComposition,buildings:readonly Sit
  // 「街の規模」ではなく当年に存在した施設だけが根拠となる。
  for(const b of [...buildings].sort((a,b)=>a.id.localeCompare(b.id))){
   if(b.condition==='ruined'||(b.kind!=='hall'&&b.kind!=='market'))continue;
-  const strip:HousingPlot={x:b.x-9,y:b.y+4,width:18,depth:2};
+  const f=b.civic?.footprint;
+  const strip:HousingPlot=f
+   ?{x:f.x+4,y:f.y+f.depth+1,width:f.width-8,depth:2}
+   :{x:b.x-9,y:b.y+4,width:18,depth:2};
   if(!isUnoccupiedGround(strip,plots,buildings,0))continue;
   marks.push({kind:'forecourt',...strip,anchors:[b.id]});
  }
