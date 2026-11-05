@@ -118,8 +118,14 @@ export function validateCivicLedger(sites:unknown,records:unknown,confirmedYear:
    const b=change.building;
    const previous=byId.get(String(b.id));
    const hasCivic=Object.hasOwn(b,'civic');
-   if(!hasCivic&&previous===undefined){byId.set(String(b.id),false);continue;}
-   if(!hasCivic||!validateCivicBuilding(b)||i!==0)
+   if(!hasCivic){
+    // 旧施設は建設後に損傷・修繕・廃墟化で何度も変更される。
+    // civicなし→なしの正常な履歴遷移は継続許可し、途中で消えた時だけ拒否。
+    if(previous)throw Error('大型公共建築: 建築正本が履歴の途中で消えた');
+    byId.set(String(b.id),false);
+    continue;
+   }
+   if(!validateCivicBuilding(b)||i!==0)
     throw Error('大型公共建築: 不正な建築様式または地点');
    if(!nat(change.year)||Number(change.year)>confirmedYear)throw Error('大型公共建築: 未確定年');
    if(!matchingRecord(b,records as CivicConstructionRecord[]))throw Error('大型公共建築: 建設出典が不正');
