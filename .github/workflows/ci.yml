@@ -61,6 +61,7 @@ jobs:
             artifacts/h4a-visual/*
             artifacts/h4d1-buildings/*
             artifacts/h4c-natural/*
+            artifacts/h4d4c-natural/*
             artifacts/h4d3-concepts/*
           if-no-files-found: warn
 
