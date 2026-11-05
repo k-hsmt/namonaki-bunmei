@@ -179,6 +179,7 @@ export function updateSettlements(
         title: `${siteNames[i]}の${kindNames[damaged.kind]}が損傷する`,
         body: '傷んだ建物はその場に残り、修繕や別の使い方を待つことになった。',
         causes: ['災害による損傷'], relatedIds: [hazard.id],
+        kind: 'building-damaged', buildingId: damaged.id,
       });
       site.lastWork = year;
     } else if (year - site.lastWork >= 8) {
@@ -193,6 +194,8 @@ export function updateSettlements(
           title: `${siteNames[i]}の${kindNames[changed.kind]}が${abandon ? '使われなくなる' : reuse ? '再利用される' : '修繕される'}`,
           body: '同じ区画に、以前の暮らしの痕跡が残っている。',
           causes: [abandon ? '担い手や食糧の不足' : '維持を担う人と食糧の回復'],
+          kind: abandon ? 'building-abandoned' : reuse ? 'building-reused' : 'building-repaired',
+          buildingId: changed.id,
           relatedIds: [changed.recordId, abandon ? shortageId : null].filter((id): id is string => Boolean(id)),
         });
         site.lastWork = year;
@@ -207,6 +210,7 @@ export function updateSettlements(
             title: `${siteNames[i]}に${kindNames[building.kind]}が造られる`,
             body: '暮らしの変化に合わせて、一つの区画に手が加えられた。',
             causes: ['利用の必要性と建設の余力'],
+            kind: 'building-built', buildingId: building.id,
           });
           view.buildings.push(building);
           site.lastWork = year;

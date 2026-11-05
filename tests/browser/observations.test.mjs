@@ -60,33 +60,42 @@ async function assertObservation(page, year, population, pendingYear) {
 
 test('pending choice shows confirmed population through save, reload and resolution', async t => {
   const state = createCivilization(42);
-  while (state.year < 652) {
-    step(state);
-    if (state.pending) chooseAutomatically(state);
+  let expected;
+  let option;
+  while (state.year < 2000) {
+    const candidate = structuredClone(state);
+    step(candidate);
+    if (candidate.pending) {
+      option = candidate.pending.options.findIndex(choice => choice.impacts.population);
+      if (option >= 0 && candidate.population !== state.population) {
+        expected = candidate;
+        break;
+      }
+      chooseAutomatically(candidate);
+    }
+    Object.assign(state, candidate);
   }
-  const expected = structuredClone(state);
-  step(expected);
-  const option = expected.pending.options.findIndex(choice => choice.impacts.population);
-  assert.ok(option >= 0);
-  assert.notEqual(expected.population, state.population);
+  assert.ok(expected);
+  const confirmedYear = state.year;
+  const pendingYear = expected.year;
   const page = await openSave(t, saveKey, state);
-  await assertObservation(page, 652, state.population);
+  await assertObservation(page, confirmedYear, state.population);
   const canvas = page.locator('#scene');
   const image = await canvas.evaluate(element => element.toDataURL());
 
   await page.locator('#step').click();
-  await assertObservation(page, 652, state.population, 653);
+  await assertObservation(page, confirmedYear, state.population, pendingYear);
   assert.equal(await canvas.evaluate(element => element.toDataURL()), image);
 
   await page.locator('#save').click();
   await page.reload();
   await page.locator('#load').click();
-  await assertObservation(page, 652, state.population, 653);
+  await assertObservation(page, confirmedYear, state.population, pendingYear);
   assert.equal(await canvas.evaluate(element => element.toDataURL()), image);
 
   choose(expected, option);
   await page.locator('#options button').nth(option).click();
-  await assertObservation(page, 653, expected.population);
+  await assertObservation(page, pendingYear, expected.population);
   for (const id of ['food', 'cohesion', 'knowledge']) {
     assert.notEqual(await page.locator(`#${id}`).textContent(), '観測年の記録なし');
   }
