@@ -126,3 +126,55 @@ test('a regional event opens its linked cause in the year it was recorded', asyn
   await page.locator('#return-now').click();
   assert.equal(await page.locator('#headline').textContent(), event.title);
 });
+
+test('the same location and year show identical building pixels after switching sites and reloading', async t => {
+  const state = createCivilization(42);
+  while (state.year < 550) {
+    step(state);
+    if (state.pending) chooseAutomatically(state);
+  }
+  const page = await openSave(t, saveKey, state);
+  const rewind = page.locator('#rewind-year');
+  const rewindTo500 = () => rewind.evaluate(el => {
+    el.value = '500';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await rewindTo500();
+  const canvas = page.locator('#scene');
+  const picture = () => canvas.evaluate(el => el.toDataURL());
+  const river = await picture();
+  const chooser = page.locator('#site-select');
+  await chooser.selectOption('1');
+  assert.match(await page.locator('#scene-phase').textContent(), /丘陵/);
+  const hills = await picture();
+  assert.notEqual(hills, river);
+  await page.locator('#save').click();
+  await page.reload();
+  await page.locator('#load').click();
+  await rewindTo500();
+  await chooser.selectOption('1');
+  assert.equal(await picture(), hills);
+  assert.equal(await page.locator('#scene-year').textContent(), '世界暦 500年');
+});
+
+test('Chromium can save and reload a 10,000-year history', async t => {
+  const state = createCivilization(42);
+  while(state.year<10000){
+    step(state);
+    if(state.pending)chooseAutomatically(state);
+  }
+  const page = await openSave(t,saveKey,state);
+  await page.evaluate(key=>localStorage.removeItem(key),saveKey);
+  await page.locator('#save').click();
+  assert.match(await page.locator('#feedback').textContent(), /ブラウザに保存しました/);
+  await page.reload();
+  await page.locator('#load').click();
+  assert.match(await page.locator('#feedback').textContent(), /保存された歴史を開きました/);
+  await assertObservation(page,10000,state.population);
+  const rewind=page.locator('#rewind-year');
+  await rewind.evaluate(el=>{
+    el.value='500';
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  assert.equal(await page.locator('#scene-year').textContent(),'世界暦 500年');
+});

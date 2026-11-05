@@ -1,7 +1,9 @@
 import { hash01, SeededRng } from '../engine/rng.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, type ObservationLedger } from './observations.js';
-import { createRegionalEconomy, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
+import { createRegionalEconomy, tradeYearsFor, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
+import { createSociety, practiceNames, updateSociety, type Society } from './society.js';
+import { createSettlementHistory, updateSettlements } from './settlement-history.js';
 export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'森林の採集';
 export type Dimension = 'population'|'food'|'cohesion'|'knowledge'|'exchange'|'culture';
 export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; relatedIds?:string[]; important?:boolean; }
@@ -11,7 +13,7 @@ export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'counc
 export interface Legacy {kind:LegacyKind; established:number; strength:number; lastChanged:number; origin:string;}
 export type MemoryLog = {year:number;kind:LegacyKind;action:'formed'|'strengthened'|'weakened'|'lost';reason:string;strength:number;established:number};
 export interface CivilizationMemory {legacies:Partial<Record<LegacyKind,Legacy>>;log:MemoryLog[];}
-export interface CivilizationState { version:2|3; observation?:ObservationLedger; economy?:RegionalEconomy; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
+export interface CivilizationState { version:2|3; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
 const clamp=(v:number,a:number,b:number)=>Math.min(b,Math.max(a,v));
 const names=['アムラ','セイラ','ルグナ','オルフェ','サリュ','ナヴァ','イリス','ヘルメ','トルア','ヴェリ','ミルハ','シルダ'];
 const places=['碧い大河の流域','石灰岩の高原','霧深い湾岸','北方の針葉樹林','季節風の吹く丘陵','内海に面した湿地','二つの山脈の谷間','乾燥した草原の縁'];
@@ -27,6 +29,7 @@ export function createCivilization(seed:number):CivilizationState {
  s.rngState=r.state; entry(s,'誕生',`${s.name}が生まれる`,`${homeland}に、いくつかの集落が形成された。人々は${trait}を暮らしの中心とし、まだ自分たちの行く末を知らない。`,['地形と生活様式が抽選された'],true); s.samples.push({year:0,population:s.population});
  s.version=3;
  s.observation={people:initialPopulation(s.population,false),blocks:[],lastYear:null,legacy:null};
+ s.observation.sites=createSettlementHistory(s.observation.people,0);
  commitObservation(s.observation,0);
  return s;
 }
@@ -58,7 +61,29 @@ function finishYear(s:CivilizationState):void {
  s.economy??=createRegionalEconomy();
  updateRegionalEconomy(s.economy,ledger.people,s.year,{
   harvestFactors,blockedRegions:new Set(flood?['river']:[]),disruptionId:flood?.id,
+  granaries:s.society?.sites.map(site=>site.practices.some(p=>p.kind==='granary'&&p.active)),
  },event=>entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds),ledger.legacy?.year);
+ const yearRecords:RecordEntry[]=[];
+ for(let i=s.history.length-1;i>=0&&s.history[i]!.year===s.year;i--)yearRecords.push(s.history[i]!);
+ const sources:Partial<Record<keyof typeof practiceNames,string>>={};
+ for(const kind of Object.keys(practiceNames) as (keyof typeof practiceNames)[]){
+  const origin=yearRecords.find(event=>event.kind===`legacy-formed-${kind}`);
+  if(origin&&legacyStrength(s,kind)>0)sources[kind]=origin.id;
+ }
+ const coverage=s.economy.districts.map(district=>district.coverage.at(-1)??1);
+ s.society??=createSociety();
+ const record=(event:import('./society.js').SocialRecord)=>entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds);
+ updateSociety(s.society,ledger.people,coverage,s.cohesion,s.year,sources,record);
+ ledger.sites??=createSettlementHistory(ledger.people,s.year);
+ const local=regions.map((region,i)=>{
+  const hazard=yearRecords.find(event=>event.kind==='earthquake'||(event.kind==='fire'&&i===0)||
+   (event.kind==='flood'&&i===0)||(event.kind==='storm'&&i===2));
+  return {population:ledger.people[i]!,coverage:coverage[i]!,shortageYears:s.economy!.districts[i]!.shortageYears,
+   tradeYears:tradeYearsFor(s.economy!,region.id),
+   hazard:hazard?.kind?{id:hazard.id,kind:hazard.kind}:undefined,
+   shortageId:s.economy!.districts[i]!.shortageRecord??undefined};
+ });
+ updateSettlements(ledger.sites,s.society,local,s.year,record);
  commitObservation(ledger,s.year);
  if(s.year%10===0)s.samples.push({year:s.year,population:s.population});
 }
@@ -85,7 +110,7 @@ function remember(s:CivilizationState,k:LegacyKind,delta:number,reason:string){
  if(next===0)delete m.legacies[k];else m.legacies[k]={kind:k,established:before?.established??s.year,strength:next,lastChanged:s.year,origin:before?.origin??reason};
  m.log.push({year:s.year,kind:k,action,reason,strength:next,established:before?.established??s.year});
  // Record major turning points, not every small adjustment.
- if(action==='formed'||action==='lost')entry(s,'継承',action==='formed'?`${descriptions[k]}が根づく`:`${descriptions[k]}が失われる`,reason,[`長く続く暮らしの変化`],true);
+ if(action==='formed'||action==='lost')entry(s,'継承',action==='formed'?`${descriptions[k]}が根づく`:`${descriptions[k]}が失われる`,reason,[`長く続く暮らしの変化`],true,undefined,`legacy-${action}-${k}`);
 }
 function recordLegacy(s:CivilizationState,kind:string,title:string){
  const mapping:Record<string,LegacyKind>={first_granary:'granary',first_port:'trade_network',first_archive:'archive',first_confederation:'council',first_fragment:'fracture',irrigation:'waterworks',dike:'waterworks',healing:'care',arrival:'migration',trade:'trade_network',council:'council',split:'fracture',writing:'archive',well:'waterworks',bridge_repair:'waterworks',ferry:'trade_network',midwife:'care',tax:'council'};

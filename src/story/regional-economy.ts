@@ -1,9 +1,9 @@
 import { regions, settlements } from './population.js';
 
 const places = [
-  { name: '川辺', land: 11500, yield: 1.20 },
-  { name: '丘陵', land: 6500, yield: 1.10 },
-  { name: '入り江', land: 8500, yield: 1.15 },
+  { name: '川辺', land: 55000, yield: 1.20 },
+  { name: '丘陵', land: 17500, yield: 1.10 },
+  { name: '入り江', land: 38000, yield: 1.15 },
 ] as const;
 
 const links = regions.flatMap((region, from) => region.neighbors.flatMap(id => {
@@ -46,6 +46,7 @@ interface AnnualConditions {
   harvestFactors: number[];
   blockedRegions: ReadonlySet<string>;
   disruptionId?: string;
+  granaries?: readonly boolean[];
 }
 
 export function createRegionalEconomy(): RegionalEconomy {
@@ -217,6 +218,12 @@ export function updateRegionalEconomy(
     }
   });
   economy.districts.forEach((district, i) => {
-    district.reserve = Math.min(Math.max(0, balances[i]!), Math.floor(people[i]! * .15));
+    district.reserve = Math.min(Math.max(0, balances[i]!), Math.floor(people[i]! * (conditions.granaries?.[i] ? .25 : .15)));
   });
+}
+
+export function tradeYearsFor(economy: RegionalEconomy, regionId: string): number {
+  const district = regions.findIndex(region => region.id === regionId);
+  return Math.max(0, ...links.flatMap(({ from, to }, i) =>
+    from === district || to === district ? [economy.routes[i]!.tradeYears.filter(Boolean).length] : []));
 }
