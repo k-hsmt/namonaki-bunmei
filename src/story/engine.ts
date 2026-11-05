@@ -1,3 +1,4 @@
+import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, type ObservationLedger } from './observations.js';
@@ -13,7 +14,7 @@ export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'counc
 export interface Legacy {kind:LegacyKind; established:number; strength:number; lastChanged:number; origin:string;}
 export type MemoryLog = {year:number;kind:LegacyKind;action:'formed'|'strengthened'|'weakened'|'lost';reason:string;strength:number;established:number};
 export interface CivilizationMemory {legacies:Partial<Record<LegacyKind,Legacy>>;log:MemoryLog[];}
-export interface CivilizationState { version:2|3; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
+export interface CivilizationState { version:2|3|4; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
 const clamp=(v:number,a:number,b:number)=>Math.min(b,Math.max(a,v));
 const names=['アムラ','セイラ','ルグナ','オルフェ','サリュ','ナヴァ','イリス','ヘルメ','トルア','ヴェリ','ミルハ','シルダ'];
 const places=['碧い大河の流域','石灰岩の高原','霧深い湾岸','北方の針葉樹林','季節風の吹く丘陵','内海に面した湿地','二つの山脈の谷間','乾燥した草原の縁'];
@@ -34,7 +35,7 @@ export function createCivilization(seed:number):CivilizationState {
  return s;
 }
 export function migrateCivilization(s:CivilizationState):CivilizationState {
- if(s.version===3){
+ if(s.version===3||s.version===4){
   if(!s.observation)throw Error('Missing observation ledger');
   return s;
  }

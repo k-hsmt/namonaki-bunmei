@@ -1,5 +1,6 @@
-import {advance,choose,chooseAutomatically,createCivilization,migrateCivilization,lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
-import type {CivilizationState,RecordEntry} from './story/engine.js';
+import {advance,choose,chooseAutomatically,lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
+import {createHousingCivilization,findSavedHousing,parseHousingSave,serializeHousingSave,CURRENT_SAVE_KEY} from './story/housing-persistence.js';
+import type {RecordEntry} from './story/engine.js';
 import {snapshotAt} from './scene/model.js';
 import {siteAt} from './story/settlement-history.js';
 import {practiceNames} from './story/society.js';
@@ -15,7 +16,7 @@ const autoChoiceInput=el('auto-choice') as HTMLInputElement;
 const autoDelayInput=el('auto-delay') as HTMLSelectElement;
 const autoStatus=el('auto-choice-status');
 const speedDelays:Record<string,number>={slow:2100,normal:850,fast:250,rapid:75};
-let state=createCivilization(42);
+let state=createHousingCivilization(42);
 let active:RecordEntry=state.history[0]!;
 let timer:ReturnType<typeof setInterval>|null=null;
 let expanded=false;
@@ -44,8 +45,7 @@ function scheduleChoice(){
 }
 
 let viewedYear:number|null=null;
-const STORAGE='namonaki-story-v4';
-const OLD_STORAGE=['namonaki-story-v3','namonaki-story-v2'];
+const STORAGE=CURRENT_SAVE_KEY;
 function stop(){clearChoiceTimer();if(timer!==null){clearInterval(timer);timer=null;}el('play').textContent='自動で見守る ▷';}
 function start(){if(timer!==null)clearInterval(timer);timer=setInterval(forward,speedDelays[speedInput.value]??850);el('play').textContent='自動進行を停止 Ⅱ';scheduleChoice();}
 function chapter(entries:RecordEntry[]){
@@ -141,9 +141,35 @@ el('play').addEventListener('click',()=>{if(viewedYear!==null){viewedYear=null;r
 el('return-now').addEventListener('click',()=>{viewedYear=null;render();});
 scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===state.year?null:y;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
-function restart(seed:number){stop();state=createCivilization(seed);viewedYear=null;expanded=false;input.value=String(seed);render();}
+function restart(seed:number){stop();state=createHousingCivilization(seed);viewedYear=null;expanded=false;input.value=String(seed);render();}
 el('restart').addEventListener('click',()=>restart(Number(input.value)||1));
 el('random').addEventListener('click',()=>restart(Math.floor(Math.random()*4294967295)+1));
-el('save').addEventListener('click',()=>{try{localStorage.setItem(STORAGE,JSON.stringify(state));el('feedback').textContent='この文明の歴史をブラウザに保存しました。';}catch{el('feedback').textContent='保存できませんでした。ブラウザの設定をご確認ください。';}});
-el('load').addEventListener('click',()=>{try{const raw=localStorage.getItem(STORAGE)??OLD_STORAGE.map(key=>localStorage.getItem(key)).find(value=>value!==null);if(!raw){el('feedback').textContent='保存された記録がありません。';return;}const data=JSON.parse(raw) as CivilizationState;if((data.version!==2&&data.version!==3)||!Number.isSafeInteger(data.population)||data.population<60||!Number.isSafeInteger(data.year)||data.year<0||!Array.isArray(data.history)||!Array.isArray(data.decisions)||!Array.isArray(data.samples)||typeof data.rngState!=='number')throw Error('Invalid save');const loaded=migrateCivilization(data);ensureMemory(loaded);snapshotAt(loaded,lastObservedYear(loaded));stop();state=loaded;viewedYear=null;input.value=String(state.seed);expanded=false;render();el('feedback').textContent='保存された歴史を開きました。';}catch{el('feedback').textContent='この保存データを読み込めませんでした。';}});
+el('save').addEventListener('click',()=>{
+ try{
+  // 先に候補全体を検証する。失敗した場合、既存の保存値を変更しない。
+  const serialized=serializeHousingSave(state);
+  localStorage.setItem(STORAGE,serialized);
+  el('feedback').textContent='この文明の歴史をブラウザに保存しました。';
+ }catch{
+  el('feedback').textContent='保存できませんでした。ブラウザの設定をご確認ください。';
+ }
+});
+el('load').addEventListener('click',()=>{
+ try{
+  const saved=findSavedHousing(key=>localStorage.getItem(key));
+  if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
+  // 候補だけを移行・検証し、成功するまで表示中の文明を変更しない。
+  const loaded=parseHousingSave(saved.raw);
+  ensureMemory(loaded);
+  snapshotAt(loaded,lastObservedYear(loaded));
+  stop();
+  state=loaded;
+  viewedYear=null;input.value=String(state.seed);expanded=false;
+  render();
+  el('feedback').textContent='保存された歴史を開きました。';
+ }catch{
+  // 現行キーの破損を旧キーへ黙ってフォールバックしない。
+  el('feedback').textContent='この保存データを読み込めませんでした。';
+ }
+});
 render();
