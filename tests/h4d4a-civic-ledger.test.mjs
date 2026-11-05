@@ -37,6 +37,7 @@ test('H4-D4-A: A/Bの新築様式と実占有を持ち、旧hallと城は許可�
  assert.equal(validateCivicBuilding(build({civic:{...foundation,constructionRecordId:''}})),false);
  assert.equal(validateCivicBuilding(build({civic:{...foundation,footprint:{x:300,y:160,width:56,depth:30}}})),false);
  assert.equal(validateCivicBuilding(build({x:100})),false);
+ assert.equal(validateCivicBuilding(build({id:'civic-hill-side-10-communal'})),false);
  assert.equal(validateCivicBuilding({id:'river-bank-3',kind:'hall',x:197,y:121,builtYear:24,condition:'intact'}),false);
 });
 test('H4-D4-A: 建設出典・未確認地形・重複ID・候補不正をHOLD',()=>{
@@ -46,6 +47,7 @@ test('H4-D4-A: 建設出典・未確認地形・重複ID・候補不正をHOLD',
  expectHold(check(a,{records:[]}),'unconfirmed-event');
  expectHold(check(a,{records:[{...record(a),kind:'building-repaired'}]}),'unconfirmed-event');
  expectHold(check(a,{records:[{...record(a),year:9}]}),'unconfirmed-event');
+ expectHold(check(a,{records:[record(a),record(a)]}),'unconfirmed-event');
  expectHold(check(a,{buildings:[a]}),'duplicate-id');
  expectHold(check(build({builtYear:9})),'invalid-candidate');
  expectHold(check(build({recordId:'latest-repair'})),'invalid-candidate');
@@ -134,6 +136,7 @@ test('H4-D4-A: v4保存往復・不正な新築出典/様式/敷地の拒否、�
  corrupt(x=>target(x).civic.constructionRecordId='missing-event');
  corrupt(x=>target(x).kind='market');
  corrupt(x=>current(x).civic.footprint.x+=1);
+ corrupt(x=>{x.observation.sites[0].view.buildings=x.observation.sites[0].view.buildings.filter(b=>b.id!==a.id);});
  corrupt(x=>{x.history=x.history.filter(e=>e.id!==a.civic.constructionRecordId);});
  corrupt(x=>{target(x).builtYear=9;});
  assert.deepEqual(parseHousingSave(serializedOld),preCivicSave,
