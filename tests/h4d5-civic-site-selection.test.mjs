@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {createHousingCivilization,parseHousingSave,serializeHousingSave} from '../dist/story/housing-persistence.js';
 import {step,chooseAutomatically} from '../dist/story/engine.js';
-import {siteAt} from '../dist/story/settlement-history.js';
+import {siteAt,fixedFacilityLotReservations} from '../dist/story/settlement-history.js';
 import {housingAt} from '../dist/story/housing-history.js';
-import {isUnoccupiedGround} from '../dist/scene/housing-ground.js';
+import {isUnoccupiedGround,existingGround} from '../dist/scene/housing-ground.js';
 import {snapshotAt} from '../dist/scene/model.js';
 import {composeScene} from '../dist/scene/composition.js';
 
@@ -31,6 +31,15 @@ test('H4-D5: 実歴史を使う公共建築の複数候補地・河川/住宅の
    assert.ok(!previous.buildings.some(x=>x.id===b.id),'建設前に施設は出現しない');
    assert.equal(first.buildings.filter(x=>x.id===b.id).length,1);
    const f=b.civic.footprint;
+   // 未来の固定施設はまだ実在しない。土地の予約は建設履歴ではなく
+   // 後年の市場や工房を不意に建設不能にしないための保守的な制約。
+   const intersects=(a,c)=>a.x<c.x+c.width&&c.x<a.x+a.width&&
+    a.y<c.y+c.depth&&c.y<a.y+a.depth;
+   for(const lot of fixedFacilityLotReservations(0)){
+    const reserved=existingGround({...lot,builtYear:0,condition:'intact'});
+    assert.equal(intersects(f,reserved),false,
+     '大型施設が固定区画の将来の仕事場・市場等を占有してはならない: '+lot.id);
+   }
    assert.equal(isUnoccupiedGround(
     f,
     housingAt(state.housing,b.builtYear,'river-bank').blocks.map(x=>x.footprint),
