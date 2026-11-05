@@ -17,8 +17,8 @@ test('fixed-observation visual comparison: four sizes and historical contraction
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+port);
   const result=await page.evaluate(async()=>{
-   const {drawScene}=await import('/dist/scene/draw.js');
-   const {visualProfile}=await import('/dist/scene/model.js');
+   const {drawScene}=await import('/scene/draw.js');
+   const {visualProfile}=await import('/scene/model.js');
    const canvas=document.querySelector('#scene');
    const original=[
     {id:'r-house',kind:'house',x:55,y:114,builtYear:0,condition:'intact'},
