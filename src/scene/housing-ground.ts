@@ -17,6 +17,9 @@ function inPolygon(x:number,y:number,polygon:readonly (readonly [number,number])
  return inside;
 }
 export function existingGround(o:SiteObject):HousingPlot{
+ // H4-D4-A: 新築時に確定した大型公共建築の実占有を優先する。
+ // 屋根の表示外接矩形は土地の正本と混同しない。
+ if(o.civic)return o.civic.footprint;
  if(o.kind==='bridge')return {x:o.x-28,y:o.y-3,width:56,depth:7};
  if(o.kind==='field')return {x:o.x-13,y:o.y-8,width:26,depth:14};
  return {x:o.x-9,y:o.y-4,width:18,depth:7};

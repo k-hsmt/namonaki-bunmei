@@ -1,5 +1,6 @@
 import { siteNames, type Practice, type Society, type SocialRecord } from './society.js';
 import { settlements } from './population.js';
+import type {CivicFoundation} from './civic-architecture.js';
 
 export const scaleNames = ['集落', '村', '町', '都市'] as const;
 export type Trend = 'stable' | 'expanding' | 'contracting' | 'reorganizing';
@@ -15,6 +16,8 @@ export interface Building {
   condition: Condition;
   reused?: boolean;
   recordId?: string;
+  /** H4-D4-A: 新築時だけ固定。旧hallでは未定義。 */
+  civic?: CivicFoundation;
 }
 
 export interface SiteView {
@@ -114,7 +117,8 @@ export function siteAt(history: SettlementHistory | undefined, i: number, year: 
     if(change.year>year)break;
     buildings.set(change.building.id,change.building);
   }
-  return {...summary.view,buildings:[...buildings.values()].map(building=>({...building})),
+  return {...summary.view,buildings:[...buildings.values()].map(building=>({...building,
+    ...(building.civic?{civic:{...building.civic,footprint:{...building.civic.footprint}}}:{})})),
     practices:lastAt(site.practiceChanges,year)?.practices.map(practice=>({...practice}))??[]};
 }
 
