@@ -1,24 +1,36 @@
-import type {CivilizationState,RecordEntry} from '../story/engine.js';
+import {lastObservedYear,type CivilizationState} from '../story/engine.js';
+import {observationAt} from '../story/observations.js';
 
 export interface SiteObject {id:string; kind:'house'|'hall'|'bridge'|'field'|'ruin'|'memorial';x:number;y:number;builtYear:number;condition:'intact'|'damaged'|'ruined';}
 export interface SiteSnapshot {year:number; population:number; phase:string; atmosphere:string; sceneEvent:string|null; objects:SiteObject[]; eventYear:number|null; scars:string[];}
 const lots=[{x:55,y:113},{x:86,y:100},{x:116,y:109},{x:159,y:98},{x:201,y:107},{x:231,y:93},{x:271,y:105},{x:96,y:129},{x:179,y:123},{x:257,y:131}];
 const mix=(seed:number,i:number)=>{let x=(seed ^ Math.imul(i+1,0x9e3779b9))>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;return x>>>0;};
 export function populationAt(s:CivilizationState,year:number):number {
- const samples=s.samples;
- if(year>=s.year)return s.population;
- if(year<=0)return samples[0]?.population??s.population;
+ const ledger=s.observation;
+ const observed=ledger&&observationAt(ledger,year);
+ if(observed)return observed.population;
+ const legacy=ledger?.legacy;
+ if(ledger&&(!legacy||year>legacy.year))throw Error('観測年が確定していません');
+ const endYear=legacy?.year??s.year;
+ const endPopulation=legacy?.population??s.population;
+ const samples=legacy?s.samples.slice(0,legacy.sampleCount):s.samples;
+ if(year>=endYear)return endPopulation;
+ if(year<=0)return samples[0]?.population??endPopulation;
  for(let i=1;i<samples.length;i++){
   const b=samples[i]!,a=samples[i-1]!;
   if(year<=b.year){const t=(year-a.year)/(b.year-a.year);return Math.round(a.population+(b.population-a.population)*t);}
  }
  const last=samples.at(-1);
- if(last&&s.year>last.year){const t=(year-last.year)/(s.year-last.year);return Math.round(last.population+(s.population-last.population)*t);}
- return s.population;
+ if(last&&endYear>last.year){const t=(year-last.year)/(endYear-last.year);return Math.round(last.population+(endPopulation-last.population)*t);}
+ return endPopulation;
 }
 export function snapshotAt(s:CivilizationState,year:number):SiteSnapshot {
- if(!Number.isInteger(year)||year<0||year>s.year)throw Error('観測年が不正です');
- const past=s.history.filter(e=>e.year<=year);
+ if(!Number.isInteger(year)||year<0||year>lastObservedYear(s))throw Error('観測年が不正です');
+ const boundary=s.observation?.legacy;
+ const legacy=boundary&&year<=boundary.year?boundary:null;
+ const history=legacy?s.history.slice(0,legacy.historyCount):s.history;
+ const samples=legacy?s.samples.slice(0,legacy.sampleCount):s.samples;
+ const past=history.filter(e=>e.year<=year);
  const pop=populationAt(s,year);
  const recent=past.filter(e=>year-e.year<=14);
  const lead=recent.at(-1)??null;
@@ -29,7 +41,7 @@ export function snapshotAt(s:CivilizationState,year:number):SiteSnapshot {
  for(let i=0;i<lots.length;i++){
   const lot=lots[i]!;
   const threshold=1350*Math.pow(2,Math.max(0,i-1));
-  const first=s.samples.find(x=>x.population>=threshold)?.year??(i<2?0:Infinity);
+  const first=samples.find(x=>x.population>=threshold)?.year??(i<2?0:Infinity);
   if(first>year)continue;
   const known=(mix(s.seed,i)%7===0);
   const kind=i===2&&year>=400?'hall':i===7?'field':'house';

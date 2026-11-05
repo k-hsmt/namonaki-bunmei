@@ -1,4 +1,4 @@
-import {advance,choose,chooseAutomatically,createCivilization,clone,ensureMemory,legacyNames} from './story/engine.js';
+import {advance,choose,chooseAutomatically,createCivilization,migrateCivilization,lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import type {CivilizationState,RecordEntry} from './story/engine.js';
 import {snapshotAt} from './scene/model.js';
 import {drawScene} from './scene/draw.js';
@@ -41,12 +41,11 @@ function scheduleChoice(){
 }
 
 let viewedYear:number|null=null;
-const STORAGE='namonaki-story-v3';
-const OLD_STORAGE='namonaki-story-v2';
+const STORAGE='namonaki-story-v4';
+const OLD_STORAGE=['namonaki-story-v3','namonaki-story-v2'];
 function stop(){clearChoiceTimer();if(timer!==null){clearInterval(timer);timer=null;}el('play').textContent='自動で見守る ▷';}
 function start(){if(timer!==null)clearInterval(timer);timer=setInterval(forward,speedDelays[speedInput.value]??850);el('play').textContent='自動進行を停止 Ⅱ';scheduleChoice();}
-function chapter(y:number){
- const entries=state.history.filter(e=>e.year<=y);
+function chapter(entries:RecordEntry[]){
  const has=(title:string)=>entries.some(e=>e.title===title);
  if(has('長く続いた共同の決まりが解かれる')||has('人々は二つの道を選ぶ'))return '分かれた道 · 受け継がれるもの';
  if(has('村々の中心に大きな町が生まれる'))return '町の時代 · 人々が集う土地';
@@ -58,20 +57,28 @@ function format(v:number){return new Intl.NumberFormat('ja-JP').format(Math.roun
 function label(v:number,good:string,bad:string){return v>=55?good:v>=30?'揺らいでいる':bad;}
 function inspect(year:number,record?:RecordEntry){stop();viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
 function render(){
+ const confirmedYear=lastObservedYear(state);
  const viewingPast=viewedYear!==null&&viewedYear<state.year;
- const y=viewingPast?viewedYear!:state.year;
- if(!viewingPast)active=state.history.at(-1)!;
+ const y=viewingPast?viewedYear!:confirmedYear;
+ const legacy=state.observation?.legacy;
+ const estimating=legacy!==null&&legacy!==undefined&&y<=legacy.year;
+ const history=estimating?state.history.slice(0,legacy.historyCount):state.history;
+ const confirmedRecords=history.filter(e=>e.year<=confirmedYear);
+ const observedRecords=confirmedRecords.filter(e=>e.year<=y);
+ if(!viewingPast||!observedRecords.includes(active))active=observedRecords.at(-1)??state.history[0]!;
+ const awaitingChoice=!viewingPast&&Boolean(state.pending);
+ const historicalStats=viewingPast||awaitingChoice||estimating;
  const scene=snapshotAt(state,y);
  drawScene(canvas,scene,state.seed);
- el('scene-year').textContent=`世界暦 ${format(y)}年`;
+ el('scene-year').textContent=`世界暦 ${format(y)}年${estimating?' · 推定情景':''}`;
  el('scene-phase').textContent=scene.phase;
  el('scene-atmosphere').textContent=scene.atmosphere;
  el('past-notice').hidden=!viewingPast;
  el('past-note').textContent=`世界暦 ${format(y)}年の風景を観測中 · 現在は${format(state.year)}年`;
  document.querySelector('.paper')!.classList.toggle('past-view',viewingPast);
- scrubber.max=String(state.year);scrubber.value=String(y);
+ scrubber.max=String(confirmedYear);scrubber.value=String(y);
  el('rewind-label').textContent=`${format(y)}年 / 現在 ${format(state.year)}年`;
- el('chapter').textContent=chapter(y);el('year').textContent=`世界暦 ${format(y)}年`;
+ el('chapter').textContent=chapter(observedRecords);el('year').textContent=`世界暦 ${format(viewingPast?y:state.year)}年${!viewingPast&&state.pending?'（未確定）':''}`;
  el('kind').textContent=!viewingPast&&state.pending?'分かれ道':active.tag;
  el('headline').textContent=!viewingPast&&state.pending?'歴史に、ひとつの選択が訪れる。':active.title;
  el('story').textContent=!viewingPast&&state.pending?'この時代に暮らす人々には、それぞれ違う考えがある。どの選択にも、確かな未来は約束されていない。':active.body;
@@ -85,20 +92,20 @@ function render(){
  const memory=ensureMemory(state);
  const list=el('legacies-list');list.replaceChildren();
  const visibleKinds=new Map<string,{strength:number;established:number}>();
- for(const m of memory.log.filter(x=>x.year<=y)){
+ for(const m of (estimating?memory.log.slice(0,legacy.memoryCount):memory.log).filter(x=>x.year<=y)){
   if(m.action==='lost')visibleKinds.delete(m.kind);
   else visibleKinds.set(m.kind,{strength:m.strength??0,established:m.established??m.year});
  }
  for(const [k,v] of visibleKinds){const row=document.createElement('div');row.className='legacy-row';const name=document.createElement('strong');name.textContent=legacyNames[k as keyof typeof legacyNames];const detail=document.createElement('span');detail.textContent=`${format(v.established)}年から · ${Math.round(v.strength)} / 100 ${viewingPast?'（当時）':''}`;row.append(name,detail);list.append(row);}
  if(!visibleKinds.size){const empty=document.createElement('p');empty.textContent='まだ記録された制度や習慣はありません。';list.append(empty);}
  el('name').textContent=state.name;el('origin').textContent=`${state.homeland} / ${state.trait} · 観測地点：河畔（試作版）`;
- el('population').textContent=viewingPast?`約 ${format(scene.population)} 人（当時）`:`約 ${format(state.population)} 人`;
- el('food').textContent=viewingPast?'当時の推定値なし':label(state.food,'比較的豊か','不足している');
- el('cohesion').textContent=viewingPast?'当時の推定値なし':label(state.cohesion,'比較的安定','分かれつつある');
- el('knowledge').textContent=viewingPast?'当時の推定値なし':label(state.knowledge,'蓄積されている','伝承の途中');
- const records=expanded?state.history:state.history.slice(-5);const ol=el('timeline');ol.replaceChildren();
+ el('population').textContent=`約 ${format(scene.population)} 人${awaitingChoice?`（${format(y)}年の観測）`:viewingPast?'（当時）':''}`;
+ el('food').textContent=historicalStats?'観測年の記録なし':label(state.food,'比較的豊か','不足している');
+ el('cohesion').textContent=historicalStats?'観測年の記録なし':label(state.cohesion,'比較的安定','分かれつつある');
+ el('knowledge').textContent=historicalStats?'観測年の記録なし':label(state.knowledge,'蓄積されている','伝承の途中');
+ const records=expanded?confirmedRecords:confirmedRecords.slice(-5);const ol=el('timeline');ol.replaceChildren();
  for(const e of [...records].reverse()){const li=document.createElement('li');li.tabIndex=0;li.classList.toggle('active',viewingPast&&active.id===e.id);const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  ${e.tag}`;li.append(time,document.createTextNode(e.title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
- el('toggle-all').textContent=expanded?'最近の5件だけ見る −':`過去の記録をすべて見る ＋（${state.history.length}件）`;
+ el('toggle-all').textContent=expanded?'最近の5件だけ見る −':`過去の記録をすべて見る ＋（${confirmedRecords.length}件）`;
 }
 function forward(){if(viewedYear!==null){viewedYear=null;render();return;}if(state.pending){render();scheduleChoice();return;}const start=state.history.length;let passes=0;while(passes<36&&!state.pending){advance(state,1);passes++;if(state.history.length>start)break;}render();scheduleChoice();}
 el('step').addEventListener('click',forward);
@@ -113,5 +120,5 @@ function restart(seed:number){stop();state=createCivilization(seed);viewedYear=n
 el('restart').addEventListener('click',()=>restart(Number(input.value)||1));
 el('random').addEventListener('click',()=>restart(Math.floor(Math.random()*4294967295)+1));
 el('save').addEventListener('click',()=>{try{localStorage.setItem(STORAGE,JSON.stringify(state));el('feedback').textContent='この文明の歴史をブラウザに保存しました。';}catch{el('feedback').textContent='保存できませんでした。ブラウザの設定をご確認ください。';}});
-el('load').addEventListener('click',()=>{try{const raw=localStorage.getItem(STORAGE)??localStorage.getItem(OLD_STORAGE);if(!raw){el('feedback').textContent='保存された記録がありません。';return;}const data=JSON.parse(raw) as CivilizationState;if(data.version!==2||!Array.isArray(data.history)||!Array.isArray(data.decisions)||!Array.isArray(data.samples)||typeof data.rngState!=='number')throw Error('Invalid save');stop();state=clone(data);ensureMemory(state);viewedYear=null;input.value=String(state.seed);expanded=false;render();el('feedback').textContent='保存された歴史を開きました。';}catch{el('feedback').textContent='この保存データを読み込めませんでした。';}});
+el('load').addEventListener('click',()=>{try{const raw=localStorage.getItem(STORAGE)??OLD_STORAGE.map(key=>localStorage.getItem(key)).find(value=>value!==null);if(!raw){el('feedback').textContent='保存された記録がありません。';return;}const data=JSON.parse(raw) as CivilizationState;if((data.version!==2&&data.version!==3)||!Number.isSafeInteger(data.population)||data.population<60||!Number.isSafeInteger(data.year)||data.year<0||!Array.isArray(data.history)||!Array.isArray(data.decisions)||!Array.isArray(data.samples)||typeof data.rngState!=='number')throw Error('Invalid save');const loaded=migrateCivilization(data);ensureMemory(loaded);snapshotAt(loaded,lastObservedYear(loaded));stop();state=loaded;viewedYear=null;input.value=String(state.seed);expanded=false;render();el('feedback').textContent='保存された歴史を開きました。';}catch{el('feedback').textContent='この保存データを読み込めませんでした。';}});
 render();
