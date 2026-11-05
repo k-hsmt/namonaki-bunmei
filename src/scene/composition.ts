@@ -15,6 +15,8 @@ export interface ComposedStructure {
  readonly condition:SiteObject['condition'];
  readonly footprint:'home'|'field'|'civic'|'trade'|'bridge'|'memorial';
  readonly architecturalSeed:number;
+ readonly civicStyle?:'great-hall'|'courtyard-hall';
+ readonly civicFootprint?:HousingPlot;
 }
 export interface ComposedBlock {
  readonly anchorId:string;
