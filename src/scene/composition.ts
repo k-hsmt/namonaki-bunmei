@@ -1,3 +1,4 @@
+import {findHousingGroundConflicts} from './housing-ground.js';
 import {housingAt,type HousingHistory,type HousingCondition,type HousingUse,type HousingPlot} from '../story/housing-history.js';
 import type {SiteObject,SiteSnapshot,VisualLevel} from './model.js';
 
@@ -114,6 +115,8 @@ export function composeScene(s:SiteSnapshot,housing?:HousingHistory):SceneCompos
  const riverUse:SceneComposition['riverUse']=working?'working':bridge?'footpath':'natural';
  const siteId=(['river-bank','hill-side','coast-inlet'] as const)[s.local?.index??0]??'river-bank';
  const historic=housingAt(housing,s.year,siteId);
+ const conflicts=findHousingGroundConflicts(historic.blocks,s.objects,s.local?.index??0);
+ if(conflicts.length)throw new Error('住宅街区の地表敷地が衝突: '+JSON.stringify(conflicts));
  const residentialBlocks=historic.blocks.map(projectHousingBlock);
  return {year:s.year,siteIndex:s.local?.index??0,scale,trend,
   population:s.local?.population??s.population,structures,blocks,riverUse,
