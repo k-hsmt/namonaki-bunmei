@@ -14,9 +14,10 @@ const history={introducedYear:0,legacyUntracked:false,events:[
  event(110,'built',b),
  event(150,'expanded',{...a,housingCount:4}),
  event(180,'underused',{...a,housingCount:4,use:'underused'}),
+ event(195,'damaged',{...a,housingCount:4,use:'underused',condition:'damaged'}),
  event(200,'ruined',{...a,housingCount:4,condition:'ruined',use:'vacant'}),
- event(215,'repaired',{...a,housingCount:4,condition:'sound',use:'vacant'}),
- event(220,'reused',{...a,housingCount:4,condition:'sound',use:'occupied'}),
+ event(215,'repaired',{...a,housingCount:4,condition:'sound',use:'vacant',lastRenovatedYear:215}),
+ event(220,'reused',{...a,housingCount:4,condition:'sound',use:'occupied',lastRenovatedYear:215}),
 ]};
 const snapshot=(year)=>({year,population:6000,phase:'fixture',atmosphere:'',
  sceneEvent:null,eventYear:null,scars:[],local:{index:0,population:6000},
