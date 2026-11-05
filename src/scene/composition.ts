@@ -1,3 +1,4 @@
+import {housingAt,type HousingHistory,type HousingCondition,type HousingUse,type HousingPlot} from '../story/housing-history.js';
 import type {SiteObject,SiteSnapshot,VisualLevel} from './model.js';
 
 /**
@@ -21,6 +22,24 @@ export interface ComposedBlock {
  readonly condition:SiteObject['condition'];
  readonly treatment:'path'|'courtyard'|'paving'|'overgrown';
 }
+export interface ComposedRoofPart {
+ readonly partId:string;
+ readonly blockId:string;
+ readonly x:number;readonly y:number;
+ readonly depth:'far'|'middle'|'near';
+ readonly styleId:'low'|'terraced'|'courtyard';
+ readonly variant:number;
+ readonly representedUnits:number;
+ readonly condition:HousingCondition;
+ readonly use:HousingUse;
+}
+export interface ComposedHousingBlock {
+ readonly blockId:string;readonly footprint:HousingPlot;
+ readonly builtYear:number;readonly housingCount:number;
+ readonly condition:HousingCondition;readonly use:HousingUse;
+ readonly roofPartCount:number;readonly slotCapacity:number;
+ readonly roofParts:readonly ComposedRoofPart[];
+}
 export interface SceneComposition {
  readonly year:number;
  readonly siteIndex:number;
@@ -30,6 +49,8 @@ export interface SceneComposition {
  readonly structures:readonly ComposedStructure[];
  readonly blocks:readonly ComposedBlock[];
  readonly riverUse:'natural'|'footpath'|'working'|'quay';
+ readonly housingStatus:'unknown'|'known';
+ readonly residentialBlocks:readonly ComposedHousingBlock[];
 }
 function stableHash(s:string):number {
  let h=2166136261;
@@ -44,7 +65,35 @@ function footprint(kind:SiteObject['kind']):ComposedStructure['footprint'] {
  if(kind==='market'||kind==='workshop')return 'trade';
  return 'memorial';
 }
-export function composeScene(s:SiteSnapshot):SceneComposition {
+/**
+ * 描画の屋根部品は住宅数の正本ではない。1部品で複数住戸を表せる。
+ * 座標は固定敷地とstyleSeedだけで決まり、規模変更で並び替わらない。
+ */
+function projectHousingBlock(b:ReturnType<typeof housingAt>['blocks'][number]):ComposedHousingBlock{
+ const {footprint:f}=b;
+ const depth=f.y<106?'far' as const:f.y<132?'middle' as const:'near' as const;
+ const step=depth==='far'?6:depth==='middle'?9:12;
+ const across=Math.max(1,Math.floor(f.width/step));
+ const down=Math.max(1,Math.floor(f.depth/Math.max(4,step-2)));
+ const slotCapacity=across*down;
+ const roofPartCount=Math.min(slotCapacity,b.housingCount);
+ const roofParts:ComposedRoofPart[]=[];
+ for(let i=0;i<roofPartCount;i++){
+  const units=Math.floor(b.housingCount/roofPartCount)+(i<b.housingCount%roofPartCount?1:0);
+  roofParts.push({
+   partId:b.blockId+':'+i,blockId:b.blockId,
+   x:f.x+(i%across)*step+Math.floor(step/2),
+   y:f.y+Math.floor(i/across)*Math.max(4,step-2)+Math.max(4,step-2),
+   depth,styleId:b.styleId,
+   variant:(stableHash(b.blockId+':'+b.styleSeed+':'+i)%4),
+   representedUnits:units,condition:b.condition,use:b.use,
+  });
+ }
+ return {blockId:b.blockId,footprint:{...f},builtYear:b.builtYear,
+  housingCount:b.housingCount,condition:b.condition,use:b.use,
+  slotCapacity,roofPartCount,roofParts};
+}
+export function composeScene(s:SiteSnapshot,housing?:HousingHistory):SceneComposition {
  const scale=s.visual?.scale??0;
  const trend=s.visual?.trend??'stable';
  const structures=s.objects.map(o=>({
@@ -63,6 +112,10 @@ export function composeScene(s:SiteSnapshot):SceneComposition {
  const bridge=facilities.some(o=>o.footprint==='bridge');
  // Do not imply a wharf exists merely because population crosses a threshold.
  const riverUse:SceneComposition['riverUse']=working?'working':bridge?'footpath':'natural';
+ const siteId=(['river-bank','hill-side','coast-inlet'] as const)[s.local?.index??0]??'river-bank';
+ const historic=housingAt(housing,s.year,siteId);
+ const residentialBlocks=historic.blocks.map(projectHousingBlock);
  return {year:s.year,siteIndex:s.local?.index??0,scale,trend,
-  population:s.local?.population??s.population,structures,blocks,riverUse};
+  population:s.local?.population??s.population,structures,blocks,riverUse,
+ housingStatus:historic.status,residentialBlocks};
 }
