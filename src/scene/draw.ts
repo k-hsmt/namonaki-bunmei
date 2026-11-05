@@ -1,3 +1,4 @@
+import {projectStreetscape} from './streetscape.js';
 import type {HousingHistory} from '../story/housing-history.js';
 import type {SiteSnapshot,SiteObject,VisualProfile} from './model.js';
 import {composeScene,type SceneComposition} from './composition.js';
@@ -189,6 +190,22 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
   for(let i=0;i<3;i++)rect(c,211+i*6,145,3,3,'#91785b');
  }
 }
+/** H4-D2: 両端に確定した住宅がある歩行の痕跡と既存公共施設の前庭。
+ * すべて地表検査済みであり、未記録の道路・広場を新設しない。
+ */
+function drawStreetscape(c:C,scene:SceneComposition,buildings:readonly SiteObject[]):void {
+ for(const mark of projectStreetscape(scene,buildings)){
+  const base=mark.kind==='lane'?'#b8a888':'#c4b294';
+  rect(c,mark.x,mark.y,mark.width,mark.depth,base);
+  if(mark.kind==='lane'&&mark.width>=5){
+   rect(c,mark.x+1,mark.y,mark.width-2,1,'#9e9078');
+  }
+  if(mark.kind==='forecourt'){
+   for(let dx=1;dx<mark.width-1;dx+=4)rect(c,mark.x+dx,mark.y+1,2,1,'#968b73');
+  }
+ }
+}
+
 /**
  * H4-B: 確定済み街区の敷地内にだけ、屋根をつなぐ生活面を描く。
  * 道路・公共施設の履歴を捏造しない。水辺や既存施設への重複は
@@ -285,6 +302,7 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,ho
  const composition=composeScene(s,housing);
  if(s.visual){builtGround(c,s.visual,index);neighborhood(c,s.objects,s.visual,index);}
  drawHistorySurface(c,composition);
+ drawStreetscape(c,composition,s.objects);
  drawHousingPlotSurface(c,composition);
  // すべての住宅屋根を確定施設より先に描く。
  // 前景住宅は住宅内では前に見えるが、歴史上の市場・集会所・仕事場を隠さない。
