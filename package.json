@@ -8,10 +8,14 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "dev": "npm run build && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs"
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "test:browser": "npm run build && node --test tests/browser/*.test.mjs"
   },
   "devDependencies": {
+    "playwright": "1.62.1",
     "typescript": "^5.8.3"
   },
-  "engines": {"node": ">=20"}
+  "engines": {
+    "node": ">=20"
+  }
 }
