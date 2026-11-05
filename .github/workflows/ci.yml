@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, feat/v06-visual-enhancement-a]
 
 permissions:
   contents: read
@@ -41,5 +41,7 @@ jobs:
         if: always()
         with:
           name: visual-a-comparison
-          path: artifacts/visual-a/*.png
+          path: |
+            artifacts/visual-a/*.png
+            artifacts/history-b/*
           if-no-files-found: warn
