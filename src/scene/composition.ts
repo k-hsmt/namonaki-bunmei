@@ -50,7 +50,7 @@ export interface SceneComposition {
  readonly structures:readonly ComposedStructure[];
  readonly blocks:readonly ComposedBlock[];
  readonly riverUse:'natural'|'footpath'|'working'|'quay';
- readonly housingStatus:'unknown'|'known';
+ readonly housingStatus:'unknown'|'partial'|'known';
  readonly residentialBlocks:readonly ComposedHousingBlock[];
 }
 function stableHash(s:string):number {
