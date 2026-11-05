@@ -1,10 +1,13 @@
 import {advance,choose,chooseAutomatically,createCivilization,migrateCivilization,lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import type {CivilizationState,RecordEntry} from './story/engine.js';
 import {snapshotAt} from './scene/model.js';
+import {siteAt} from './story/settlement-history.js';
+import {practiceNames} from './story/society.js';
 import {drawScene} from './scene/draw.js';
 const el=(id:string)=>document.getElementById(id)!;
 const input=el('seed') as HTMLInputElement;
 const scrubber=el('rewind-year') as HTMLInputElement;
+const siteSelect=el('site-select') as HTMLSelectElement;
 const canvas=el('scene') as HTMLCanvasElement;
 const slot=el('choice');
 const speedInput=el('speed') as HTMLSelectElement;
@@ -68,9 +71,18 @@ function render(){
  if(viewedYear===null||!observedRecords.includes(active))active=observedRecords.at(-1)??state.history[0]!;
  const awaitingChoice=!viewingPast&&Boolean(state.pending);
  const historicalStats=viewingPast||awaitingChoice||estimating;
- const scene=snapshotAt(state,y);
+ const siteIndex=Number(siteSelect.value);
+ const scene=snapshotAt(state,y,siteIndex);
+ const site=siteAt(state.observation?.sites,siteIndex,y);
+ el('scene-place').hidden=!site;
+ if(site&&scene.local){
+  const population=`${format(scene.local.population)}人`;
+  const affiliation=site.communityId==='founding-community'?'共同の寄り合い':'独自の寄り合い';
+  el('site-residents').textContent=site.inhabited?`${population} · ${affiliation}`:population;
+  el('site-practices').textContent=site.practices.map(p=>`${practiceNames[p.kind]}${p.active?'':'（途絶）'}`).join(' · ');
+ }
  drawScene(canvas,scene,state.seed);
- el('scene-year').textContent=`世界暦 ${format(y)}年${estimating?' · 推定情景':''}`;
+ el('scene-year').textContent=`世界暦 ${format(y)}年${!scene.local?' · 推定情景':''}`;
  el('scene-phase').textContent=scene.phase;
  el('scene-atmosphere').textContent=scene.atmosphere;
  el('past-notice').hidden=!viewingPast;
@@ -110,7 +122,7 @@ function render(){
  }
  for(const [k,v] of visibleKinds){const row=document.createElement('div');row.className='legacy-row';const name=document.createElement('strong');name.textContent=legacyNames[k as keyof typeof legacyNames];const detail=document.createElement('span');detail.textContent=`${format(v.established)}年から · ${Math.round(v.strength)} / 100 ${viewingPast?'（当時）':''}`;row.append(name,detail);list.append(row);}
  if(!visibleKinds.size){const empty=document.createElement('p');empty.textContent='まだ記録された制度や習慣はありません。';list.append(empty);}
- el('name').textContent=state.name;el('origin').textContent=`${state.homeland} / ${state.trait} · 観測地点：河畔（試作版）`;
+ el('name').textContent=state.name;el('origin').textContent=`${state.homeland} / ${state.trait}`;
  el('population').textContent=`約 ${format(scene.population)} 人${awaitingChoice?`（${format(y)}年の観測）`:viewingPast?'（当時）':''}`;
  el('food').textContent=historicalStats?'観測年の記録なし':label(state.food,'比較的豊か','不足している');
  el('cohesion').textContent=historicalStats?'観測年の記録なし':label(state.cohesion,'比較的安定','分かれつつある');
@@ -120,6 +132,7 @@ function render(){
  el('toggle-all').textContent=expanded?'最近の5件だけ見る −':`過去の記録をすべて見る ＋（${confirmedRecords.length}件）`;
 }
 function forward(){if(viewedYear!==null){viewedYear=null;render();return;}if(state.pending){render();scheduleChoice();return;}const start=state.history.length;let passes=0;while(passes<36&&!state.pending){advance(state,1);passes++;if(state.history.length>start)break;}render();scheduleChoice();}
+siteSelect.addEventListener('change',render);
 el('step').addEventListener('click',forward);
 speedInput.addEventListener('change',()=>{if(timer!==null)start();});
 autoChoiceInput.addEventListener('change',()=>{if(autoChoiceInput.checked)scheduleChoice();else clearChoiceTimer();});

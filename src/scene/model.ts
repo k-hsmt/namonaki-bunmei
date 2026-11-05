@@ -1,8 +1,10 @@
 import {lastObservedYear,type CivilizationState} from '../story/engine.js';
 import {observationAt} from '../story/observations.js';
+import {scaleNames, siteAt} from '../story/settlement-history.js';
+import {siteNames} from '../story/society.js';
 
-export interface SiteObject {id:string; kind:'house'|'hall'|'bridge'|'field'|'ruin'|'memorial';x:number;y:number;builtYear:number;condition:'intact'|'damaged'|'ruined';}
-export interface SiteSnapshot {year:number; population:number; phase:string; atmosphere:string; sceneEvent:string|null; objects:SiteObject[]; eventYear:number|null; scars:string[];}
+export interface SiteObject {id:string; kind:'house'|'hall'|'bridge'|'field'|'ruin'|'memorial'|'market'|'workshop'|'granary';x:number;y:number;builtYear:number;condition:'intact'|'damaged'|'ruined';}
+export interface SiteSnapshot {year:number; population:number; phase:string; atmosphere:string; sceneEvent:string|null; objects:SiteObject[]; eventYear:number|null; scars:string[]; local?:{index:number;population:number};}
 const lots=[{x:55,y:113},{x:86,y:100},{x:116,y:109},{x:159,y:98},{x:201,y:107},{x:231,y:93},{x:271,y:105},{x:96,y:129},{x:179,y:123},{x:257,y:131}];
 const mix=(seed:number,i:number)=>{let x=(seed ^ Math.imul(i+1,0x9e3779b9))>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;return x>>>0;};
 export function populationAt(s:CivilizationState,year:number):number {
@@ -24,7 +26,7 @@ export function populationAt(s:CivilizationState,year:number):number {
  if(last&&endYear>last.year){const t=(year-last.year)/(endYear-last.year);return Math.round(last.population+(endPopulation-last.population)*t);}
  return endPopulation;
 }
-export function snapshotAt(s:CivilizationState,year:number):SiteSnapshot {
+export function snapshotAt(s:CivilizationState,year:number,siteIndex=0):SiteSnapshot {
  if(!Number.isInteger(year)||year<0||year>lastObservedYear(s))throw Error('観測年が不正です');
  const boundary=s.observation?.legacy;
  const legacy=boundary&&year<=boundary.year?boundary:null;
@@ -35,7 +37,9 @@ export function snapshotAt(s:CivilizationState,year:number):SiteSnapshot {
  const recent=past.filter(e=>year-e.year<=14);
  const lead=recent.at(-1)??null;
  const scars:string[]=[];
+ const site=siteAt(s.observation?.sites,siteIndex,year);
  const objects:SiteObject[]=[];
+ if(!site){
  // The same numbered lots represent the same pieces of ground for every date.
  const slots=Math.min(lots.length,Math.max(2,Math.floor(Math.log2(Math.max(1,pop)/1350))+2));
  for(let i=0;i<lots.length;i++){
@@ -54,15 +58,35 @@ export function snapshotAt(s:CivilizationState,year:number):SiteSnapshot {
  }
  if(year>=70)objects.push({id:'bridge',kind:'bridge',x:148,y:143,builtYear:70,condition:recent.some(e=>e.title.includes('洪水')||e.title.includes('堤を越える'))?'damaged':'intact'});
  for(const e of past){if(e.tag==='文化'&&e.year>100&&mix(s.seed,e.year)%5===0){const id=`memorial-${e.id}`;if(!objects.some(o=>o.id===id)){objects.push({id,kind:'memorial',x:35+(mix(s.seed,e.year)%5)*45,y:130,builtYear:e.year,condition:'intact'});}}}
- const latest=lead?.title??'';
- if(latest.includes('熱病')||latest.includes('病'))scars.push('epidemic');
- if(latest.includes('堤を越える'))scars.push('flood');
- if(latest.includes('雨を待つ')||latest.includes('飢え'))scars.push('drought');
- if(latest.includes('祭り')||latest.includes('歌'))scars.push('festival');
- if(latest.includes('火災'))scars.push('fire');
- if(latest.includes('旅人')||latest.includes('移住'))scars.push('travel');
- if(latest.includes('大地が揺れ'))scars.push('quake');
+ }
+ const atmosphericEvent=recent.filter(event=>event.tag!=='地域').at(-1);
+ if(site){
+  const kind=atmosphericEvent?.kind;
+  if(kind==='disease')scars.push('epidemic');
+  if(kind==='flood'&&siteIndex===0)scars.push('flood');
+  if(kind==='drought'||kind==='famine')scars.push('drought');
+  if(kind==='ritual'||kind==='song')scars.push('festival');
+  if(kind==='fire'&&siteIndex===0)scars.push('fire');
+  if(kind==='arrival'||kind==='migration')scars.push('travel');
+  if(kind==='earthquake')scars.push('quake');
+ }else{
+  const latest=atmosphericEvent?.title??'';
+  if(latest.includes('熱病')||latest.includes('病'))scars.push('epidemic');
+  if(latest.includes('堤を越える'))scars.push('flood');
+  if(latest.includes('雨を待つ')||latest.includes('飢え'))scars.push('drought');
+  if(latest.includes('祭り')||latest.includes('歌'))scars.push('festival');
+  if(latest.includes('火災'))scars.push('fire');
+  if(latest.includes('旅人')||latest.includes('移住'))scars.push('travel');
+  if(latest.includes('大地が揺れ'))scars.push('quake');
+ }
  const town=past.some(e=>e.title==='村々の中心に大きな町が生まれる');const broken=past.some(e=>e.title==='長く続いた共同の決まりが解かれる');const phase=pop<7000?'小さな集落':broken&&pop<25000?'離れてゆく村々':town&&pop>23000?'河畔の町':pop<25000?'川辺の村':'広がる集落';
  const atmosphere=scars.includes('epidemic')?'人通りが少ない':scars.includes('flood')?'水が増している':scars.includes('drought')?'乾いた季節':scars.includes('festival')?'人々の集まり':scars.includes('fire')?'焼け跡の残る土地':'日々の暮らし';
- return {year,population:pop,phase,atmosphere,sceneEvent:lead?.title??null,objects,eventYear:lead?.year??null,scars};
+ const summary={year,population:pop,phase,atmosphere,sceneEvent:lead?.title??null,objects,eventYear:lead?.year??null,scars};
+ if(!site)return summary;
+ const local=observationAt(s.observation!,year)!.residents[siteIndex]!.population;
+ const trends={stable:'日々の暮らし',expanding:'建設と往来が続く',contracting:'暮らしが縮みつつある',reorganizing:'暮らしの決まりが変わりつつある'};
+ return {...summary,local:{index:siteIndex,population:local},
+  phase:`${siteNames[siteIndex]} · ${site.inhabited?scaleNames[site.scale]:'無人の土地'}`,
+  atmosphere:site.inhabited?trends[site.trend]:'人のいない風景',
+  objects:site.buildings.map(building=>({...building}))};
 }

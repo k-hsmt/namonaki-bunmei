@@ -1,5 +1,7 @@
 import { populationColumns, populationTotal } from './population.js';
 
+import {communityAt, type SettlementHistory} from './settlement-history.js';
+
 const checkpointInterval = 100;
 
 export interface LegacyBoundary {
@@ -18,6 +20,7 @@ interface ObservationBlock {
 
 export interface ObservationLedger {
   people: number[];
+  sites?: SettlementHistory;
   blocks: ObservationBlock[];
   lastYear: number | null;
   legacy: LegacyBoundary | null;
@@ -58,6 +61,7 @@ export function observationAt(ledger: ObservationLedger, year: number) {
     population: populationTotal(people),
     residents: populationColumns.map((column, index) => ({
       ...column,
+      communityId: communityAt(ledger.sites,index,year)??column.communityId,
       population: people[index]!,
     })),
   };
