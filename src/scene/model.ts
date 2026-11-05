@@ -117,6 +117,7 @@ export function snapshotAt(s:CivilizationState,year:number,siteIndex=0):SiteSnap
  return {...summary,local:{index:siteIndex,population:local},
   phase:`${siteNames[siteIndex]} · ${site.inhabited?scaleNames[site.scale]:'無人の土地'}`,
   atmosphere:site.inhabited?trends[site.trend]:'人のいない風景',
-  objects:site.buildings.map(building=>({...building})),
+  objects:site.buildings.map(building=>({...building,
+   ...(building.civic?{civic:{...building.civic,footprint:{...building.civic.footprint}}}:{})})),
   visual:visualProfile(site.scale,site.trend,site.inhabited,site.buildings)};
 }

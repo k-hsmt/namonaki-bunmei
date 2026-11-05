@@ -15,6 +15,8 @@ export interface ComposedStructure {
  readonly condition:SiteObject['condition'];
  readonly footprint:'home'|'field'|'civic'|'trade'|'bridge'|'memorial';
  readonly architecturalSeed:number;
+ readonly civicStyle?:'great-hall'|'courtyard-hall';
+ readonly civicFootprint?:HousingPlot;
 }
 export interface ComposedBlock {
  readonly anchorId:string;
@@ -100,6 +102,7 @@ export function composeScene(s:SiteSnapshot,housing?:HousingHistory):SceneCompos
  const structures=s.objects.map(o=>({
   id:o.id,kind:o.kind,x:o.x,y:o.y,builtYear:o.builtYear,
   condition:o.condition,footprint:footprint(o.kind),architecturalSeed:stableHash(o.id),
+  ...(o.civic?{civicStyle:o.civic.architectureStyle,civicFootprint:{...o.civic.footprint}}:{}),
  }));
  const occupied=structures.filter(o=>o.footprint!=='bridge'&&o.footprint!=='memorial'&&o.footprint!=='field');
  const blocks=occupied.map(o=>({

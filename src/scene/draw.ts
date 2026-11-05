@@ -10,6 +10,62 @@ function poly(c:C,points:number[],col:string){c.fillStyle=col;c.beginPath();c.mo
 function rng(seed:number){let z=seed>>>0;return ()=>{z=(Math.imul(1664525,z)+1013904223)>>>0;return z/4294967296;};}
 function tree(c:C,x:number,y:number,k=1){rect(c,x-1*k,y-8*k,3*k,12*k,'#625745');rect(c,x-6*k,y-20*k,13*k,11*k,'#607b57');rect(c,x-10*k,y-17*k,8*k,9*k,'#77916a');rect(c,x+4*k,y-16*k,7*k,9*k,'#4d7055');rect(c,x-4*k,y-24*k,9*k,6*k,'#849672');}
 /** H4-D1: 建設時の施設種別だけで輪郭を決める。規模・年・人口に依存しない。 */
+/** H4-D4-C: 新築時に確定した公共施設だけを大きい建築として描く。
+ * 実施設の独立した1件であり、住宅や規模分類から生成される飾りではない。
+ */
+export function drawCivicArchitecture(c:C,o:SiteObject):void{
+ const civic=o.civic;
+ if(!civic||o.kind!=='hall')return;
+ const {x,y}=o;
+ const court=civic.architectureStyle==='courtyard-hall';
+ const half=court?28:22;
+ if(o.condition==='ruined'){
+  // 同じ様式を維持したまま、壁・屋根の一部が欠ける。
+  rect(c,x-half-1,y-3,half*2+3,5,'#8b8874');
+  rect(c,x-half-1,y-18,7,18,'#9b947c');
+  rect(c,x+half-5,y-15,6,17,'#a79b80');
+  if(court){
+   rect(c,x-12,y-6,24,3,'#a39c83');
+   rect(c,x-25,y-21,15,3,'#7c7464');
+   rect(c,x+14,y-23,13,3,'#857767');
+  }else{
+   poly(c,[x-21,y-19,x-9,y-27,x-3,y-20],'#857867');
+   rect(c,x+9,y-21,9,3,'#777064');
+  }
+  for(let k=-half+8;k<half;k+=11)rect(c,x+k,y+3,3,2,'#747e66');
+  return;
+ }
+ const damaged=o.condition==='damaged';
+ if(court){
+  // 低い両翼棟と中央に開いた中庭。「大きい家」にならない空間的な抜け。
+  rect(c,x-29,y-15,19,17,'#b0a18a');
+  rect(c,x+11,y-15,19,17,'#b5a68b');
+  poly(c,[x-32,y-15,x-20,y-29,x-7,y-15],'#80756a');
+  poly(c,[x+8,y-15,x+20,y-30,x+33,y-15],'#80756a');
+  // 奥の回廊と手前の回廊で中庭の空隙を囲む。
+  rect(c,x-13,y-19,27,4,'#997f67');
+  for(const dx of [-11,-4,4,11])rect(c,x+dx,y-14,2,6,'#c5ae8c');
+  rect(c,x-11,y-8,23,10,'#b7a888');
+  rect(c,x-10,y-7,21,7,'#a99c7f');
+  rect(c,x-3,y-4,7,4,'#879777');
+  rect(c,x-31,y+1,63,3,'#847765');
+  rect(c,x-18,y-7,5,7,'#5d5d52');
+  rect(c,x+14,y-7,5,7,'#5d5d52');
+  // 手前の列柱を断続的にして中庭が原寸で見える余地を保つ。
+  for(const dx of [-10,10])rect(c,x+dx,y-1,2,4,'#8e775e');
+  if(damaged){rect(c,x+16,y-26,7,5,'#a29b83');rect(c,x-26,y-15,5,4,'#6c665b');}
+ }else{
+  // 大きな会堂：通常のhallより屋根高と列柱のスパンを大きく取る。
+  rect(c,x-22,y-17,45,19,'#b7aa91');
+  rect(c,x-24,y-21,49,5,'#8d7967');
+  poly(c,[x-26,y-21,x,y-38,x+26,y-21],'#77756d');
+  rect(c,x-26,y+1,53,3,'#8c7e68');
+  for(const dx of [-18,-11,10,17])rect(c,x+dx,y-11,3,13,'#d0bfa0');
+  rect(c,x-5,y-10,11,12,'#545b55');
+  rect(c,x-4,y-12,9,2,'#8b806f');
+  if(damaged){rect(c,x+12,y-31,8,5,'#aaa18a');rect(c,x-22,y-20,6,3,'#656960');}
+ }
+}
 export function drawBuildingSprite(c:C,o:SiteObject,stone:boolean):void {
  const {x,y}=o;
  if(o.condition==='ruined'){
@@ -310,7 +366,11 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,ho
  drawResidentialRoofs(c,composition,'middle');
  drawResidentialRoofs(c,composition,'near');
  const stone=!s.local&&(s.objects.filter(o=>o.kind==='memorial').length>2 || population>47000);
+ // 大型公共施設の屋根は住宅より前景、既存の市場・小規模施設より背面。
+ // こうして新しい建物によって古い橋・市場の視認性を消さない。
+ for(const o of s.objects)if(o.civic&&o.kind==='hall')drawCivicArchitecture(c,o);
  for(const o of s.objects){
+  if(o.civic&&o.kind==='hall')continue;
   if(o.kind==='bridge')continue;
   if(o.condition==='ruined'){drawBuildingSprite(c,o,false);continue;}
   if(o.kind==='field'){
