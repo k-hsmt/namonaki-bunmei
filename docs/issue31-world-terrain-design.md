@@ -190,6 +190,9 @@ interface Geography {
 interface GroundShape {
   id:string; kind:'land'|'freshwater'|'sea'|'island'|'slope'|'cliff'|'sandbar';
   polygon:Polygon; grade:Grade; elevation:number;
+  streamId:string|null; // 淡水形状のみ必須。他はnull
+  elevationProfile:null | {axis:'x'|'y'; knots:readonly Point[]};
+  // knots=[画面軸座標,相対標高]。斜面のみ必須、他はnull
 }
 interface Silhouette {
   landmarkIds:readonly string[]; contour:readonly Point[];
@@ -602,3 +605,12 @@ H08はC01/C02/C04/C08のみ。H01の岬側・H06の谷方向・M06の海への�
 legacy-fixedの進行はv4互換経路（既存の住宅・civic・空地台帳の有無も維持）。generatedの進行だけが3地区の新土地ゲート・候補探索を使う。version番号だけで地形を選ばず、validated modeと保存されたplacementPolicyを読む。`terrain-placement-v1` を保存した世界には将来もv1規則を適用し、最新版で未来の候補順位を変更しない。地形結果を保存することと、将来の建設方針を固定することは別の責務である。新しい方針への任意移行はこのIssueでは作らない。
 
 文明計算への直接変更はしないが、新建設イベントの追加で履歴ID・文言・規模分類が変わることはある。D3接続試験では純粋関数の非干渉テスト、旧互換の完全回帰、新規世界の意図した差分を3種類の別レポートにする。既存の歴史が一致しないことを、地形生成の乱数バグと同一視しない一方、意図しない人口・食料・災害系列差を見逃さない。
+
+
+### A.6 斜面プロファイル・水路ID・hashの固定表現
+
+斜面形状にはelevationProfileを保存する。knotsは軸座標昇順で2点以上、同座標重複なし、端点が当該polygonの軸範囲を覆うこと。各セル中心の軸座標を線形補間しMath.roundで整数標高にする。非斜面はelevation一定。地表を全て描いた後、陸の隣接4セルとの最大標高差でgradeを検証し、水面・背景はgrade0、岩壁はgrade2の例外とする。斜面パーツが重なる場合は保存配列の後勝ちで、配列順を保存後に並び替えない。profileのPointは軸座標と標高の組であり、画面のx,y用validatorと別に値域を検査する。
+
+全淡水shapeにstreamIdを保存する。合流・分流の接合から上下8pxは架橋除外域とし、その外では一つのIDに属する単連続水域だけ橋候補にする。physicsの水種だけで支流IDを推定せず、保存済みshapeとportsから得る。中州で切れた二つの水域を一つの横橋候補にまとめない。
+
+hashの整数mixは `k ^= k>>>16; k=Math.imul(k,0x7feb352d); k ^= k>>>15; k=Math.imul(k,0x846ca68b); k ^= k>>>16; return k>>>0`。FNV-1a初期値2166136261、各UTF-8バイトごとにxor→Math.imul(16777619)、各要素の前にUTF-8バイト長をuint32 little-endianの4バイトで同じ処理へ入れる。数値要素は符号なし整数の10進ASCII、欠損要素は空文字、要素順は§4.2で固定。生のJSON.stringifyやlocale比較の出力をhashへ使わない。これをD1のgolden vectorで固定し、変更時はgeneratorId／placementPolicyを更新する。
