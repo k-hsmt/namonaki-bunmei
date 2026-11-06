@@ -251,8 +251,15 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
  */
 function drawStreetscape(c:C,scene:SceneComposition,buildings:readonly SiteObject[]):void {
  for(const mark of projectStreetscape(scene,buildings)){
-  const base=mark.kind==='lane'?'#b8a888':'#c4b294';
+  const base=mark.kind==='lane'?'#b8a888':mark.kind==='civic-approach'?'#a99b80':'#c4b294';
   rect(c,mark.x,mark.y,mark.width,mark.depth,base);
+  if(mark.kind==='civic-approach'){
+   // 小さな踏み跡の節目。舗装道路や新規施設を意味しない。
+   if(mark.width>7)for(let x=mark.x+2;x<mark.x+mark.width-1;x+=6)
+    rect(c,x,mark.y,2,1,'#c2ae8b');
+   if(mark.depth>7)for(let y=mark.y+2;y<mark.y+mark.depth-1;y+=6)
+    rect(c,mark.x,y,1,2,'#c2ae8b');
+  }
   if(mark.kind==='lane'&&mark.width>=5){
    rect(c,mark.x+1,mark.y,mark.width-2,1,'#9e9078');
   }
