@@ -4,7 +4,7 @@
  * 地形データ未整備の丘陵・入り江は確定イベントを発行しない。
  */
 import {hash01} from '../engine/rng.js';
-import type {ResidentialBlock,HousingHistory,ResidentialBlockEvent} from './housing-history.js';
+import type {HousingPlot,ResidentialBlock,HousingHistory,ResidentialBlockEvent} from './housing-history.js';
 import {housingAt} from './housing-history.js';
 import {findHousingGroundConflicts} from '../scene/housing-ground.js';
 import type {SiteObject} from '../scene/model.js';
@@ -16,6 +16,7 @@ export interface HousingProgressionInput{
  readonly siteIndex:number;
  readonly population:number;
  readonly buildings:readonly SiteObject[];
+ readonly publicSpacePlots?:readonly HousingPlot[];
 }
 export type HousingProgressionResult=
  |{status:'built';event:ResidentialBlockEvent}
@@ -49,6 +50,11 @@ export function proposeHousingConstruction(input:HousingProgressionInput):Housin
     styleSeed:(seed+year+count)>>>0,
    };
    if(findHousingGroundConflicts([...before.blocks,candidate],buildings,0).length!==0)continue;
+   if(input.publicSpacePlots?.some(plot=>
+    plot.x<candidate.footprint.x+candidate.footprint.width&&
+    candidate.footprint.x<plot.x+plot.width&&
+    plot.y<candidate.footprint.y+candidate.footprint.depth&&
+    candidate.footprint.y<plot.y+plot.depth))continue;
    return {status:'built',event:{year,seq:0,kind:'built',blockId:id,after:candidate}};
   }
  }
