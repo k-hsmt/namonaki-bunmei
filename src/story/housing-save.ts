@@ -5,6 +5,7 @@
 import {migrateCivilization,type CivilizationState} from './engine.js';
 import {housingAt,type HousingHistory,type ResidentialBlockEvent} from './housing-history.js';
 import {validateCivicLedger} from './civic-architecture.js';
+import {validatePublicSpaceLedger} from './public-space-history.js';
 
 export interface PersistedHousingHistory extends HousingHistory {
  readonly schemaVersion:1;
@@ -80,6 +81,8 @@ export function prepareHousingSave(raw:unknown):HousingSaveState{
   current.housing=validateHousing(current.housing,confirmed);
   // 新しく記録された大型公共建築のみ検査。旧v4の欠損はそのまま維持する。
   validateCivicLedger(current.observation?.sites,current.history,confirmed);
+  validatePublicSpaceLedger(current.publicSpaces,{confirmedYear:confirmed,
+   records:current.history,sites:current.observation?.sites,housing:current.housing});
   if(!current.housing.legacyUntracked&&current.housing.introducedYear!==0)fail('新規完全記録の導入年が0以外');
   return current;
  }

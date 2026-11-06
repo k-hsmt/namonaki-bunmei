@@ -1,0 +1,234 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHousingCivilization,parseHousingSave,serializeHousingSave} from '../dist/story/housing-persistence.js';
+import {step,chooseAutomatically} from '../dist/story/engine.js';
+import {housingAt} from '../dist/story/housing-history.js';
+import {siteAt} from '../dist/story/settlement-history.js';
+import {snapshotAt} from '../dist/scene/model.js';
+import {drawScene} from '../dist/scene/draw.js';
+import {proposeHousingConstruction} from '../dist/story/housing-progression.js';
+import {proposeCivicConstruction} from '../dist/story/civic-progression.js';
+import {createSettlementHistory} from '../dist/story/settlement-history.js';
+import {
+ publicSpacesAt,reviewPublicSpaceFoundation,appendConfirmedPublicSpace,
+ appendConfirmedPublicSpaceUse,overlapsPublicSpace,
+} from '../dist/story/public-space-history.js';
+const ledger=()=>({schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
+const fixture={
+ id:'public-river-bank-test-40',siteId:'river-bank',kind:'assembly-ground',
+ footprint:{x:5,y:155,width:24,depth:12},establishedYear:40,
+ anchorBuildingId:'hall-left',foundationRecordId:'40-space',condition:'used',
+};
+const hall={id:'hall-left',kind:'hall',x:35,y:140,builtYear:10,condition:'intact',recordId:'10-hall'};
+const established={id:'40-space',year:40,kind:'public-space-established',publicSpaceId:fixture.id};
+const params=(overrides={})=>({
+ siteIndex:0,year:40,candidate:fixture,buildings:[hall],housingBlocks:[],existing:[],
+ housingStatus:'known',records:[established],...overrides,
+});
+const hold=(result,reason)=>{assert.equal(result.status,'hold');assert.equal(result.reason,reason);};
+test('D7-A: 最小敷地・奇偶座標の公共空地も地表描画が敷地内に収まる',()=>{
+ const snapshot={year:70,population:0,phase:'手動描画fixture',atmosphere:'',
+  sceneEvent:null,objects:[],eventYear:null,scars:[],local:{index:0,population:0}};
+ const paint=spaces=>{
+  const commands=[];
+  const c={fillStyle:'',
+   fillRect(...args){commands.push({op:'fillRect',args,color:this.fillStyle});},
+   fill(){commands.push({op:'fill',color:this.fillStyle});},
+  };
+  for(const op of ['beginPath','closePath','lineTo','moveTo'])
+   c[op]=(...args)=>commands.push({op,args});
+  drawScene({getContext:()=>c},{...snapshot,publicSpaces:spaces},42);
+  return commands.map(command=>JSON.stringify(command));
+ };
+ const baseline=paint([]);
+ for(const x of [5,6])for(const width of [12,13,24])for(const depth of [6,7,8,10]){
+  for(const kind of ['assembly-ground','market-yard'])for(const condition of ['used','overgrown']){
+   const footprint={x,y:155,width,depth};
+   const actual=paint([{...fixture,footprint,kind,condition}]);
+   let first=0,last=0;
+   while(first<baseline.length&&baseline[first]===actual[first])first++;
+   while(last<baseline.length-first&&baseline.at(-1-last)===actual.at(-1-last))last++;
+   assert.equal(first+last,baseline.length,'公共空地以外の描画は変更しない');
+   const added=actual.slice(first,actual.length-last).map(command=>JSON.parse(command));
+   assert.ok(added.length>0,'公共空地を描画する');
+   for(const command of added){
+    assert.equal(command.op,'fillRect');
+    const [px,py,w,h]=command.args;
+    assert.ok(w>0&&h>0&&px>=x&&py>=155&&px+w<=x+width&&py+h<=155+depth,
+     JSON.stringify({footprint,kind,condition,command}));
+   }
+  }
+ }
+});
+test('D7-A: 建築・住宅・河川・予約敷地に衝突しない場所だけが明示新設候補',()=>{
+ assert.equal(reviewPublicSpaceFoundation(params()).status,'clear');
+ hold(reviewPublicSpaceFoundation(params({siteIndex:1})),'unsupported-terrain');
+ hold(reviewPublicSpaceFoundation(params({siteIndex:2})),'unsupported-terrain');
+ hold(reviewPublicSpaceFoundation(params({housingStatus:'unknown'})),'unknown-history');
+ hold(reviewPublicSpaceFoundation(params({housingStatus:'partial'})),'unknown-history');
+ hold(reviewPublicSpaceFoundation(params({records:[]})),'unconfirmed-event');
+ hold(reviewPublicSpaceFoundation(params({records:[established,established]})),'unconfirmed-event');
+ hold(reviewPublicSpaceFoundation(params({buildings:[]})),'anchor-unavailable');
+ hold(reviewPublicSpaceFoundation(params({buildings:[{...hall,condition:'ruined'}]})),'anchor-unavailable');
+ hold(reviewPublicSpaceFoundation(params({candidate:{...fixture,kind:'fortress'}})),'invalid-candidate');
+ hold(reviewPublicSpaceFoundation(params({candidate:{...fixture,footprint:{...fixture.footprint,x:310}}})),'invalid-candidate');
+ const crossed={...fixture,footprint:{x:129,y:112,width:24,depth:12}};
+ hold(reviewPublicSpaceFoundation(params({candidate:crossed})), 'anchor-unavailable');
+ const home={blockId:'old-ruin',footprint:{...fixture.footprint},builtYear:0,
+  siteId:'river-bank',housingCount:2,condition:'ruined',use:'vacant',
+  styleId:'low',styleSeed:1};
+ const blocked=reviewPublicSpaceFoundation(params({housingBlocks:[home]}));
+ hold(blocked,'occupied-ground');
+ assert.deepEqual(blocked.conflicts,['housing:old-ruin']);
+ assert.deepEqual(reviewPublicSpaceFoundation(params({existing:[fixture]})),
+  {status:'hold',reason:'duplicate-space',conflicts:[fixture.id]});
+ assert.equal(overlapsPublicSpace({x:6,y:160,width:3,depth:2},[fixture]),true);
+ assert.equal(overlapsPublicSpace({x:45,y:160,width:3,depth:2},[fixture]),false);
+});
+test('D7-A: 成立・荒廃・再利用は確定記録でのみ変化し、敷地は不変',()=>{
+ const original=ledger(),before=structuredClone(original);
+ const founded=appendConfirmedPublicSpace({
+  history:original,year:40,candidate:fixture,buildings:[hall],housingBlocks:[],
+  records:[established],
+ });
+ assert.deepEqual(original,before);
+ assert.equal(publicSpacesAt(founded,39).spaces.length,0);
+ assert.deepEqual(publicSpacesAt(founded,40).spaces,[fixture]);
+ const fade={id:'70-fade',year:70,kind:'public-space-overgrown',publicSpaceId:fixture.id};
+ const after=appendConfirmedPublicSpaceUse({
+  history:founded,year:70,spaceId:fixture.id,kind:'overgrown',
+  causeRecordId:fade.id,records:[established,fade],
+ });
+ assert.equal(publicSpacesAt(after,70).spaces[0].condition,'overgrown');
+ assert.deepEqual(publicSpacesAt(after,40).spaces,[fixture]);
+ const again={id:'95-renew',year:95,kind:'public-space-reused',publicSpaceId:fixture.id};
+ const renewed=appendConfirmedPublicSpaceUse({
+  history:after,year:95,spaceId:fixture.id,kind:'reused',
+  causeRecordId:again.id,records:[established,fade,again],
+ });
+ assert.deepEqual(publicSpacesAt(renewed,95).spaces,[fixture]);
+ assert.deepEqual(publicSpacesAt(founded,95).spaces,[fixture]);
+ const invalid={...founded,events:[...founded.events,{
+  year:70,seq:0,kind:'overgrown',spaceId:fixture.id,causeRecordId:fade.id,
+  after:{...fixture,footprint:{...fixture.footprint,x:6},condition:'overgrown'},
+ }]};
+ assert.throws(()=>publicSpacesAt(invalid,70),/不変属性/);
+ assert.throws(()=>appendConfirmedPublicSpaceUse({
+  history:founded,year:70,spaceId:fixture.id,kind:'reused',
+  causeRecordId:'70-unknown',records:[],
+ }),/確定記録/);
+});
+test('D7-A: 新たな住宅・大型公共施設は確定した空地の敷地を侵さない',()=>{
+ const h={schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]};
+ const input={history:h,year:60,seed:42,siteIndex:0,population:8000,buildings:[]};
+ const first=proposeHousingConstruction(input);
+ assert.equal(first.status,'built');
+ const blocked=proposeHousingConstruction({...input,
+  publicSpacePlots:[first.event.after.footprint]});
+ if(blocked.status==='built')
+  assert.notDeepEqual(blocked.event.after.footprint,first.event.after.footprint,
+   '明示公共空地を後発の住宅が先取りしない');
+
+ const sites=createSettlementHistory([10000,0,0],0);
+ const hall={id:'hall-existing',kind:'hall',x:197,y:121,builtYear:10,
+  condition:'intact',recordId:'10-hall'};
+ sites[0].view.buildings.push(hall);
+ sites[0].buildingChanges.push({year:10,building:{...hall}});
+ const council={kind:'council',originId:'council-old',recordId:'10-council',active:true};
+ sites[0].view.practices=[council];
+ sites[0].practiceChanges.push({year:10,practices:[council]});
+ const candidate={history:sites,housing:h,siteIndex:0,year:40,seed:82,
+  population:10000,coverage:1,shortageYears:0,tradeYears:6,recordId:'40-civic'};
+ const ordinary=proposeCivicConstruction(candidate);
+ assert.equal(ordinary.status,'built');
+ const excluded=proposeCivicConstruction({...candidate,
+  publicSpacePlots:[ordinary.candidate.civic.footprint]});
+ if(excluded.status==='built')
+  assert.notDeepEqual(excluded.candidate.civic.footprint,ordinary.candidate.civic.footprint,
+   '大型共同施設も確定公共空地を避ける');
+});
+
+test('D7-A: 旧v4は無変更、新しい公共空地は保存・過去観測・将来占有に残る',()=>{
+ const state=createHousingCivilization(42);
+ while(state.year<160){step(state);if(state.pending)chooseAutomatically(state);}
+ const oldWire=serializeHousingSave(state),before=snapshotAt(state,159,0);
+ assert.equal(state.publicSpaces,undefined);
+ const site=siteAt(state.observation.sites,0,160);
+ const homes=housingAt(state.housing,160,'river-bank');
+ assert.equal(homes.status,'known');
+ const occupied=site.buildings.filter(b=>
+  (b.kind==='hall'||b.kind==='market')&&b.condition==='intact');
+ assert.ok(occupied.length>0,'自然進行で既存集会所または市場がある');
+ const year=160,recordId=year+'-manual-space';
+ let chosen;
+ for(const anchor of occupied){
+  for(const y of [119,126,133,140,147,154,160]){
+   for(const x of [5,17,29,41,53,65,77,89,101,210,222,234,246,258,270,282]){
+    const candidate={
+     id:'public-river-bank-fixture-'+year,siteId:'river-bank',
+     kind:anchor.kind==='market'?'market-yard':'assembly-ground',
+     footprint:{x,y,width:24,depth:10},establishedYear:year,
+     anchorBuildingId:anchor.id,foundationRecordId:recordId,condition:'used',
+    };
+    const rec={id:recordId,year,kind:'public-space-established',publicSpaceId:candidate.id};
+    const gate=reviewPublicSpaceFoundation({
+     siteIndex:0,year,candidate,buildings:site.buildings,
+     housingBlocks:homes.blocks,existing:[],housingStatus:homes.status,records:[rec],
+    });
+    if(gate.status==='clear'){chosen=candidate;break;}
+   }
+   if(chosen)break;
+  }
+  if(chosen)break;
+ }
+ assert.ok(chosen,'既存施設周辺に歴史と両立する公共空地の敷地が必要');
+ const confirmedRecord={id:recordId,year,tag:'地域',
+  kind:'public-space-established',publicSpaceId:chosen.id,
+  title:'共同の空地が定められる',body:'人々はここを共同で使うことにした。',
+  causes:['寄り合いの確定記録'],relatedIds:[]};
+ const next=appendConfirmedPublicSpace({
+  history:ledger(),year,candidate:chosen,buildings:site.buildings,
+  housingBlocks:homes.blocks,records:[...state.history,confirmedRecord],
+ });
+ state.history.push(confirmedRecord);
+ state.publicSpaces=next;
+ assert.deepEqual(snapshotAt(state,159,0),before);
+ assert.deepEqual(snapshotAt(state,160,0).publicSpaces,[chosen]);
+ const wire=serializeHousingSave(state),saved=parseHousingSave(wire);
+ assert.deepEqual(saved,state);
+ assert.deepEqual(snapshotAt(saved,160,0).publicSpaces,[chosen]);
+ const corrupt=fn=>{
+  const copy=JSON.parse(wire);fn(copy);
+  assert.throws(()=>parseHousingSave(JSON.stringify(copy)),/公共空地履歴/);
+ };
+ corrupt(copy=>{copy.publicSpaces.events[0].after.footprint.width=500;});
+ corrupt(copy=>{copy.publicSpaces.events[0].after.id='public-river-bank-fake';});
+ corrupt(copy=>{copy.publicSpaces.events[0].causeRecordId='no-record';});
+ corrupt(copy=>{copy.history=copy.history.filter(e=>e.id!==recordId);});
+ corrupt(copy=>{copy.publicSpaces.events[0].after.kind='fortress';});
+ // 導入年が翌年なら、当年のイベントを保存・読込のどちらでも拒否する。
+ for(const legacyUntracked of [false,true]){
+  const invalid=JSON.parse(wire);
+  invalid.publicSpaces.introducedYear=year+1;
+  invalid.publicSpaces.legacyUntracked=legacyUntracked;
+  assert.throws(()=>serializeHousingSave(invalid),/公共空地履歴/);
+  assert.throws(()=>parseHousingSave(JSON.stringify(invalid)),/公共空地履歴/);
+  // 翌年から追跡する空履歴は合法。境界より前を架空の記録で埋めない。
+  invalid.publicSpaces.events=[];
+  const empty=parseHousingSave(serializeHousingSave(invalid));
+  assert.deepEqual(publicSpacesAt(empty.publicSpaces,year),{
+   status:legacyUntracked?'unknown':'known',spaces:[],
+  });
+  step(empty);if(empty.pending)chooseAutomatically(empty);
+  assert.equal(empty.year,year+1);
+  assert.deepEqual(publicSpacesAt(empty.publicSpaces,year+1).spaces,[]);
+ }
+ assert.deepEqual(parseHousingSave(oldWire),JSON.parse(oldWire),'旧v4には存在しない公共空地を補完しない');
+ while(state.year<400){step(state);if(state.pending)chooseAutomatically(state);}
+ const future=parseHousingSave(serializeHousingSave(state));
+ assert.deepEqual(publicSpacesAt(future.publicSpaces,400).spaces,[chosen]);
+ assert.deepEqual(snapshotAt(future,159,0),before);
+ console.log('D7-A-MANUAL-FIXTURE '+JSON.stringify({seed:42,year:160,kind:chosen.kind,
+  footprint:chosen.footprint,anchor:chosen.anchorBuildingId,
+  status:'explicit test fixture only: NOT natural history'}));
+});

@@ -246,11 +246,58 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
   for(let i=0;i<3;i++)rect(c,211+i*6,145,3,3,'#91785b');
  }
 }
+/** H4-D7-A: 公共空地の歴史イベントが実在する場合に限る地表。
+ * 住宅・会堂・川とは独立した「占有と利用状態」の表示である。
+ * 自然進行での成立判定は後工程。既存の前庭や描画からは遡及作成しない。
+ */
+function drawConfirmedPublicSpaces(c:C,spaces:NonNullable<SiteSnapshot['publicSpaces']>):void{
+ for(const p of [...spaces].sort((a,b)=>a.id.localeCompare(b.id))){
+  const f=p.footprint,overgrown=p.condition==='overgrown';
+  rect(c,f.x,f.y,f.width,f.depth,overgrown?'#8d9777':'#b7a987');
+  rect(c,f.x+1,f.y+1,f.width-2,1,overgrown?'#7a8967':'#9d9076');
+  rect(c,f.x+1,f.y+f.depth-2,f.width-2,1,overgrown?'#778a68':'#92886f');
+  if(overgrown){
+   // 人が去ったあとも地表占有と形を残し、植生にゆっくり覆われる。
+   // 奥行き6pxの最小敷地でも、草の先端を隣の土地へ描かない。
+   const grass=(x:number,y:number,width:number,height:number,color:string)=>{
+    const w=Math.min(width,f.x+f.width-x),h=Math.min(height,f.y+f.depth-y);
+    if(w>0&&h>0)rect(c,x,y,w,h,color);
+   };
+   for(let x=f.x+3;x<f.x+f.width-2;x+=7){
+    grass(x,f.y+3+(x%2),3,2,'#718865');
+    grass(x+1,f.y+5+(x%2),1,2,'#5f7c5b');
+   }
+  }else if(p.kind==='assembly-ground'){
+   // 寄り合いの空地は舗装の少ない広場。中央に建物や人を捏造しない。
+   for(let x=f.x+4;x<f.x+f.width-3;x+=9){
+    rect(c,x,f.y+Math.floor(f.depth/2),4,1,'#a79a7e');
+   }
+   for(let y=f.y+3;y<f.y+f.depth-2;y+=6){
+    rect(c,f.x+2,y,2,1,'#998e76');
+    rect(c,f.x+f.width-4,y,2,1,'#998e76');
+   }
+  }else{
+   // 市の余白。常設市場とは別の、使われる土間だけを表す。
+   for(let y=f.y+3;y<f.y+f.depth-2;y+=4){
+    for(let x=f.x+3+(y%2)*2;x<f.x+f.width-3;x+=7)
+     rect(c,x,y,3,1,'#9c917b');
+   }
+  }
+ }
+}
+
 /** H4-D2: 両端に確定した住宅がある歩行の痕跡と既存公共施設の前庭。
  * すべて地表検査済みであり、未記録の道路・広場を新設しない。
  */
-function drawStreetscape(c:C,scene:SceneComposition,buildings:readonly SiteObject[]):void {
+function drawStreetscape(
+ c:C,scene:SceneComposition,buildings:readonly SiteObject[],
+ publicSpaces:NonNullable<SiteSnapshot['publicSpaces']>=[],
+):void {
  for(const mark of projectStreetscape(scene,buildings)){
+  // 実在の公共空地に、史実ではない古い前庭・歩行痕を上書きしない。
+  if(publicSpaces.some(p=>
+   mark.x<p.footprint.x+p.footprint.width&&p.footprint.x<mark.x+mark.width&&
+   mark.y<p.footprint.y+p.footprint.depth&&p.footprint.y<mark.y+mark.depth))continue;
   if(mark.kind==='civic-margin'){
    // 実在施設の敷地のすぐ外側だけ。舗装広場ではなく土の色の揺らぎ。
    rect(c,mark.x,mark.y,mark.width,mark.depth,'#b3a489');
@@ -381,7 +428,8 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,ho
  const composition=composeScene(s,housing);
  if(s.visual){builtGround(c,s.visual,index);neighborhood(c,s.objects,s.visual,index);}
  drawHistorySurface(c,composition);
- drawStreetscape(c,composition,s.objects);
+ if(s.publicSpaces?.length)drawConfirmedPublicSpaces(c,s.publicSpaces);
+ drawStreetscape(c,composition,s.objects,s.publicSpaces);
  drawHousingPlotSurface(c,composition);
  // すべての住宅屋根を確定施設より先に描く。
  // 前景住宅は住宅内では前に見えるが、歴史上の市場・集会所・仕事場を隠さない。

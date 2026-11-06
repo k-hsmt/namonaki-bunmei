@@ -1,9 +1,11 @@
+import {publicSpacesAt,overlapsPublicSpace} from './public-space-history.js';
+import type {PublicSpaceHistory} from './public-space-history.js';
 import {proposeHousingLifecycle,appendHousingLifecycle} from './housing-lifecycle.js';
 import {proposeCivicConstruction} from './civic-progression.js';
 import {appendConfirmedCivicConstruction} from './civic-architecture.js';
 import {housingAt} from './housing-history.js';
 import {proposeHousingConstruction} from './housing-progression.js';
-import {facilityHousingConflicts,facilityCivicConflicts} from '../scene/housing-ground.js';
+import {facilityHousingConflicts,facilityCivicConflicts,existingGround} from '../scene/housing-ground.js';
 import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
@@ -13,14 +15,14 @@ import { createSociety, practiceNames, updateSociety, type Society } from './soc
 import { createSettlementHistory, updateSettlements, siteAt } from './settlement-history.js';
 export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'森林の採集';
 export type Dimension = 'population'|'food'|'cohesion'|'knowledge'|'exchange'|'culture';
-export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; buildingId?:string; relatedIds?:string[]; important?:boolean; }
+export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; buildingId?:string; publicSpaceId?:string; relatedIds?:string[]; important?:boolean; }
 export interface Choice { label:string; description:string; impacts:Partial<Record<Dimension,number>>; consequence:string; }
 export interface Decision { id:string; year:number; question:string; context:string; options:Choice[]; }
 export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'council'|'care'|'migration'|'fracture';
 export interface Legacy {kind:LegacyKind; established:number; strength:number; lastChanged:number; origin:string;}
 export type MemoryLog = {year:number;kind:LegacyKind;action:'formed'|'strengthened'|'weakened'|'lost';reason:string;strength:number;established:number};
 export interface CivilizationMemory {legacies:Partial<Record<LegacyKind,Legacy>>;log:MemoryLog[];}
-export interface CivilizationState { version:2|3|4; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
+export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHistory; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
 const clamp=(v:number,a:number,b:number)=>Math.min(b,Math.max(a,v));
 const names=['アムラ','セイラ','ルグナ','オルフェ','サリュ','ナヴァ','イリス','ヘルメ','トルア','ヴェリ','ミルハ','シルダ'];
 const places=['碧い大河の流域','石灰岩の高原','霧深い湾岸','北方の針葉樹林','季節風の吹く丘陵','内海に面した湿地','二つの山脈の谷間','乾燥した草原の縁'];
@@ -98,8 +100,10 @@ function finishYear(s:CivilizationState):void {
     if(!siteId)return false;
     const existing=housingAt(s.housing!,s.year,siteId).blocks;
     const site=ledger.sites?.[siteIndex]?.view;
+    const communal=siteIndex===0?publicSpacesAt(s.publicSpaces,s.year).spaces:[];
     return facilityHousingConflicts(candidate,existing).length===0&&
-      facilityCivicConflicts(candidate,site?.buildings??[]).length===0;
+      facilityCivicConflicts(candidate,site?.buildings??[]).length===0&&
+      !overlapsPublicSpace(existingGround(candidate),communal);
    }
   :undefined;
  updateSettlements(ledger.sites,s.society,local,s.year,record,canBuild);
@@ -109,12 +113,13 @@ function finishYear(s:CivilizationState):void {
   // H4-D4-B: 社会史・旧施設・住宅と河川の敷地が確定した後にだけ提案。
   // 未来の記録IDを予測して純粋な候補判定を行い、全ゲート成功時に
   // 施設台帳と歴史イベントを一括して確定する。乱数列・旧セーブは変更しない。
+  const publicSpacePlots=publicSpacesAt(s.publicSpaces,s.year).spaces.map(p=>p.footprint);
   const anticipatedId=s.year+'-'+s.history.length;
   const civic=proposeCivicConstruction({
    siteIndex:0,year:s.year,seed:s.seed,history:ledger.sites,
    housing:s.housing,population:local[0]?.population??0,
    coverage:local[0]?.coverage??0,shortageYears:local[0]?.shortageYears??0,
-   tradeYears:local[0]?.tradeYears??0,recordId:anticipatedId,
+   tradeYears:local[0]?.tradeYears??0,recordId:anticipatedId,publicSpacePlots,
   });
   if(civic.status==='built'){
    const event:RecordEntry={
@@ -138,7 +143,7 @@ function finishYear(s:CivilizationState):void {
   const river=siteAt(ledger.sites,0,s.year);
   const proposal=proposeHousingConstruction({
    history:s.housing,year:s.year,seed:s.seed,siteIndex:0,
-   population:local[0]?.population??0,buildings:river?.buildings??[],
+   population:local[0]?.population??0,buildings:river?.buildings??[],publicSpacePlots,
   });
   if(proposal.status==='built'){
    const event=proposal.event;
