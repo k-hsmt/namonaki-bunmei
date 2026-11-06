@@ -83,6 +83,10 @@ jobs:
         run: node scripts/review-terrain-record.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify legacy v2/v3/v4 terrain compatibility
+        run: node scripts/review-legacy-terrain-save.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify 10,000-year save in Chromium localStorage
         shell: bash
         run: |
@@ -110,6 +114,7 @@ jobs:
             artifacts/terrain31-hills/*
             artifacts/terrain31-world/*
             artifacts/terrain31-record/*
+            artifacts/terrain31-legacy/*
             artifacts/h4d3-concepts/*
           if-no-files-found: warn
 
@@ -132,9 +137,15 @@ jobs:
           set -o pipefail
           mkdir -p artifacts
           node scripts/evaluate-h3-housing.mjs | tee artifacts/h3-longrun.jsonl
+      - name: Audit legacy continuation to 10,000 years
+        run: node scripts/audit-legacy-terrain-save.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: h3-longrun-audit
-          path: artifacts/h3-longrun.jsonl
+          path: |
+            artifacts/h3-longrun.jsonl
+            artifacts/terrain31-legacy/longrun-report.json
           if-no-files-found: warn
