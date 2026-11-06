@@ -284,8 +284,15 @@ function drawConfirmedPublicSpaces(c:C,spaces:NonNullable<SiteSnapshot['publicSp
 /** H4-D2: 両端に確定した住宅がある歩行の痕跡と既存公共施設の前庭。
  * すべて地表検査済みであり、未記録の道路・広場を新設しない。
  */
-function drawStreetscape(c:C,scene:SceneComposition,buildings:readonly SiteObject[]):void {
+function drawStreetscape(
+ c:C,scene:SceneComposition,buildings:readonly SiteObject[],
+ publicSpaces:NonNullable<SiteSnapshot['publicSpaces']>=[],
+):void {
  for(const mark of projectStreetscape(scene,buildings)){
+  // 実在の公共空地に、史実ではない古い前庭・歩行痕を上書きしない。
+  if(publicSpaces.some(p=>
+   mark.x<p.footprint.x+p.footprint.width&&p.footprint.x<mark.x+mark.width&&
+   mark.y<p.footprint.y+p.footprint.depth&&p.footprint.y<mark.y+mark.depth))continue;
   if(mark.kind==='civic-margin'){
    // 実在施設の敷地のすぐ外側だけ。舗装広場ではなく土の色の揺らぎ。
    rect(c,mark.x,mark.y,mark.width,mark.depth,'#b3a489');
@@ -417,7 +424,7 @@ export function drawScene(canvas:HTMLCanvasElement,s:SiteSnapshot,seed:number,ho
  if(s.visual){builtGround(c,s.visual,index);neighborhood(c,s.objects,s.visual,index);}
  drawHistorySurface(c,composition);
  if(s.publicSpaces?.length)drawConfirmedPublicSpaces(c,s.publicSpaces);
- drawStreetscape(c,composition,s.objects);
+ drawStreetscape(c,composition,s.objects,s.publicSpaces);
  drawHousingPlotSurface(c,composition);
  // すべての住宅屋根を確定施設より先に描く。
  // 前景住宅は住宅内では前に見えるが、歴史上の市場・集会所・仕事場を隠さない。
