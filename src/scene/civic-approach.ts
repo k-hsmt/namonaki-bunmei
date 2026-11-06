@@ -80,3 +80,37 @@ export function projectCivicApproaches(
  }
  return result;
 }
+
+/** 共同建築の実際の敷地の縁で踏み固められた地面。
+ * 建設されていない「広場」ではなく、既存建築の周辺の地表質感だけを表す。
+ * 10px前後の短い断片ごとに検査し、川と既存敷地を侵さない。
+ */
+export interface CivicMarginMark extends HousingPlot{
+ readonly kind:'civic-margin';
+ readonly anchors:readonly [string];
+}
+export function projectCivicMargins(
+ scene:SceneComposition,buildings:readonly SiteObject[],
+):readonly CivicMarginMark[]{
+ if(scene.siteIndex!==0)return [];
+ const plots=scene.residentialBlocks.map(b=>b.footprint);
+ const marks:CivicMarginMark[]=[];
+ for(const b of [...buildings].filter(b=>b.civic&&b.kind==='hall'&&b.condition!=='ruined')
+  .sort((a,b)=>a.id.localeCompare(b.id))){
+  const f=b.civic!.footprint;
+  const pieces:HousingPlot[]=[];
+  for(let x=f.x+4;x<=f.x+f.width-12;x+=12){
+   pieces.push({x,y:f.y-3,width:10,depth:3});
+   pieces.push({x,y:f.y+f.depth,width:10,depth:3});
+  }
+  for(let y=f.y+5;y<=f.y+f.depth-10;y+=8){
+   pieces.push({x:f.x-3,y,width:3,depth:7});
+   pieces.push({x:f.x+f.width,y,width:3,depth:7});
+  }
+  for(const tile of pieces){
+   if(!isUnoccupiedGround(tile,plots,buildings,0))continue;
+   marks.push({...tile,kind:'civic-margin',anchors:[b.id]});
+  }
+ }
+ return marks;
+}
