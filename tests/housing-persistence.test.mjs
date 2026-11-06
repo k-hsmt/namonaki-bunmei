@@ -11,7 +11,8 @@ test('新規作成と再作成は住宅ゼロを既知として保存し、エ�
  assert.equal(a.housing.introducedYear,0);
  assert.equal(a.housing.legacyUntracked,false);
  assert.equal(housingAt(a.housing,0).status,'known');
- const {version,housing,...withoutHousing}=a;
+ assert.deepEqual(a.publicSpaces,{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
+ const {version,housing,publicSpaces,...withoutHousing}=a;
  const {version:oldVersion,...original}=b;
  assert.deepEqual(withoutHousing,original);
  assert.deepEqual(parseHousingSave(serializeHousingSave(a)),a);
