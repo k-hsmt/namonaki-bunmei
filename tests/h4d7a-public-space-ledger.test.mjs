@@ -5,6 +5,7 @@ import {step,chooseAutomatically} from '../dist/story/engine.js';
 import {housingAt} from '../dist/story/housing-history.js';
 import {siteAt} from '../dist/story/settlement-history.js';
 import {snapshotAt} from '../dist/scene/model.js';
+import {drawScene} from '../dist/scene/draw.js';
 import {proposeHousingConstruction} from '../dist/story/housing-progression.js';
 import {proposeCivicConstruction} from '../dist/story/civic-progression.js';
 import {createSettlementHistory} from '../dist/story/settlement-history.js';
@@ -25,6 +26,40 @@ const params=(overrides={})=>({
  housingStatus:'known',records:[established],...overrides,
 });
 const hold=(result,reason)=>{assert.equal(result.status,'hold');assert.equal(result.reason,reason);};
+test('D7-A: 最小敷地・奇偶座標の公共空地も地表描画が敷地内に収まる',()=>{
+ const snapshot={year:70,population:0,phase:'手動描画fixture',atmosphere:'',
+  sceneEvent:null,objects:[],eventYear:null,scars:[],local:{index:0,population:0}};
+ const paint=spaces=>{
+  const commands=[];
+  const c={fillStyle:'',
+   fillRect(...args){commands.push({op:'fillRect',args,color:this.fillStyle});},
+   fill(){commands.push({op:'fill',color:this.fillStyle});},
+  };
+  for(const op of ['beginPath','closePath','lineTo','moveTo'])
+   c[op]=(...args)=>commands.push({op,args});
+  drawScene({getContext:()=>c},{...snapshot,publicSpaces:spaces},42);
+  return commands.map(command=>JSON.stringify(command));
+ };
+ const baseline=paint([]);
+ for(const x of [5,6])for(const width of [12,13,24])for(const depth of [6,7,8,10]){
+  for(const kind of ['assembly-ground','market-yard'])for(const condition of ['used','overgrown']){
+   const footprint={x,y:155,width,depth};
+   const actual=paint([{...fixture,footprint,kind,condition}]);
+   let first=0,last=0;
+   while(first<baseline.length&&baseline[first]===actual[first])first++;
+   while(last<baseline.length-first&&baseline.at(-1-last)===actual.at(-1-last))last++;
+   assert.equal(first+last,baseline.length,'公共空地以外の描画は変更しない');
+   const added=actual.slice(first,actual.length-last).map(command=>JSON.parse(command));
+   assert.ok(added.length>0,'公共空地を描画する');
+   for(const command of added){
+    assert.equal(command.op,'fillRect');
+    const [px,py,w,h]=command.args;
+    assert.ok(w>0&&h>0&&px>=x&&py>=155&&px+w<=x+width&&py+h<=155+depth,
+     JSON.stringify({footprint,kind,condition,command}));
+   }
+  }
+ }
+});
 test('D7-A: 建築・住宅・河川・予約敷地に衝突しない場所だけが明示新設候補',()=>{
  assert.equal(reviewPublicSpaceFoundation(params()).status,'clear');
  hold(reviewPublicSpaceFoundation(params({siteIndex:1})),'unsupported-terrain');
@@ -171,6 +206,23 @@ test('D7-A: 旧v4は無変更、新しい公共空地は保存・過去観測・
  corrupt(copy=>{copy.publicSpaces.events[0].causeRecordId='no-record';});
  corrupt(copy=>{copy.history=copy.history.filter(e=>e.id!==recordId);});
  corrupt(copy=>{copy.publicSpaces.events[0].after.kind='fortress';});
+ // 導入年が翌年なら、当年のイベントを保存・読込のどちらでも拒否する。
+ for(const legacyUntracked of [false,true]){
+  const invalid=JSON.parse(wire);
+  invalid.publicSpaces.introducedYear=year+1;
+  invalid.publicSpaces.legacyUntracked=legacyUntracked;
+  assert.throws(()=>serializeHousingSave(invalid),/公共空地履歴/);
+  assert.throws(()=>parseHousingSave(JSON.stringify(invalid)),/公共空地履歴/);
+  // 翌年から追跡する空履歴は合法。境界より前を架空の記録で埋めない。
+  invalid.publicSpaces.events=[];
+  const empty=parseHousingSave(serializeHousingSave(invalid));
+  assert.deepEqual(publicSpacesAt(empty.publicSpaces,year),{
+   status:legacyUntracked?'unknown':'known',spaces:[],
+  });
+  step(empty);if(empty.pending)chooseAutomatically(empty);
+  assert.equal(empty.year,year+1);
+  assert.deepEqual(publicSpacesAt(empty.publicSpaces,year+1).spaces,[]);
+ }
  assert.deepEqual(parseHousingSave(oldWire),JSON.parse(oldWire),'旧v4には存在しない公共空地を補完しない');
  while(state.year<400){step(state);if(state.pending)chooseAutomatically(state);}
  const future=parseHousingSave(serializeHousingSave(state));

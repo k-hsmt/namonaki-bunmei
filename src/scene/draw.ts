@@ -258,9 +258,14 @@ function drawConfirmedPublicSpaces(c:C,spaces:NonNullable<SiteSnapshot['publicSp
   rect(c,f.x+1,f.y+f.depth-2,f.width-2,1,overgrown?'#778a68':'#92886f');
   if(overgrown){
    // 人が去ったあとも地表占有と形を残し、植生にゆっくり覆われる。
+   // 奥行き6pxの最小敷地でも、草の先端を隣の土地へ描かない。
+   const grass=(x:number,y:number,width:number,height:number,color:string)=>{
+    const w=Math.min(width,f.x+f.width-x),h=Math.min(height,f.y+f.depth-y);
+    if(w>0&&h>0)rect(c,x,y,w,h,color);
+   };
    for(let x=f.x+3;x<f.x+f.width-2;x+=7){
-    rect(c,x,f.y+3+(x%2),3,2,'#718865');
-    rect(c,x+1,f.y+5+(x%2),1,2,'#5f7c5b');
+    grass(x,f.y+3+(x%2),3,2,'#718865');
+    grass(x+1,f.y+5+(x%2),1,2,'#5f7c5b');
    }
   }else if(p.kind==='assembly-ground'){
    // 寄り合いの空地は舗装の少ない広場。中央に建物や人を捏造しない。

@@ -233,7 +233,7 @@ export function validatePublicSpaceLedger(input:unknown,params:{
   const raw:unknown=rawValue;
   if(!object(raw))throw Error('公共空地履歴: イベント形式が不正');
   keys(raw,['year','seq','kind','spaceId','after','causeRecordId']);
-  if(!nat(raw.year)||Number(raw.year)>params.confirmedYear||
+  if(!nat(raw.year)||Number(raw.year)<history.introducedYear||Number(raw.year)>params.confirmedYear||
    !nat(raw.seq)||typeof raw.spaceId!=='string'||typeof raw.causeRecordId!=='string'||
    !validatePublicSpace(raw.after))err('確定イベント属性が不正');
   const event=raw as unknown as PublicSpaceEvent;

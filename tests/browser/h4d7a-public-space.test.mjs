@@ -81,14 +81,42 @@ test('H4-D7-A: 自然史の背景と、手動で確定した公共空地のデ�
    if(present!==repeat)throw Error('nondeterministic graphics');
    const original=paint(base),previous=paint(earlier);
    if(present===original)throw Error('historical public space does not change the pixels');
+   // 最小敷地と奇偶座標を含め、公共空地の描画差分が実敷地内に収まること。
+   // 自然史の画像とは別の、地表描画だけを調べる手動fixture。
+   const boundaryBase={...base,objects:[],visual:undefined,publicSpaces:undefined};
+   const pixels=spaces=>{
+    const canvas=document.createElement('canvas');
+    drawScene(canvas,{...boundaryBase,publicSpaces:spaces},seed);
+    return canvas.getContext('2d').getImageData(0,0,320,180).data;
+   };
+   const without=pixels([]);
+   let boundaryCases=0;
+   for(const x of [5,6])for(const width of [12,13,24])for(const depth of [6,7,8,10]){
+    for(const kind of ['assembly-ground','market-yard'])for(const condition of ['used','overgrown']){
+     const footprint={x,y:155,width,depth};
+     const p={...staged.publicSpaces[0],footprint,kind,condition};
+     const actual=pixels([p]);
+     let changed=0;
+     for(let y=0;y<180;y++)for(let px=0;px<320;px++){
+      const offset=(y*320+px)*4;
+      if(![0,1,2,3].some(channel=>actual[offset+channel]!==without[offset+channel]))continue;
+      if(px<x||px>=x+width||y<155||y>=155+depth)
+       throw Error('public space paints outside its footprint: '+JSON.stringify({footprint,kind,condition,px,y}));
+      changed++;
+     }
+     if(changed===0)throw Error('public space boundary fixture did not paint');
+     boundaryCases++;
+    }
+   }
    const canvas=document.createElement('canvas');
    canvas.width=1280;canvas.height=720;
    const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
    const image=new Image();image.src=present;
    await image.decode();ctx.drawImage(image,0,0,1280,720);
-   return {present,original,previous,large:canvas.toDataURL('image/png')};
+   return {present,original,previous,large:canvas.toDataURL('image/png'),boundaryCases};
   },{base,staged,earlier,housing:state.housing,seed});
   assert.deepEqual(errors,[]);
+  assert.equal(result.boundaryCases,96);
   await mkdir('artifacts/h4d7a-design',{recursive:true});
   await Promise.all([
    writeFile('artifacts/h4d7a-design/baseline_ACTUAL_seed42_year160.png',PNG(result.original)),
