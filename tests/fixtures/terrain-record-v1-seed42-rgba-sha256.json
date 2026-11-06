@@ -1,0 +1,11 @@
+{
+  "rendererId": "terrain-result-render-v1",
+  "width": 320,
+  "height": 180,
+  "seed": 42,
+  "rgbaSha256": {
+    "hill-side": "fcb5d3771c83f4971b38b5bc89f66423d7204fd49bd59929f919d23440d1ad02",
+    "river-bank": "e59a3ffe88c5a32e38facdd26f9bf74b6e961f16d1106dcadb6bfa098e1dfe6c",
+    "coast-inlet": "e36c0b23727669105fd16d54284aacdb619e167f5635c21299b837a849a25db7"
+  }
+}
