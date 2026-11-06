@@ -65,6 +65,10 @@ jobs:
         run: node scripts/preview-hill-terrain.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Preview Issue 31 coasts, mountains and watershed
+        run: node scripts/preview-world-terrain.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify 10,000-year save in Chromium localStorage
         shell: bash
         run: |
@@ -90,6 +94,7 @@ jobs:
             artifacts/h4d7c-review/*
             artifacts/terrain31-prototype/*
             artifacts/terrain31-hills/*
+            artifacts/terrain31-world/*
             artifacts/h4d3-concepts/*
           if-no-files-found: warn
 

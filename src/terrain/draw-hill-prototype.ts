@@ -11,12 +11,13 @@ export function hillGroundColor(r:HillRaster,i:number):string {
  return hillGroundPalette.raised;
 }
 /** Geometry-only preview. Far mountains are deliberately a common reference. */
-export function drawHillPrototype(canvas:HTMLCanvasElement,t:HillPrototype,mode:'landscape'|'physics'='landscape'):void {
+export function drawHillPrototype(canvas:HTMLCanvasElement,t:HillPrototype,mode:'landscape'|'physics'='landscape',drawFar?:(c:CanvasRenderingContext2D)=>void):void {
  canvas.width=320;canvas.height=180;const c=canvas.getContext('2d');if(!c)throw Error('2d context missing');
  c.imageSmoothingEnabled=false;
  c.fillStyle='#bdc9bb';c.fillRect(0,0,320,96);c.fillStyle='#d8cfad';c.fillRect(0,53,320,43);
  const polygon=(p:readonly Point[],color:string)=>{c.fillStyle=color;c.beginPath();c.moveTo(p[0]![0],p[0]![1]);for(const q of p.slice(1))c.lineTo(q[0],q[1]);c.closePath();c.fill();};
- polygon([[0,96],[0,84],[47,71],[87,83],[134,64],[179,83],[227,72],[274,84],[320,73],[320,96]],'#9da991');
+ if(drawFar)drawFar(c);
+ else polygon([[0,96],[0,84],[47,71],[87,83],[134,64],[179,83],[227,72],[274,84],[320,73],[320,96]],'#9da991');
  const contours:Record<HillPrototype['variant'],readonly Point[]>={
   H01:[[0,80],[37,78],[72,83],[102,93],[147,102],[320,108]],
   H02:[[0,104],[35,91],[65,79],[92,82],[127,102],[177,101],[211,82],[239,78],[268,88],[302,104],[320,105]],
