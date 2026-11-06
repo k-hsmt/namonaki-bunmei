@@ -69,6 +69,7 @@ jobs:
             artifacts/h4c-natural/*
             artifacts/h4d4c-natural/*
             artifacts/h4d6-footfall/*
+            artifacts/h4d7a-design/*
             artifacts/h4d3-concepts/*
           if-no-files-found: warn
 
