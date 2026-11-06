@@ -33,12 +33,17 @@ export function proposeCivicConstruction(input:{
  const site=siteAt(history,siteIndex,year);
  if(!site)return {status:'hold',reason:'unknown-history'};
  if(site.buildings.some(b=>b.civic))return {status:'hold',reason:'already-built'};
- const hall=site.buildings.find(b=>b.kind==='hall'&&b.condition==='intact'&&!b.civic);
+ const hall=site.buildings.find(b=>b.kind==='hall'&&b.condition==='intact'&&!b.civic&&b.builtYear<=year-24);
  if(!hall)return {status:'hold',reason:'no-hall'};
  const now=site.practices.find(p=>p.kind==='council'&&p.active);
  const earlier=siteAt(history,siteIndex,year-24)?.practices.find(p=>
   p.kind==='council'&&p.active&&p.originId===now?.originId);
- if(!now||!earlier)return {status:'hold',reason:'no-council'};
+ // 両端で寄り合いが有効でも、途中で途絶えれば「24年間の継続」ではない。
+ const uninterrupted=history[siteIndex]?.practiceChanges
+  .filter(change=>change.year>year-24&&change.year<=year)
+  .every(change=>change.practices.some(p=>
+   p.kind==='council'&&p.active&&p.originId===now?.originId));
+ if(!now||!earlier||!uninterrupted)return {status:'hold',reason:'no-council'};
  if(population<4500||coverage<.94||shortageYears>0||tradeYears<3)
   return {status:'hold',reason:'no-capacity'};
  const style:CivicStyle=hash01(seed,14,0)<.5?'great-hall':'courtyard-hall';
