@@ -5,6 +5,9 @@ import {step,chooseAutomatically} from '../dist/story/engine.js';
 import {housingAt} from '../dist/story/housing-history.js';
 import {siteAt} from '../dist/story/settlement-history.js';
 import {snapshotAt} from '../dist/scene/model.js';
+import {proposeHousingConstruction} from '../dist/story/housing-progression.js';
+import {proposeCivicConstruction} from '../dist/story/civic-progression.js';
+import {createSettlementHistory} from '../dist/story/settlement-history.js';
 import {
  publicSpacesAt,reviewPublicSpaceFoundation,appendConfirmedPublicSpace,
  appendConfirmedPublicSpaceUse,overlapsPublicSpace,
@@ -80,6 +83,36 @@ test('D7-A: 成立・荒廃・再利用は確定記録でのみ変化し、敷�
   causeRecordId:'70-unknown',records:[],
  }),/確定記録/);
 });
+test('D7-A: 新たな住宅・大型公共施設は確定した空地の敷地を侵さない',()=>{
+ const h={schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]};
+ const input={history:h,year:60,seed:42,siteIndex:0,population:8000,buildings:[]};
+ const first=proposeHousingConstruction(input);
+ assert.equal(first.status,'built');
+ const blocked=proposeHousingConstruction({...input,
+  publicSpacePlots:[first.event.after.footprint]});
+ if(blocked.status==='built')
+  assert.notDeepEqual(blocked.event.after.footprint,first.event.after.footprint,
+   '明示公共空地を後発の住宅が先取りしない');
+
+ const sites=createSettlementHistory([10000,0,0],0);
+ const hall={id:'hall-existing',kind:'hall',x:197,y:121,builtYear:10,
+  condition:'intact',recordId:'10-hall'};
+ sites[0].view.buildings.push(hall);
+ sites[0].buildingChanges.push({year:10,building:{...hall}});
+ const council={kind:'council',originId:'council-old',recordId:'10-council',active:true};
+ sites[0].view.practices=[council];
+ sites[0].practiceChanges.push({year:10,practices:[council]});
+ const candidate={history:sites,housing:h,siteIndex:0,year:40,seed:82,
+  population:10000,coverage:1,shortageYears:0,tradeYears:6,recordId:'40-civic'};
+ const ordinary=proposeCivicConstruction(candidate);
+ assert.equal(ordinary.status,'built');
+ const excluded=proposeCivicConstruction({...candidate,
+  publicSpacePlots:[ordinary.candidate.civic.footprint]});
+ if(excluded.status==='built')
+  assert.notDeepEqual(excluded.candidate.civic.footprint,ordinary.candidate.civic.footprint,
+   '大型共同施設も確定公共空地を避ける');
+});
+
 test('D7-A: 旧v4は無変更、新しい公共空地は保存・過去観測・将来占有に残る',()=>{
  const state=createHousingCivilization(42);
  while(state.year<160){step(state);if(state.pending)chooseAutomatically(state);}
