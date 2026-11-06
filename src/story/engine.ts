@@ -15,7 +15,7 @@ import { createSociety, practiceNames, updateSociety, type Society } from './soc
 import { createSettlementHistory, updateSettlements, siteAt } from './settlement-history.js';
 export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'森林の採集';
 export type Dimension = 'population'|'food'|'cohesion'|'knowledge'|'exchange'|'culture';
-export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; buildingId?:string; relatedIds?:string[]; important?:boolean; }
+export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; buildingId?:string; publicSpaceId?:string; relatedIds?:string[]; important?:boolean; }
 export interface Choice { label:string; description:string; impacts:Partial<Record<Dimension,number>>; consequence:string; }
 export interface Decision { id:string; year:number; question:string; context:string; options:Choice[]; }
 export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'council'|'care'|'migration'|'fracture';
