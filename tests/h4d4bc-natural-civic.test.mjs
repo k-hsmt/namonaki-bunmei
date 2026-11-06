@@ -45,6 +45,18 @@ test('H4-D4-B: 寄り合いの継続・実在hall・余力が必要、単なる�
  reason(propose({history:withoutCouncil}),'no-council');
  const recent=make();recent[0].practiceChanges.at(-1).year=30;
  reason(propose({history:recent}),'no-council');
+ // 始点・終点では有効でも途中で途絶えた慣習は「24年間の継続」ではない。
+ const interrupted=make();
+ const p=interrupted[0].view.practices.find(p=>p.kind==='council');
+ interrupted[0].practiceChanges.push({year:25,practices:[{...p,active:false}]});
+ interrupted[0].practiceChanges.push({year:34,practices:[{...p,active:true}]});
+ reason(propose({history:interrupted}),'no-council');
+ // 集会所自体ができたばかりなのに、歴史の古さを借用して大型化しない。
+ const newlyBuiltHall=make();
+ const entry=newlyBuiltHall[0].buildingChanges.find(e=>e.building.id==='river-bank-3');
+ entry.year=30;entry.building.builtYear=30;
+ newlyBuiltHall[0].view.buildings.find(b=>b.id==='river-bank-3').builtYear=30;
+ reason(propose({history:newlyBuiltHall}),'no-hall');
  const missingHall=make();
  missingHall[0].buildingChanges=missingHall[0].buildingChanges.filter(e=>e.building.kind!=='hall');
  missingHall[0].view.buildings=missingHall[0].view.buildings.filter(b=>b.kind!=='hall');
