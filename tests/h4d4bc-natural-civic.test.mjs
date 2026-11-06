@@ -45,6 +45,18 @@ test('H4-D4-B: 寄り合いの継続・実在hall・余力が必要、単なる�
  reason(propose({history:withoutCouncil}),'no-council');
  const recent=make();recent[0].practiceChanges.at(-1).year=30;
  reason(propose({history:recent}),'no-council');
+ // 始点・終点では有効でも途中で途絶えた慣習は「24年間の継続」ではない。
+ const interrupted=make();
+ const p=interrupted[0].view.practices.find(p=>p.kind==='council');
+ interrupted[0].practiceChanges.push({year:25,practices:[{...p,active:false}]});
+ interrupted[0].practiceChanges.push({year:34,practices:[{...p,active:true}]});
+ reason(propose({history:interrupted}),'no-council');
+ // 集会所自体ができたばかりなのに、歴史の古さを借用して大型化しない。
+ const newlyBuiltHall=make();
+ const entry=newlyBuiltHall[0].buildingChanges.find(e=>e.building.id==='river-bank-3');
+ entry.year=30;entry.building.builtYear=30;
+ newlyBuiltHall[0].view.buildings.find(b=>b.id==='river-bank-3').builtYear=30;
+ reason(propose({history:newlyBuiltHall}),'no-hall');
  const missingHall=make();
  missingHall[0].buildingChanges=missingHall[0].buildingChanges.filter(e=>e.building.kind!=='hall');
  missingHall[0].view.buildings=missingHall[0].view.buildings.filter(b=>b.kind!=='hall');
@@ -55,10 +67,8 @@ test('H4-D4-B: 寄り合いの継続・実在hall・余力が必要、単なる�
 });
 test('H4-D4-B: 全候補の敷地が占有済みなら建設しない、既存台帳も不変',()=>{
  const h=make(),before=structuredClone(h);
- const allPlots=[
-  [5,142],[65,140],[233,145],[5,107],[260,105],[65,105],
-  [204,98],[5,120],[75,150],[244,95],[20,90],[82,94],
- ];
+ const allPlots=[112,124,136,148].flatMap(y=>
+  [6,22,38,54,70,86,102,208,224,240,256,272].map(x=>[x,y]));
  const events=allPlots.map(([x,y],i)=>({
   year:40,seq:i,kind:'built',
   blockId:'crowded-'+i,after:{
