@@ -61,6 +61,8 @@ jobs:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Preview Issue 31 river terrain prototypes
         run: node scripts/preview-river-terrain.mjs
+      - name: Preview Issue 31 hill terrain prototypes
+        run: node scripts/preview-hill-terrain.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify 10,000-year save in Chromium localStorage
@@ -87,6 +89,7 @@ jobs:
             artifacts/h4d7b-natural/*
             artifacts/h4d7c-review/*
             artifacts/terrain31-prototype/*
+            artifacts/terrain31-hills/*
             artifacts/h4d3-concepts/*
           if-no-files-found: warn
 
