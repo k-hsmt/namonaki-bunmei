@@ -150,6 +150,7 @@ test('D7-A: 新たな住宅・大型公共施設は確定した空地の敷地�
 
 test('D7-A: 旧v4は無変更、新しい公共空地は保存・過去観測・将来占有に残る',()=>{
  const state=createHousingCivilization(42);
+ delete state.publicSpaces; // D7-A以前のv4保存を明示的に再現。
  while(state.year<160){step(state);if(state.pending)chooseAutomatically(state);}
  const oldWire=serializeHousingSave(state),before=snapshotAt(state,159,0);
  assert.equal(state.publicSpaces,undefined);
@@ -226,7 +227,8 @@ test('D7-A: 旧v4は無変更、新しい公共空地は保存・過去観測・
  assert.deepEqual(parseHousingSave(oldWire),JSON.parse(oldWire),'旧v4には存在しない公共空地を補完しない');
  while(state.year<400){step(state);if(state.pending)chooseAutomatically(state);}
  const future=parseHousingSave(serializeHousingSave(state));
- assert.deepEqual(publicSpacesAt(future.publicSpaces,400).spaces,[chosen]);
+ const {condition,...foundation}=chosen;
+ assert.deepEqual(publicSpacesAt(future.publicSpaces,400).spaces.map(({condition,...space})=>space),[foundation]);
  assert.deepEqual(snapshotAt(future,159,0),before);
  console.log('D7-A-MANUAL-FIXTURE '+JSON.stringify({seed:42,year:160,kind:chosen.kind,
   footprint:chosen.footprint,anchor:chosen.anchorBuildingId,

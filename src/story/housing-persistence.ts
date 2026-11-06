@@ -11,7 +11,7 @@ export const LEGACY_SAVE_KEYS=['namonaki-story-v3','namonaki-story-v2'] as const
  */
 export function createHousingCivilization(seed:number):HousingSaveState {
  const original=createCivilization(seed);
- return {...original,version:4,housing:{
+ return {...original,version:4,publicSpaces:{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]},housing:{
   schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[],
  }};
 }

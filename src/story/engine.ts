@@ -1,4 +1,5 @@
-import {publicSpacesAt,overlapsPublicSpace} from './public-space-history.js';
+import {publicSpacesAt,overlapsPublicSpace,appendConfirmedPublicSpace,appendConfirmedPublicSpaceUse} from './public-space-history.js';
+import {proposePublicSpaceProgression} from './public-space-progression.js';
 import type {PublicSpaceHistory} from './public-space-history.js';
 import {proposeHousingLifecycle,appendHousingLifecycle} from './housing-lifecycle.js';
 import {proposeCivicConstruction} from './civic-progression.js';
@@ -180,6 +181,42 @@ function finishYear(s:CivilizationState):void {
     life.causeRecordId?[life.causeRecordId]:undefined,
     'housing-'+life.kind,life.blockId);
    s.housing=appendHousingLifecycle(s.housing,s.year,life,id);
+  }
+  // D7-B: 当年の施設・住宅状態の後に判定し、土地と年代記を一括確定。
+  // 台帳の無い旧保存では新たな追跡や過去の空地を推測しない。
+  if(s.publicSpaces){
+   const id=s.year+'-'+s.history.length;
+   const communal=proposePublicSpaceProgression({year:s.year,siteIndex:0,seed:s.seed,
+    spaces:s.publicSpaces,housing:s.housing,sites:ledger.sites,
+    population:local[0]?.population??0,coverage:s.economy.districts[0]!.coverage,
+    shortageYears:local[0]?.shortageYears??0,recordId:id,
+    shortageRecordId:local[0]?.shortageId,
+   });
+   if(communal.status!=='hold'){
+    const kind=communal.status;
+    const reasons={
+     'shared-use':'寄り合いと集会所の利用、近隣の住まい、維持の余力が続いた',
+     'practice-lost':'寄り合いの担い手が途絶えた状態が8年続いた',
+     'anchor-unavailable':'集会所を使えない状態が8年続いた',
+     'homes-vacant':'利用中の住宅街区がない状態が8年続いた',
+     'prolonged-shortage':'食糧不足が8年以上続き、維持余力が失われた',
+     'use-returned':'寄り合いと集会所、住まいと維持の余力が回復した',
+    };
+    const event:RecordEntry={id,year:s.year,tag:'地域',important:true,
+     kind:'public-space-'+kind,publicSpaceId:communal.space.id,
+     title:kind==='established'?'河畔で寄り合いの空地が定められる':
+      kind==='overgrown'?'寄り合いの空地が草に覆われ始める':'かつての寄り合いの空地が再び使われる',
+     body:reasons[communal.reason]+'。土地の位置と、それまでの記録は残されている。',
+     causes:[reasons[communal.reason]],relatedIds:[...communal.relatedIds],
+    };
+    const records=[...s.history,event];
+    const next=kind==='established'?appendConfirmedPublicSpace({history:s.publicSpaces,
+     year:s.year,candidate:communal.space,buildings:siteAt(ledger.sites,0,s.year)!.buildings,
+     housingBlocks:housingAt(s.housing,s.year,'river-bank').blocks,records,
+    }):appendConfirmedPublicSpaceUse({history:s.publicSpaces,year:s.year,
+     spaceId:communal.space.id,kind,causeRecordId:id,records});
+    s.history.push(event);s.publicSpaces=next;
+   }
   }
  }
  commitObservation(ledger,s.year);
