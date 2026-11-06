@@ -251,15 +251,24 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
  */
 function drawStreetscape(c:C,scene:SceneComposition,buildings:readonly SiteObject[]):void {
  for(const mark of projectStreetscape(scene,buildings)){
-  const base=mark.kind==='lane'?'#b8a888':mark.kind==='civic-approach'?'#a99b80':'#c4b294';
-  rect(c,mark.x,mark.y,mark.width,mark.depth,base);
   if(mark.kind==='civic-approach'){
-   // 小さな踏み跡の節目。舗装道路や新規施設を意味しない。
-   if(mark.width>7)for(let x=mark.x+2;x<mark.x+mark.width-1;x+=6)
-    rect(c,x,mark.y,2,1,'#c2ae8b');
-   if(mark.depth>7)for(let y=mark.y+2;y<mark.y+mark.depth-1;y+=6)
-    rect(c,mark.x,y,1,2,'#c2ae8b');
+   // 連続した2px幅の帯は柵のように見えるため避ける。
+   // わずかな隙間を持つ1pxの踏み跡だけで地面の使われ方を示す。
+   if(mark.width>=mark.depth){
+    for(let x=mark.x+1;x<mark.x+mark.width-1;x+=5){
+     const n=Math.min(3,mark.x+mark.width-1-x);
+     if(n>0)rect(c,x,mark.y+((x+mark.y)%3===0?1:0),n,1,'#ac9e80');
+    }
+   }else{
+    for(let y=mark.y+1;y<mark.y+mark.depth-1;y+=5){
+     const n=Math.min(3,mark.y+mark.depth-1-y);
+     if(n>0)rect(c,mark.x+((mark.x+y)%3===0?1:0),y,1,n,'#ac9e80');
+    }
+   }
+   continue;
   }
+  const base=mark.kind==='lane'?'#b8a888':'#c4b294';
+  rect(c,mark.x,mark.y,mark.width,mark.depth,base);
   if(mark.kind==='lane'&&mark.width>=5){
    rect(c,mark.x+1,mark.y,mark.width-2,1,'#9e9078');
   }
