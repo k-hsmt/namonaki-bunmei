@@ -24,6 +24,15 @@ export interface Legacy {kind:LegacyKind; established:number; strength:number; l
 export type MemoryLog = {year:number;kind:LegacyKind;action:'formed'|'strengthened'|'weakened'|'lost';reason:string;strength:number;established:number};
 export interface CivilizationMemory {legacies:Partial<Record<LegacyKind,Legacy>>;log:MemoryLog[];}
 export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHistory; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
+/** Explicit land-only extension for independent generated-world trials.
+ * Omitted by every existing game/legacy caller. Never inferred from a save version.
+ */
+export interface ReviewLandProgression {
+ readonly mode:'generated-review-only';
+ placeFacility:(state:CivilizationState,siteIndex:number,candidate:Readonly<import('./settlement-history.js').Building>)=>
+  {status:'clear';x:number;y:number}|{status:'hold'};
+ afterFacilities:(state:CivilizationState)=>void;
+}
 const clamp=(v:number,a:number,b:number)=>Math.min(b,Math.max(a,v));
 const names=['アムラ','セイラ','ルグナ','オルフェ','サリュ','ナヴァ','イリス','ヘルメ','トルア','ヴェリ','ミルハ','シルダ'];
 const places=['碧い大河の流域','石灰岩の高原','霧深い湾岸','北方の針葉樹林','季節風の吹く丘陵','内海に面した湿地','二つの山脈の谷間','乾燥した草原の縁'];
@@ -59,7 +68,8 @@ function setPopulation(s:CivilizationState,next:number):void {
  changePopulation(ledger.people,next);
  s.population=populationTotal(ledger.people);
 }
-function finishYear(s:CivilizationState):void {
+function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
+ if(land&&land.mode!=='generated-review-only')throw Error('Unsupported land progression mode');
  const ledger=s.observation!;
  if(s.year===ledger.legacy?.year)return; // A choice already pending in the old save.
  const floodYear=s.lastKind.flood??-Infinity;
@@ -107,10 +117,17 @@ function finishYear(s:CivilizationState):void {
       !overlapsPublicSpace(existingGround(candidate),communal);
    }
   :undefined;
- updateSettlements(ledger.sites,s.society,local,s.year,record,canBuild);
+ const landGate=land?(siteIndex:number,candidate:import('./settlement-history.js').Building)=>{
+  const placement=land.placeFacility(s,siteIndex,Object.freeze({...candidate}));
+  if(placement.status==='hold')return false;
+  if(!Number.isSafeInteger(placement.x)||!Number.isSafeInteger(placement.y))throw Error('Invalid proposed facility anchor');
+  candidate.x=placement.x;candidate.y=placement.y;return true;
+ }:canBuild;
+ updateSettlements(ledger.sites,s.society,local,s.year,record,landGate);
+ land?.afterFacilities(s);
  // 施設建設が確定した同一年の台帳を先に観測し、その後住宅候補を検査する。
  // 丘陵・入り江は地形未検証につき建設をHOLD。
- if(s.version===4&&s.housing){
+ if(!land&&s.version===4&&s.housing){
   // H4-D4-B: 社会史・旧施設・住宅と河川の敷地が確定した後にだけ提案。
   // 未来の記録IDを予測して純粋な候補判定を行い、全ゲート成功時に
   // 施設台帳と歴史イベントを一括して確定する。乱数列・旧セーブは変更しない。
@@ -272,10 +289,10 @@ function ageLegacies(s:CivilizationState,rng:SeededRng){
 export function legacySummary(s:CivilizationState):{kind:LegacyKind;name:string;strength:number;established:number}[]{
  return Object.values(ensureMemory(s).legacies).map(x=>({kind:x.kind,name:descriptions[x.kind],strength:x.strength,established:x.established})).sort((a,b)=>a.established-b.established);
 }
-export function chooseAutomatically(s:CivilizationState):number {
+export function chooseAutomatically(s:CivilizationState,land?:ReviewLandProgression):number {
  if(!s.pending)throw Error('No choice pending');
  const rng=new SeededRng(s.rngState);const i=rng.int(0,s.pending.options.length-1);
- s.rngState=rng.state;choose(s,i,'auto');return i;
+ s.rngState=rng.state;choose(s,i,'auto',land);return i;
 }
 interface EventRule {kind:string; tag:string; weight:(s:CivilizationState)=>number; apply:(s:CivilizationState,r:SeededRng)=>[string,string,string[]]; important?:boolean; }
 const bump=(s:CivilizationState,k:Dimension,amount:number)=>{
@@ -389,15 +406,15 @@ const decisionTemplates=[
  {label:'遠くの村へ贈る',description:'今は見返りを求めない。',impacts:{food:-5,exchange:8},consequence:'舟に食糧が積まれ、遠くへ運ばれた。'}]},
 ];
 function generateDecision(s:CivilizationState,r:SeededRng){let index=r.int(0,decisionTemplates.length-1);if(index===s.lastDecisionId)index=(index+1+r.int(0,decisionTemplates.length-2))%decisionTemplates.length;s.lastDecisionId=index;const t=decisionTemplates[index]!;s.pending={id:`choice-${s.year}`,year:s.year,question:t.question,context:`世界暦${s.year}年。${s.name}は${s.homeland}で暮らしている。どの道も、未来を約束するものではない。`,options:t.options};}
-export function choose(s:CivilizationState,index:number,source:'manual'|'auto'='manual'){if(!s.pending)throw Error('No choice pending');const option=s.pending.options[index];if(!option)throw Error('Invalid choice'); migrateCivilization(s); for(const [key,val] of Object.entries(option.impacts))bump(s,key as Dimension,val!);s.decisions.push({year:s.year,label:option.label});entry(s,'選択',option.label,option.consequence,[source==='auto'?'偶然に委ねられた選択':'観察者が選んだ一度きりの分岐'],true);
+export function choose(s:CivilizationState,index:number,source:'manual'|'auto'='manual',land?:ReviewLandProgression){if(!s.pending)throw Error('No choice pending');const option=s.pending.options[index];if(!option)throw Error('Invalid choice'); migrateCivilization(s); for(const [key,val] of Object.entries(option.impacts))bump(s,key as Dimension,val!);s.decisions.push({year:s.year,label:option.label});entry(s,'選択',option.label,option.consequence,[source==='auto'?'偶然に委ねられた選択':'観察者が選んだ一度きりの分岐'],true);
  const label=option.label;
  if(/蓄え|共同で分かち合う/.test(label))remember(s,'granary',18,`世界暦${s.year}年の選択から備蓄を共有する習慣が深まった。`);
  if(/水路|橋|堤|再建/.test(label))remember(s,'waterworks',18,'共同作業の経験が次の世代へ伝わった。');
  if(/記録|正本|両方を残す/.test(label))remember(s,'archive',16,'異なる記憶を残すという判断が伝承された。');
  if(/迎え入れ|共に暮らす/.test(label))remember(s,'migration',25,'移住者を迎え入れた経験が地域の習慣になった。');
  if(/交易|遠くの村/.test(label))remember(s,'trade_network',15,'遠方への往来が次世代まで続いた。');
- if(/看病/.test(label))remember(s,'care',15,'病人を助けた記憶が残った。');s.pending=null;finishYear(s);return s;}
-export function step(s:CivilizationState){migrateCivilization(s);if(s.pending)return s;const rng=new SeededRng(s.rngState);s.year++;
+ if(/看病/.test(label))remember(s,'care',15,'病人を助けた記憶が残った。');s.pending=null;finishYear(s,land);return s;}
+export function step(s:CivilizationState,land?:ReviewLandProgression){migrateCivilization(s);if(s.pending)return s;const rng=new SeededRng(s.rngState);s.year++;
  const rain=(rng.next()+rng.next()+rng.next())/3;const scarcity=rain<.29?1:0;s.drought=scarcity?s.drought+1:Math.max(0,s.drought-1);s.epidemic=Math.max(0,s.epidemic-1);
  ageLegacies(s,rng);
  const reserve=legacyStrength(s,'granary')/100;
@@ -425,7 +442,7 @@ export function step(s:CivilizationState){migrateCivilization(s);if(s.pending)re
  // Prompt about once a century, no more than 1 in 85 years.
  const last=s.decisions.length?s.decisions[s.decisions.length-1]!.year:0;
  if(s.year>=60&&s.year-last>=85&&rng.next()<.012)generateDecision(s,rng);
- if(!s.pending)finishYear(s);s.rngState=rng.state;return s;
+ if(!s.pending)finishYear(s,land);s.rngState=rng.state;return s;
 }
-export function advance(s:CivilizationState,years:number){if(!Number.isInteger(years)||years<0||years>10000)throw Error('Invalid years');for(let i=0;i<years&&!s.pending;i++)step(s);return s;}
+export function advance(s:CivilizationState,years:number,land?:ReviewLandProgression){if(!Number.isInteger(years)||years<0||years>10000)throw Error('Invalid years');for(let i=0;i<years&&!s.pending;i++)step(s,land);return s;}
 export function clone(s:CivilizationState):CivilizationState{return JSON.parse(JSON.stringify(s)) as CivilizationState;}
