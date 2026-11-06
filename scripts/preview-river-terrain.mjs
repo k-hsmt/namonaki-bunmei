@@ -4,12 +4,12 @@ import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
-import {generateRiverPrototype,legacyRiverReference,reviewPrototypePlot} from '../dist/terrain/river-prototype.js';
+import {riverPrototypeExamples,riverVariantLabels,legacyRiverReference,reviewPrototypePlot} from '../dist/terrain/river-prototype.js';
 import {fixedFacilityLotReservations} from '../dist/story/settlement-history.js';
 import {existingGround} from '../dist/scene/housing-ground.js';
 
 const output='artifacts/terrain31-prototype';
-const terrains=[legacyRiverReference(),...[7,42,82].map(generateRiverPrototype)];
+const terrains=[legacyRiverReference(),...riverPrototypeExamples()];
 const reserved=fixedFacilityLotReservations(0).map(lot=>({id:lot.id,kind:lot.kind,
  footprint:existingGround({...lot,builtYear:0,condition:'intact'})}));
 const server=spawn(process.execPath,['scripts/serve.mjs'],{
@@ -58,28 +58,32 @@ try{
   const prefix=terrain.variant+'_seed'+terrain.seed+'_PROTOTYPE_NOT_HISTORY';
   for(const [key,suffix] of [['raw','320x180'],['large','4x'],['marked','reserved-lots_4x']])
    await writeFile(output+'/'+prefix+'_'+suffix+'.png',Buffer.from(rendered[key].split(',')[1],'base64'));
-  frames.push({title:terrain.variant+' | seed '+terrain.seed,raw:rendered.raw,marked:rendered.marked});
+  if(terrain.variant!=='legacy-reference')frames.push({
+   title:String(frames.length+1).padStart(2,'0')+' '+riverVariantLabels[terrain.variant]+' | seed '+terrain.seed,
+   raw:rendered.raw,marked:rendered.marked,
+  });
   cases.push({terrain,waterPixels:rendered.waterPixels,plots,
    landLots:plots.filter(p=>p.status==='land').length,
    waterConflictLots:plots.filter(p=>p.reason==='water').map(p=>p.id)});
  }
  const sheet=await page.evaluate(async frames=>{
-  const c=document.createElement('canvas');c.width=2608;c.height=1744;
+  const c=document.createElement('canvas');c.width=1328;c.height=2200;
   const x=c.getContext('2d');x.imageSmoothingEnabled=false;
   x.fillStyle='#f4f0e6';x.fillRect(0,0,c.width,c.height);
-  x.fillStyle='#303d32';x.font='35px sans-serif';x.fillText('Issue #31 | River terrain prototypes',24,48);
-  x.font='22px sans-serif';x.fillText('PROTOTYPE ONLY: terrain geometry, not gameplay history. Existing games are unchanged.',24,88);
+  x.fillStyle='#303d32';x.font='30px sans-serif';x.fillText('Issue #31 | 10 river variations',24,44);
+  x.font='18px sans-serif';x.fillText('PROTOTYPE ONLY | 320 x 180 enlarged 2x | Existing gameplay is unchanged.',24,79);
+  x.fillText('Each shape is selected from its seed; the legacy reference is separate and is not counted.',24,105);
   for(let i=0;i<frames.length;i++){
-   const f=frames[i],px=16+(i%2)*1296,py=120+Math.floor(i/2)*788;
-   x.fillStyle='#303d32';x.font='26px sans-serif';x.fillText(f.title,px+8,py+30);
-   const image=new Image();image.src=f.raw;await image.decode();x.drawImage(image,px,py+46,1280,720);
+   const f=frames[i],px=16+(i%2)*656,py=130+Math.floor(i/2)*400;
+   x.fillStyle='#303d32';x.font='21px sans-serif';x.fillText(f.title,px+4,py+27);
+   const image=new Image();image.src=f.raw;await image.decode();x.drawImage(image,px,py+38,640,360);
   }
-  x.fillStyle='#62685d';x.font='22px sans-serif';x.fillText('The renderer and land checks read the same water geometry. Reserved-lot diagnostics are separate.',24,1720);
+  x.fillStyle='#62685d';x.font='18px sans-serif';x.fillText('The renderer and land checks read the same geometry. Reserved-lot diagnostics are separate.',24,2165);
   return c.toDataURL('image/png');
  },frames);
  await writeFile(output+'/terrain31_comparison.png',Buffer.from(sheet.split(',')[1],'base64'));
  const report={status:'PROTOTYPE_NOT_HISTORY',sourceHead:process.env.REVIEW_SOURCE_SHA??'local-unidentified',
-  liveGameIntegration:false,saveMigration:false,cases,
+  generatedVariantCount:frames.length,liveGameIntegration:false,saveMigration:false,cases,
   note:'land means only that the old reserved rectangle is dry in this prototype. It is not construction approval. Bridge alignment, access, slopes, housing and land-use history need later design.'};
  await writeFile(output+'/provenance.json',JSON.stringify(report,null,2));
  assert.deepEqual(errors,[]);
