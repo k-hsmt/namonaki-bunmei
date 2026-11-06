@@ -251,18 +251,25 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
  */
 function drawStreetscape(c:C,scene:SceneComposition,buildings:readonly SiteObject[]):void {
  for(const mark of projectStreetscape(scene,buildings)){
+  if(mark.kind==='civic-margin'){
+   // 実在施設の敷地のすぐ外側だけ。舗装広場ではなく土の色の揺らぎ。
+   rect(c,mark.x,mark.y,mark.width,mark.depth,'#b3a489');
+   if(mark.width>mark.depth)rect(c,mark.x+2,mark.y,Math.max(1,mark.width-4),1,'#a69a7d');
+   else rect(c,mark.x,mark.y+2,1,Math.max(1,mark.depth-4),'#a69a7d');
+   continue;
+  }
   if(mark.kind==='civic-approach'){
    // 連続した2px幅の帯は柵のように見えるため避ける。
-   // わずかな隙間を持つ1pxの踏み跡だけで地面の使われ方を示す。
+   // 短く途切れた2px以内の踏み跡で地面の使われ方を示す。
    if(mark.width>=mark.depth){
     for(let x=mark.x+1;x<mark.x+mark.width-1;x+=5){
      const n=Math.min(3,mark.x+mark.width-1-x);
-     if(n>0)rect(c,x,mark.y+((x+mark.y)%3===0?1:0),n,1,'#ac9e80');
+     if(n>0)rect(c,x,mark.y+((x+mark.y)%3===0?1:0),n,2,'#ad9e80');
     }
    }else{
     for(let y=mark.y+1;y<mark.y+mark.depth-1;y+=5){
      const n=Math.min(3,mark.y+mark.depth-1-y);
-     if(n>0)rect(c,mark.x+((mark.x+y)%3===0?1:0),y,1,n,'#ac9e80');
+     if(n>0)rect(c,mark.x+((mark.x+y)%3===0?1:0),y,2,n,'#ad9e80');
     }
    }
    continue;
