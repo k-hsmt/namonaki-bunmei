@@ -44,7 +44,8 @@ test('D7-B: 自然成立・荒廃・再利用の原寸画像と保存後のピ�
      const native=paint(snapshot),raw=native.toDataURL();
      if(paint(again).toDataURL()!==raw)throw Error('save/reload pixels changed');
      const without=paint({...snapshot,publicSpaces:undefined}).toDataURL();
-     if(Boolean(snapshot.publicSpaces?.length)===(raw===without))throw Error('public-space visibility mismatch');
+     if(Boolean(snapshot.publicSpaces?.length)===(raw===without))
+      throw Error('public-space visibility mismatch: '+JSON.stringify({seed,year:snapshot.year}));
      const large=document.createElement('canvas');large.width=1280;large.height=720;
      const c=large.getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(native,0,0,1280,720);
      return {raw,large:large.toDataURL()};

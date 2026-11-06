@@ -81,13 +81,15 @@ export function proposePublicSpaceProgression(input:PublicSpaceProgressionInput)
  const candidates:{space:PublicSpace;score:number;relatedIds:(string|undefined)[]}[]=[];
  for(const anchor of halls){
   const ground=existingGround(anchor);
-  // 施設の外側に接する候補のみ。空地と集会所の間に川や建築を挟まない。
+  // 入口のある南側と側面の候補。屋根に隠れる北側の裏庭は集会の場に選ばない。
+  // 空地と集会所の間に川や建築を挟まない。
   const plots:HousingPlot[]=[];
   for(const offset of [-16,-8,0,8,16]){
-   plots.push({x:ground.x+offset,y:ground.y-12,width:24,depth:10});
    plots.push({x:ground.x+offset,y:ground.y+ground.depth+2,width:24,depth:10});
-   plots.push({x:ground.x-26,y:ground.y+offset,width:24,depth:10});
-   plots.push({x:ground.x+ground.width+2,y:ground.y+offset,width:24,depth:10});
+   if(offset>=0){
+    plots.push({x:ground.x-26,y:ground.y+offset,width:24,depth:10});
+    plots.push({x:ground.x+ground.width+2,y:ground.y+offset,width:24,depth:10});
+   }
   }
   for(const footprint of plots){
    const nearest=[...usedHomes].sort((a,b)=>distance(a.footprint,footprint)-distance(b.footprint,footprint)||a.blockId.localeCompare(b.blockId))[0]!;
