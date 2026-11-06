@@ -116,7 +116,8 @@ export function publicSpacesAt(history:PublicSpaceHistory|undefined,year:number)
     e.after.foundationRecordId!==e.causeRecordId)err('不正な成立または重複');
    if([...spaces.values()].some(s=>overlaps(s.footprint,e.after.footprint)))err('公共空地どうしが重複');
   }else{
-   if(!old||!immutable(old,e.after))err('未成立の更新または不変属性の変更');
+   if(!old)throw Error('公共空地履歴: 未成立の更新');
+   if(!immutable(old,e.after))throw Error('公共空地履歴: 不変属性の変更');
    if(e.kind==='overgrown'&&(old.condition!=='used'||e.after.condition!=='overgrown'))
     err('荒廃への遷移が不正');
    if(e.kind==='reused'&&(old.condition!=='overgrown'||e.after.condition!=='used'))
@@ -202,7 +203,7 @@ export function appendConfirmedPublicSpaceUse(input:{
  const view=publicSpacesAt(history,year);
  if(view.status==='unknown')err('土地利用の過去が未確認');
  const old=view.spaces.find(s=>s.id===spaceId);
- if(!old)err('未成立の公共空地');
+ if(!old)throw Error('公共空地履歴: 未成立の公共空地');
  if(!hasRecord(records,causeRecordId,year,
   kind==='overgrown'?'public-space-overgrown':'public-space-reused',spaceId))
   err('状態変更の確定記録が無い');
@@ -220,7 +221,7 @@ export function validatePublicSpaceLedger(input:unknown,params:{
  readonly sites:SettlementHistory|undefined;readonly housing:HousingHistory|undefined;
 }):void{
  if(input===undefined)return;
- if(!object(input))err('履歴の形式が不正');
+ if(!object(input))throw Error('公共空地履歴: 履歴の形式が不正');
  keys(input,['schemaVersion','introducedYear','legacyUntracked','events']);
  if(input.schemaVersion!==1||!nat(input.introducedYear)||
   typeof input.legacyUntracked!=='boolean'||!Array.isArray(input.events)||
@@ -228,8 +229,9 @@ export function validatePublicSpaceLedger(input:unknown,params:{
  const history=input as unknown as PublicSpaceHistory;
  // 全確定イベントの出典を検査。過去画面を読むだけでは検査を省けない。
  let prefix:PublicSpaceHistory={...history,events:[]};
- for(const raw of history.events){
-  if(!object(raw))err('イベント形式が不正');
+ for(const rawValue of history.events){
+  const raw:unknown=rawValue;
+  if(!object(raw))throw Error('公共空地履歴: イベント形式が不正');
   keys(raw,['year','seq','kind','spaceId','after','causeRecordId']);
   if(!nat(raw.year)||Number(raw.year)>params.confirmedYear||
    !nat(raw.seq)||typeof raw.spaceId!=='string'||typeof raw.causeRecordId!=='string'||
@@ -242,7 +244,7 @@ export function validatePublicSpaceLedger(input:unknown,params:{
   if(event.kind==='established'){
    const site=siteAt(params.sites,0,event.year);
    const housingView=housingAt(params.housing,event.year,'river-bank');
-   if(!site)err('敷地と施設の観測が欠損');
+   if(!site)throw Error('公共空地履歴: 敷地と施設の観測が欠損');
    const gate=reviewPublicSpaceFoundation({
     siteIndex:0,year:event.year,candidate:event.after,
     buildings:site.buildings,housingBlocks:housingView.blocks,
@@ -259,7 +261,7 @@ export function validatePublicSpaceLedger(input:unknown,params:{
  if(latest.length){
   const site=siteAt(params.sites,0,params.confirmedYear);
   const houses=housingAt(params.housing,params.confirmedYear,'river-bank');
-  if(!site||houses.status!=='known')err('最終年の敷地記録が不明');
+  if(!site||houses.status!=='known')throw Error('公共空地履歴: 最終年の敷地記録が不明');
   for(const space of latest){
    if(site.buildings.some(b=>overlaps(space.footprint,existingGround(b)))||
     houses.blocks.some(b=>overlaps(space.footprint,b.footprint)))
