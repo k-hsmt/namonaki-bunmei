@@ -1,3 +1,4 @@
+import {projectCivicApproaches,projectCivicMargins} from './civic-approach.js';
 /**
  * H4-D2: 確定した住宅街区と公共施設を接点にした「歩き慣らされた地面」の描画投影。
  * 新たな道路・施設の建設履歴ではない。地点0のみ地形検証済み。
@@ -8,7 +9,7 @@ import type {SceneComposition} from './composition.js';
 import {isUnoccupiedGround} from './housing-ground.js';
 
 export type StreetscapeMark={
- readonly kind:'lane'|'forecourt';
+ readonly kind:'lane'|'forecourt'|'civic-approach'|'civic-margin';
  readonly x:number;readonly y:number;readonly width:number;readonly depth:number;
  readonly anchors:readonly string[];
 };
@@ -47,5 +48,5 @@ export function projectStreetscape(scene:SceneComposition,buildings:readonly Sit
   if(!isUnoccupiedGround(strip,plots,buildings,0))continue;
   marks.push({kind:'forecourt',...strip,anchors:[b.id]});
  }
- return marks;
+ return [...marks,...projectCivicMargins(scene,buildings),...projectCivicApproaches(scene,buildings)];
 }
