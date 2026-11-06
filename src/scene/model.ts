@@ -3,6 +3,7 @@ import {observationAt} from '../story/observations.js';
 import {scaleNames, siteAt} from '../story/settlement-history.js';
 import {siteNames} from '../story/society.js';
 import type {CivicFoundation} from '../story/civic-architecture.js';
+import {publicSpacesAt,type PublicSpace} from '../story/public-space-history.js';
 
 export interface SiteObject {id:string; kind:'house'|'hall'|'bridge'|'field'|'ruin'|'memorial'|'market'|'workshop'|'granary';x:number;y:number;builtYear:number;condition:'intact'|'damaged'|'ruined';civic?:CivicFoundation;}
 export type VisualLevel = 0 | 1 | 2 | 3;
@@ -11,7 +12,7 @@ export interface VisualProfile {
  roadLevel:VisualLevel; squareLevel:VisualLevel; riversideLevel:VisualLevel;
  activityLevel:VisualLevel; densityLevel:VisualLevel; heightLevel:VisualLevel;
 }
-export interface SiteSnapshot {year:number; population:number; phase:string; atmosphere:string; sceneEvent:string|null; objects:SiteObject[]; eventYear:number|null; scars:string[]; local?:{index:number;population:number}; visual?:VisualProfile;}
+export interface SiteSnapshot {year:number; population:number; phase:string; atmosphere:string; sceneEvent:string|null; objects:SiteObject[]; publicSpaces?:readonly PublicSpace[]; eventYear:number|null; scars:string[]; local?:{index:number;population:number}; visual?:VisualProfile;}
 const lots=[{x:55,y:113},{x:86,y:100},{x:116,y:109},{x:159,y:98},{x:201,y:107},{x:231,y:93},{x:271,y:105},{x:96,y:129},{x:179,y:123},{x:257,y:131}];
 const mix=(seed:number,i:number)=>{let x=(seed ^ Math.imul(i+1,0x9e3779b9))>>>0;x^=x>>>16;x=Math.imul(x,0x7feb352d);x^=x>>>15;return x>>>0;};
 export function populationAt(s:CivilizationState,year:number):number {
@@ -113,10 +114,16 @@ export function snapshotAt(s:CivilizationState,year:number,siteIndex=0):SiteSnap
   return {...summary,visual:visualProfile(level,'stable',pop>0,objects)};
  }
  const local=observationAt(s.observation!,year)!.residents[siteIndex]!.population;
+ // 旧セーブの空白期間を空地ゼロとして補完しない。確定済みだけを描画へ渡す。
+ const publicView=siteIndex===0?publicSpacesAt(s.publicSpaces,year):null;
+ const publicPlots=publicView&&publicView.status!=='unknown'&&publicView.spaces.length
+  ?{publicSpaces:publicView.spaces.map(p=>({...p,footprint:{...p.footprint}}))}:{};
+
  const trends={stable:'日々の暮らし',expanding:'建設と往来が続く',contracting:'暮らしが縮みつつある',reorganizing:'暮らしの決まりが変わりつつある'};
  return {...summary,local:{index:siteIndex,population:local},
   phase:`${siteNames[siteIndex]} · ${site.inhabited?scaleNames[site.scale]:'無人の土地'}`,
   atmosphere:site.inhabited?trends[site.trend]:'人のいない風景',
+  ...publicPlots,
   objects:site.buildings.map(building=>({...building,
    ...(building.civic?{civic:{...building.civic,footprint:{...building.civic.footprint}}}:{})})),
   visual:visualProfile(site.scale,site.trend,site.inhabited,site.buildings)};
