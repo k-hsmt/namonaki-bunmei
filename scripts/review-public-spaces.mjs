@@ -133,7 +133,7 @@ try{
   contract:'H4-D7-C',sourceHead:process.env.REVIEW_SOURCE_SHA??'local-unidentified',
   source:'actual deterministic natural progression; no injected events',crop,
   measurementNote:'Pixel differences compare the same year with public-space display suppressed. This is a hypothetical display-only comparison, not another history. Differences are not a visible-area percentage or Human visual acceptance.',
-  acceptance:{humanReview:'pending',milestoneB:'not-complete',
+  acceptance:{humanReview:'accepted-as-is-for-now',additionalCentreImprovements:'deferred-by-user',milestoneB:'not-complete',
    assistantAssessment:'The hall frontage and land-use transitions are readable; a town centre linking homes and market remains unproven.'},
   observations,
  };
@@ -147,7 +147,7 @@ try{
   const m=frame.measurement.spaces[0];
   rows.push(`| ${obs.seed} | ${frame.year} | ${frame.roles.join(', ')} | ${m?.condition??'not established'} | ${m?m.changedInsidePlot+' / '+m.plotArea:'—'} |`);
  }
- rows.push('','Human visual acceptance: pending. Milestone B: not complete.');
+ rows.push('','User decision: keep the public space as is for now; additional centre improvements are deferred. Milestone B is not declared complete.');
  await writeFile(output+'/README.md',rows.join('\n')+'\n');
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify({type:'h4d7c-review',output,sourceHead:report.sourceHead,
