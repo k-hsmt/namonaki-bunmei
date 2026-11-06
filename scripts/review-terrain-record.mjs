@@ -59,6 +59,17 @@ try{
   }
   report.push({seed:item.seed,bytes:item.bytes,variants:{river:item.world.river.variant,hills:item.world.hill.variant,coast:item.world.coast.variant,mountains:item.world.mountains.variant},pngEqual:true,pastYears:[0,100,1000,10000]});
  }
+ const fixedFixture=await readFile('tests/fixtures/terrain-record-v1-seed42.json','utf8');
+ const golden=JSON.parse(await readFile('tests/fixtures/terrain-record-v1-seed42-rgba-sha256.json','utf8'));
+ const fixtureHashes=await reader.evaluate(async json=>{
+  const {parseTerrainRecord}=await import('/terrain/terrain-record.js'),{drawTerrainRecord}=await import('/terrain/draw-terrain-record-v1.js'),record=parseTerrainRecord(json),out={};
+  for(const site of ['hill-side','river-bank','coast-inlet']){
+   const c=document.createElement('canvas');drawTerrainRecord(c,record,site);
+   const hash=await crypto.subtle.digest('SHA-256',c.getContext('2d').getImageData(0,0,320,180).data);
+   out[site]=[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join('');
+  }return out;
+ },fixedFixture);
+ assert.deepEqual(fixtureHashes,golden.rgbaSha256,'fixed old fixture pixel hash changed');
  assert.deepEqual(blocked,[]);assert.deepEqual(errors,[]);
  const sheet=await reader.evaluate(async frames=>{
   const c=document.createElement('canvas');c.width=1024;c.height=106+Math.ceil(frames.length/3)*216;
@@ -72,7 +83,7 @@ try{
  },frames);
  await writeFile(output+'/terrain31_restored_comparison.png',Buffer.from(sheet.split(',')[1],'base64'));
  await writeFile(output+'/report.json',JSON.stringify({status:'REVIEW_ONLY_NOT_GAME_V5',sourceHead:process.env.REVIEW_SOURCE_SHA??'local-unidentified',schemaVersion:1,
-  generatorImportsDuringRead:blocked,rendererId:'terrain-result-render-v1',worlds:12,scenes:36,
+  generatorImportsDuringRead:blocked,rendererId:'terrain-result-render-v1',worlds:12,scenes:36,fixedFixtureRgbaSha256:fixtureHashes,
   targetBytes:200*1024,rejectBytes:terrainRecordMaxBytes,minBytes:Math.min(...cases.map(x=>x.bytes)),maxBytes:Math.max(...cases.map(x=>x.bytes)),cases:report,
   limitations:['No v5 game save integration','No legacy migration','No D3 placement policy','No 10000-year construction simulation of generated terrain']},null,2));
  console.log(JSON.stringify({type:'terrain31-record',worlds:12,scenes:36,pngEqual:true,generatorImports:0,maxBytes:Math.max(...cases.map(x=>x.bytes))}));

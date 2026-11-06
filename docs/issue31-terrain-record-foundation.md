@@ -100,6 +100,8 @@ node scripts/review-terrain-record.mjs
 ```
 
 固定fixture：[seed42の保存結果](../tests/fixtures/terrain-record-v1-seed42.json)。テスト実行時に生成し直さない。
+固定fixtureの[RGBA SHA256](../tests/fixtures/terrain-record-v1-seed42-rgba-sha256.json)も3地点分を保持し、ブラウザで画素を照合する。
+PNG圧縮の差を避けてRGBAを使う。生成器だけでなく、同じrenderer IDの実装をうっかり変えた場合も検出する。基準hashをテストで自動更新しない。
 追加Node検査は、JSON・RLE・形状・版・ID・stream/port・投影・不正色・色と地表の適用範囲・容量・deep-freeze・読み取り専用性、生成器を含まないimport graphを含む。
 既存の文明を並走し、recordのparse／過去投影を挟んでもpending・乱数・履歴を含む全状態が同じことを検査する。
 
