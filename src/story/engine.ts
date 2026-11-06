@@ -5,7 +5,7 @@ import {proposeCivicConstruction} from './civic-progression.js';
 import {appendConfirmedCivicConstruction} from './civic-architecture.js';
 import {housingAt} from './housing-history.js';
 import {proposeHousingConstruction} from './housing-progression.js';
-import {facilityHousingConflicts,facilityCivicConflicts} from '../scene/housing-ground.js';
+import {facilityHousingConflicts,facilityCivicConflicts,existingGround} from '../scene/housing-ground.js';
 import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
@@ -103,10 +103,7 @@ function finishYear(s:CivilizationState):void {
     const communal=siteIndex===0?publicSpacesAt(s.publicSpaces,s.year).spaces:[];
     return facilityHousingConflicts(candidate,existing).length===0&&
       facilityCivicConflicts(candidate,site?.buildings??[]).length===0&&
-      !overlapsPublicSpace((candidate.civic?.footprint??(
-        candidate.kind==='bridge'?{x:candidate.x-28,y:candidate.y-3,width:56,depth:7}:
-        candidate.kind==='field'?{x:candidate.x-13,y:candidate.y-8,width:26,depth:14}:
-        {x:candidate.x-9,y:candidate.y-4,width:18,depth:7})),communal);
+      !overlapsPublicSpace(existingGround(candidate),communal);
    }
   :undefined;
  updateSettlements(ledger.sites,s.society,local,s.year,record,canBuild);
