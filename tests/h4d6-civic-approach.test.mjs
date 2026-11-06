@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {projectCivicApproaches} from '../dist/scene/civic-approach.js';
+import {projectCivicApproaches,projectCivicMargins} from '../dist/scene/civic-approach.js';
 import {projectStreetscape} from '../dist/scene/streetscape.js';
 import {composeScene} from '../dist/scene/composition.js';
 import {isUnoccupiedGround} from '../dist/scene/housing-ground.js';
@@ -40,6 +40,19 @@ test('H4-D6: 正本の大型公共施設と現存住宅の間だけに合法な�
   '人口・町/都市の分類だけで既存の歩行痕を変えない');
  assert.ok(projectStreetscape(scene,[civic]).some(m=>m.kind==='civic-approach'),
   '既存の街並み投影へ統合されている');
+});
+test('H4-D6: 大型公共施設の地表外縁も川と他の敷地を避けて描く',()=>{
+ const scene=fixture();
+ const marks=projectCivicMargins(scene,[civic]);
+ assert.ok(marks.length>0);
+ assert.ok(marks.every(m=>m.kind==='civic-margin'&&m.anchors[0]===civic.id));
+ assert.ok(safe(marks),'川や住宅の実敷地にマージンを描かない');
+ assert.deepEqual(projectCivicMargins(scene,[civic]),marks);
+ assert.deepEqual(projectCivicMargins(fixture({scale:3}),[civic]),marks);
+ assert.deepEqual(projectCivicMargins(fixture({siteIndex:1}),[civic]),[]);
+ assert.deepEqual(projectCivicMargins(scene,[]),[]);
+ assert.deepEqual(projectCivicMargins(scene,[{...civic,condition:'ruined'}]),[]);
+ assert.ok(projectStreetscape(scene,[civic]).some(m=>m.kind==='civic-margin'));
 });
 test('H4-D6: 廃墟・空き家・未知の住宅履歴・他地点には描かない',()=>{
  assert.deepEqual(projectCivicApproaches(fixture(),[]),[]);
