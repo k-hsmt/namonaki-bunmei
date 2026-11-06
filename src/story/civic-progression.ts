@@ -1,3 +1,4 @@
+import type {HousingPlot} from './housing-history.js';
 /**
  * H4-D4-B: 実際に記録された寄り合い・既存集会所・生活余力に基づく大型公共建築の提案。
  * 単なる都市分類・人口だけでは建設しない。候補は土地の正本ゲートを必ず通す。
@@ -22,7 +23,7 @@ export function proposeCivicConstruction(input:{
  readonly siteIndex:number;readonly year:number;readonly seed:number;
  readonly history:SettlementHistory;readonly housing:HousingHistory;
  readonly population:number;readonly coverage:number;readonly shortageYears:number;
- readonly tradeYears:number;readonly recordId:string;
+ readonly tradeYears:number;readonly recordId:string;readonly publicSpacePlots?:readonly HousingPlot[];
 }):CivicProposal{
  const {siteIndex,year,seed,history,housing,population,coverage,shortageYears,tradeYears,recordId}=input;
  if(siteIndex!==0)return {status:'hold',reason:'unsupported-terrain'};
@@ -75,7 +76,8 @@ export function proposeCivicConstruction(input:{
      architectureStyle:style,footprint:{x,y,width,depth},constructionRecordId:recordId,
     },
    };
-   if(reserved.some(plot=>overlaps(candidate.civic.footprint,plot)))continue;
+   if(reserved.some(plot=>overlaps(candidate.civic.footprint,plot))||
+    input.publicSpacePlots?.some(plot=>overlaps(candidate.civic.footprint,plot)))continue;
    const gate=reviewCivicConstruction({
     siteIndex,year,candidate,buildings:site.buildings,
     housingBlocks:inhabited.blocks,records:[event],
