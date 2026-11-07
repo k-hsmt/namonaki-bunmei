@@ -155,8 +155,8 @@ async function restart(seed:number){
  catch{el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
  finally{setBusy(false);render();}
 }
-el('restart').addEventListener('click',()=>void restart(Number(input.value)||randomSeed()));
-el('random').addEventListener('click',()=>void restart(randomSeed()));
+el('restart').addEventListener('click',()=>void restart(Number(input.value)||1));
+el('random').addEventListener('click',()=>void restart(Math.floor(Math.random()*4294967295)+1));
 function download(json:string){const blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`namonaki-${state.seed}-${state.year}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 el('save').addEventListener('click',async()=>{
  if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を保存しています。';
