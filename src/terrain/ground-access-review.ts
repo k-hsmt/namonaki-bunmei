@@ -1,7 +1,8 @@
 /** D3-A independent review kernel. No live engine, storage, or policy activation. */
 import type {RecordPoint, RecordSite} from './terrain-record-types.js';
 import type {ValidatedTerrainRecord} from './terrain-record.js';
-import {decodeRecordPhysics, type RecordRaster} from './terrain-record-raster-v1.js';
+import type {RecordRaster} from './terrain-record-raster-v1.js';
+import {readOwnedRecordPhysics} from './owned-record-physics.js';
 import type {WalkableBridgeCrossing} from './bridge-access-types.js';
 
 export interface GroundPlot {readonly x:number;readonly y:number;readonly width:number;readonly depth:number}
@@ -76,9 +77,10 @@ export function groundReachParents(windows:Uint8Array,root:RecordPoint):Int32Arr
  const queue=new Int32Array(N);let head=0,tail=1;queue[0]=start;parent[start]=start;
  while(head<tail){const i=queue[head++]!,x=i%W,y=Math.floor(i/W);
   // Fixed N,E,S,W order and first-visit parents.
-  for(const next of [y>96?i-W:-1,x<W-2?i+1:-1,y<H-2?i+W:-1,x>0?i-1:-1]){
-   if(next>=0&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
-  }
+  let next=i-W;if(y>96&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
+  next=i+1;if(x<W-2&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
+  next=i+W;if(y<H-2&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
+  next=i-1;if(x>0&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
  }return parent;
 }
 export function groundDistances(windows:Uint8Array,root:RecordPoint):Int32Array {
@@ -90,9 +92,10 @@ export function groundDistancesFromAny(windows:Uint8Array,roots:readonly RecordP
  const starts=roots.filter(validPoint).map(p=>p[1]*W+p[0]).sort((a,b)=>a-b);
  for(const i of starts)if(windows[i]&&d[i]===-1){d[i]=0;queue[tail++]=i;}
  while(head<tail){const i=queue[head++]!,x=i%W,y=Math.floor(i/W);
-  for(const j of [y>96?i-W:-1,x<W-2?i+1:-1,y<H-2?i+W:-1,x>0?i-1:-1]){
-   if(j>=0&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
-  }
+  let j=i-W;if(y>96&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+  j=i+1;if(x<W-2&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+  j=i+W;if(y<H-2&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+  j=i-1;if(x>0&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
  }return d;
 }
 function index(p:RecordPoint):number{return p[1]*W+p[0];}
@@ -106,7 +109,7 @@ export function reviewGroundAccess(ctx:GroundReviewContext,purpose:GroundPurpose
  if(!Number.isSafeInteger(ctx.year)||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year<0||ctx.year>ctx.confirmedYear)return hold('unconfirmed-year');
  if(!validPlot(plot))return hold('outside-ground');
  if(ctx.occupancy.some(o=>!validPlot(o.plot)||!validPoint(o.entrance))||ctx.reservations.some(o=>!validPlot(o.plot)))throw Error('Invalid ground context');
- const r=decodeRecordPhysics(ctx.terrain.sites[ctx.site].physics),physical=reviewPhysicalPlot(r,purpose,plot);
+ const r=readOwnedRecordPhysics(ctx.terrain.sites[ctx.site].physics),physical=reviewPhysicalPlot(r,purpose,plot);
  if(physical.status==='hold')return hold(physical.reason);
  if(purpose!=='field'){
   const water=(x:number,y:number)=>x>=0&&x<W&&y>=96&&y<H&&(r.surface[y*W+x]===2||r.surface[y*W+x]===3);

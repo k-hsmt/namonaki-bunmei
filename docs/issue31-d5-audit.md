@@ -20,6 +20,11 @@ candidate scores and final hypothetical access checks are recalculated. Returned
 plots do not expose cached geometry. No candidate cutoff or scoring change is
 introduced.
 
+A CPU profile identified graph traversals and repeated RLE decoding as remaining
+costs. Land queries now share a private raster only for deeply frozen physics;
+the public decoder still returns fresh arrays. Graph traversal retains the exact
+N/E/S/W order while avoiding a temporary neighbor array for every visited vertex.
+
 The full-state reference fixture contains all twelve original field-only Q5
 states at year 2000 (source `55cd3c5`) and the original seed 1 storage probe at
 year 10000 (its original report recorded `local-unidentified`). The benchmark
@@ -54,6 +59,7 @@ The separate long-run audit includes IO and must not run during measurement:
 
 ```sh
 PLAYWRIGHT_BROWSERS_PATH=/tmp/namonaki-browsers node scripts/audit-generated-longrun.mjs
+PLAYWRIGHT_BROWSERS_PATH=/tmp/namonaki-browsers node scripts/review-terrain-families.mjs
 ```
 
 All twelve Q5 worlds advance naturally to 10000. The audit checks original year
@@ -64,7 +70,13 @@ It produces native and nearest-neighbor 4x scenes for 0/100/1000/10000 plus each
 actually reached settlement/village/town/city/decline phase. Unreached phases,
 unbuilt slots, failures and HOLD periods remain in the report.
 
-Outputs are under `artifacts/terrain31-performance` and `artifacts/terrain31-d5`;
+The separate family catalog contains all R10/H8/C8/M6, including all three
+mountain cameras. Prototype overrides are labeled and have no artificial
+construction history. The natural long-run pages include a separate canonical
+physics/plot/root overlay, with the same saved mirroring as the rendered scene.
+
+Outputs are under `artifacts/terrain31-performance`, `artifacts/terrain31-d5`
+and `artifacts/terrain31-families`;
 bulk world saves and images are diagnostic artifacts, not source fixtures.
 
 ## Acceptance boundary

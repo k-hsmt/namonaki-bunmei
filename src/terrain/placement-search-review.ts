@@ -3,6 +3,7 @@
  */
 import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
+import {readOwnedRecordPhysics,frozenRecordPhysics} from './owned-record-physics.js';
 import {terrainHash} from './terrain-hash-v1.js';
 import {groundContextWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
@@ -21,7 +22,7 @@ const staticPlots=new WeakMap<object,Map<string,StaticPlots>>();
  */
 function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:ReturnType<typeof decodeRecordPhysics>,cache:boolean):StaticPlots {
  const physics=ctx.terrain.sites[ctx.site].physics,key=JSON.stringify([req.purpose,req.width,req.depth]);
- const frozen=cache&&Object.isFrozen(physics)&&Object.isFrozen(physics.rows)&&physics.rows.every(row=>Object.isFrozen(row)&&row.every(Object.isFrozen));
+ const frozen=cache&&frozenRecordPhysics(physics);
  const found=frozen?staticPlots.get(physics)?.get(key):undefined;if(found)return found;
  const water=new Int32Array(N);water.fill(N);const queue:number[]=[];
  // Sea proximity must not be interpreted as freshwater irrigation for fields.
@@ -52,7 +53,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  // Public space still needs its constrained anchor neighborhood.
  if(!['house','field','housing','hall','market','workshop','granary','civic'].includes(req.purpose))return stop('unsupported-review-purpose');
  if(req.purpose==='civic'&&!req.neighborEntrances.length)return stop('missing-anchor');
- const r=decodeRecordPhysics(ctx.terrain.sites[ctx.site].physics),baseWindows=groundContextWindows(r,ctx);
+ const r=readOwnedRecordPhysics(ctx.terrain.sites[ctx.site].physics),baseWindows=groundContextWindows(r,ctx);
  const housing=req.purpose==='civic'?req.housingEntrances??[]:[];
  const distancesFor=(windows:Uint8Array)=>[groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances),
   ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];

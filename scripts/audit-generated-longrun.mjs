@@ -24,7 +24,7 @@ const report={sourceSHA,dirty,rendererId:'generated-scene-v1',mode:'generated',p
  selection:'Same twelve worlds as Q5, without exclusions; all advanced naturally to 10000 with automatic choices',
  seeds,checkpoints,cases:[],failures:[],humanSceneryAcceptance:'pending',
  limitations:['Includes save/load, observation and IO; timings are not the annual performance benchmark',
- 'Single-family catalog is maintained separately in terrain31-world; human review remains required']};
+ 'Single-family catalog is maintained separately in terrain31-families; human review remains required']};
 for(const seed of seeds){
  try{
   let outer=createNewWorld(seed).review;
@@ -89,6 +89,8 @@ try{
    const {WORLD_SAVE_KEY,restoreGeneratedWorld}=await import('/story/world-save.js');
    const {observeGeneratedSceneReview}=await import('/scene/generated-scene-review.js');
    const {drawGeneratedSceneReview}=await import('/scene/draw-generated-review.js');
+   const {decodeRecordPhysics}=await import('/terrain/terrain-record-raster-v1.js');
+   const {housingAt}=await import('/story/housing-history.js');
    const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))).map(b=>b.toString(16).padStart(2,'0')).join('');
    const save=await decodeWorldSave(json);if(await digest(save.state)!==expectedHash)throw Error('Browser decode changed full state');
    if((await storeWorldSave(localStorage,save)).status!=='saved')throw Error('10000-year production save exceeded quota');
@@ -98,11 +100,20 @@ try{
     const o=observeGeneratedSceneReview(outer,year,index),canvas=document.createElement('canvas');drawGeneratedSceneReview(canvas,o);const raw=canvas.toDataURL();
     const copy=document.createElement('canvas');drawGeneratedSceneReview(copy,o);if(copy.toDataURL()!==raw)throw Error('Repeated PNG changed');
     const enlarged=document.createElement('canvas');enlarged.width=1280;enlarged.height=720;const c=enlarged.getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(canvas,0,0,1280,720);
-    frames.push({index,year,raw,large:enlarged.toDataURL()});
+    const overlay=document.createElement('canvas');overlay.width=320;overlay.height=180;const z=overlay.getContext('2d');z.drawImage(canvas,0,0);
+    const terrain=o.ground.terrain.sites[o.ground.site],r=decodeRecordPhysics(terrain.physics),mirror=terrain.render.mirrorX;
+    for(let y=96;y<180;y++)for(let x=0;x<320;x++){const i=y*320+x;z.fillStyle=r.surface[i]===2?'#6c999e':r.surface[i]===3?'#739aa9':r.bearing[i]!==0?'#68606d':r.grade[i]===2?'#ab7058':r.grade[i]===1?'#b3aa69':'#8eaa83';z.fillRect(mirror?319-x:x,y,1,1);}
+    const plot=(p,color)=>{z.strokeStyle=color;z.strokeRect((mirror?320-p.x-p.width:p.x)+.5,p.y+.5,p.width-1,p.depth-1);};
+    for(const p of o.ground.facilities)plot(p.plot,'#ffffff');
+    for(const b of housingAt(outer.review.state.housing,year,o.ground.site).blocks)plot(b.footprint,'#fff1a0');
+    for(const p of o.snapshot.publicSpaces??[])plot(p.footprint,'#f2a2dd');
+    for(const b of o.ground.bridges){plot(b.deck,'#242424');for(const p of b.bankSupports)plot(p,'#ffffff');}
+    const [rx,ry]=o.ground.primaryRoot;z.fillStyle='#ff3232';z.fillRect(mirror?318-rx:rx,ry,2,2);
+    frames.push({index,year,raw,large:enlarged.toDataURL(),overlay:overlay.toDataURL()});
    }
    if(await digest(outer.review.state)!==expectedHash)throw Error('Rendering mutated state');localStorage.removeItem(WORLD_SAVE_KEY);return frames;
   },{json,districts:row.districts,expectedHash:row.stateSha256});
-  for(const im of images)for(const kind of ['raw','large'])await writeFile(`${out}/seed${row.seed}_${sites[im.index]}_year${im.year}_${kind}.png`,Buffer.from(im[kind].split(',')[1],'base64'));
+  for(const im of images)for(const kind of ['raw','large','overlay'])await writeFile(`${out}/seed${row.seed}_${sites[im.index]}_year${im.year}_${kind}.png`,Buffer.from(im[kind].split(',')[1],'base64'));
   row.browserStorageRoundtrip=true;row.repeatPngChecks=images.length;
   console.log(JSON.stringify({seed:row.seed,status:'browser-storage/scenery-checked',frames:images.length}));
  }
@@ -110,8 +121,8 @@ try{
 }finally{await browser?.close();server.kill();}
 const rows=report.cases.flatMap(row=>row.districts.map(d=>`<section><h2>seed ${row.seed} / ${d.site}</h2><p>${JSON.stringify(d.variants)} / natural progression</p><p>${Object.entries(d.phases).map(([name,year])=>`${name}: ${year??'unreached'}`).join(' · ')}</p><div class="row">`+d.years.map(year=>{
  const name=`seed${row.seed}_${d.site}_year${year}`;
- return `<article><h3>year ${year}</h3><img width="320" height="180" src="${name}_raw.png"><details><summary>4×</summary><img src="${name}_large.png"></details></article>`;
+ return `<article><h3>year ${year}</h3><img width="320" height="180" src="${name}_raw.png"><details><summary>4×</summary><img src="${name}_large.png"></details><details><summary>Physics / plots / primary root</summary><img src="${name}_overlay.png"></details></article>`;
 }).join('')+'</div></section>'));
-await writeFile(out+'/index.html',`<!doctype html><meta charset="utf-8"><title>Issue31 D5 scenery</title><style>body{font:15px sans-serif;background:#eee8da;color:#354333}.row{display:flex;gap:16px;overflow:auto}article{min-width:330px}img{image-rendering:pixelated}section{margin-bottom:32px}</style><h1>D5: twelve natural worlds to year 10000</h1><p>sourceSHA ${sourceSHA}; renderer generated-scene-v1; local changes: ${dirty.join(', ')||'none'}. Human acceptance pending. Unreached phases are retained.</p><p><a href="../terrain31-world/index.html">Separate prototype family catalog (see its own provenance)</a></p>`+rows.join(''));
+await writeFile(out+'/index.html',`<!doctype html><meta charset="utf-8"><title>Issue31 D5 scenery</title><style>body{font:15px sans-serif;background:#eee8da;color:#354333}.row{display:flex;gap:16px;overflow:auto}article{min-width:330px}img{image-rendering:pixelated}section{margin-bottom:32px}</style><h1>D5: twelve natural worlds to year 10000</h1><p>sourceSHA ${sourceSHA}; renderer generated-scene-v1; local changes: ${dirty.join(', ')||'none'}. Human acceptance pending. Unreached phases are retained.</p><p>Single-family prototype catalog is a separate acceptance item; this page shows natural integrated worlds only.</p>`+rows.join(''));
 await writeFile(out+'/report.json',JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify({worlds:report.cases.length,failures:report.failures.length,humanSceneryAcceptance:'pending',index:out+'/index.html'}));

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {emptyRecordRaster,encodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
+import {emptyRecordRaster,encodeRecordPhysics,decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {validateTerrainRecord} from '../dist/terrain/terrain-record.js';
 import {reviewGroundAccess,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny} from '../dist/terrain/ground-access-review.js';
 const plot=(x,y,width=18,depth=7)=>({x,y,width,depth});
@@ -22,6 +22,18 @@ test('half-open plots, deterministic shortest path, and input noninterference',(
  assert.deepEqual(a.access.at(-1),a.entrance);
  for(let i=1;i<a.access.length;i++)assert.equal(Math.abs(a.access[i][0]-a.access[i-1][0])+Math.abs(a.access[i][1]-a.access[i-1][1]),1);
  assert.deepEqual(southEntrance(plot(2,100,19)),[10,107]);
+});
+test('owned frozen raster is isolated from public decoding and mutable wires remain fresh',()=>{
+ const {raster,ctx}=setup(),physics=encodeRecordPhysics(raster);
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+ freeze(physics);ctx.terrain={sites:{'river-bank':{physics}}};
+ const before=reviewGroundAccess(ctx,'house','new',plot(20,110));assert.equal(before.status,'clear');
+ decodeRecordPhysics(physics).surface.fill(2);
+ assert.deepEqual(reviewGroundAccess(ctx,'house','new',plot(20,110)),before);
+ const mutable=structuredClone(physics);ctx.terrain={sites:{'river-bank':{physics:mutable}}};
+ assert.equal(reviewGroundAccess(ctx,'house','new',plot(20,110)).status,'clear');
+ mutable.rows[110]=[[320,2,0,0,0]];
+ assert.equal(reviewGroundAccess(ctx,'house','new',plot(20,110)).reason,'water');
 });
 test('interior cells, water, unstable bearing, slope and elevation are inspected',()=>{
  for(const [channel,value,reason] of [['surface',2,'water'],['surface',3,'water'],['surface',0,'outside-ground'],['bearing',1,'unstable'],['bearing',2,'unstable'],['grade',2,'steep'],['elevation',3,'steep']]){
