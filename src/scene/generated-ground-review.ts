@@ -1,6 +1,6 @@
 /** D4-A saved ground contract; no legacy river polygons or generator calls. */
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
-import type {RecordSite} from '../terrain/terrain-record-types.js';
+import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
 import type {GroundPlot,GroundPurpose} from '../terrain/ground-access-review.js';
 import {reviewPhysicalPlot} from '../terrain/ground-access-review.js';
 import {decodeRecordPhysics} from '../terrain/terrain-record-raster-v1.js';
@@ -11,6 +11,7 @@ import {housingAt,type HousingHistory} from '../story/housing-history.js';
 import {projectSceneComposition,type SceneComposition} from './composition.js';
 export interface GeneratedSceneGround {
  readonly terrain:ValidatedTerrainRecord;readonly site:RecordSite;
+ readonly primaryRoot:RecordPoint;
  readonly facilities:readonly {readonly id:string;readonly purpose:GroundPurpose;readonly plot:GroundPlot}[];
  readonly bridges:readonly ValidatedBridgeGeometry[];
 }

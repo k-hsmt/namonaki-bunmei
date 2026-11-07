@@ -21,6 +21,16 @@ the legacy validation and generated saved-ground validation in separate callers.
 The Chromium legacy check caught an initial static dependency leak; the final
 separation restores all 66 exact PNG/RGBA matches and zero new terrain imports.
 
+Terrain-aware presentation uses the same observed-year walking graph as land
+placement. People stand on reachable 2×2 windows near existing active facilities
+or occupied homes. Light wear follows routes between those confirmed anchors,
+but paints only original land and creates no road history. Travel carts require
+an entire free 10×4 stable-land plot. Disease/vacancy suppress activity. Trees
+use saved terrain and a separate hash, so their positions stay fixed across dates.
+Festival flags and fire marks require an actual hall or damaged building anchor.
+Flood tint changes only saved freshwater; drought does not alter physics. Clouds
+are independent decorations in the sky. None of these consume civilization RNG.
+
 ## Fixed-coordinate audit
 
 | Existing drawing | Generated path in this foundation | Remaining work before activation |
@@ -30,24 +40,25 @@ separation restores all 66 exact PNG/RGBA matches and zero new terrain imports.
 | Old fixed-river housing conflict check | Saved physics and actual occupied plots | Complete import history validator |
 | Fixed field rows/footings outside their actual plots | Confirmed footprint-clipped ground paint | Scenery refinement if review requests it |
 | Housing/civic/public-space painting | Existing styles and confirmed sources, all three sites | Full v5 save/UI dispatch |
-| Fixed shore paving, neighborhood accents and paths | Not copied into generated scenes | Terrain-aware presentation marks |
-| Fixed trees/reeds/stones, boats and travel carts | Not copied into generated scenes | Stable terrain-aware decorations |
-| Fixed people/festival/fire/flood/drought overlays | Not copied into generated scenes | Confirmed-anchor/physics-aware atmosphere and activity |
+| Fixed shore paving, neighborhood accents and paths | Reachable light wear between confirmed home/facility entrances on original land | Human scenery acceptance |
+| Fixed trees/reeds/stones, boats and travel carts | Stable trees and saved decals; carts need free land. Legacy inferred boats/docks were already excluded from local-site views and remain excluded | Human scenery acceptance |
+| Fixed people/festival/fire/flood/drought overlays | Reachable people, confirmed anchors, freshwater-only flood tint and soil-only drought marks | Human scenery acceptance |
 
-The renderer is a structural foundation for D4-A, not the completed D4-A/D4-B
-or D5 scenery. In particular, the pending atmosphere/activity rows must be
-resolved before generated mode is activated in the game.
+The generated D4-A path is ready for scenery review. D4-B save/UI activation
+and D5 human scenery acceptance remain separate; this independent renderer
+does not activate generated mode in the game.
 
 ## Verification and comparison
 
-The full local suite passed 260 tests. Related generated/legacy scene tests are
+The full local suite passed 262 tests. Related generated/legacy scene tests are
 also rerun after the import separation. Chromium verifies repeat rendering,
-320×180 resolution, west-side house anchors, and open water through broken
-spans. Native/four-times images of all 108 scenes are reproducible with
+320×180 resolution, west-side house anchors, open water through broken
+spans, and flood paint confined to saved water. Five generated-scene tests also
+check stable vegetation, reachable people/wear and free cart plots. Native/four-times images of all 108 scenes are reproducible with
 `node scripts/review-generated-scenes.mjs`; CI runs the complete fixed
 twelve-world, three-reservation comparison in a separate job without reducing
 earlier audit coverage. Detailed policy and indirect-history results are in
 [the Q5/Q8 comparison](issue31-q5-q8-generated-comparison.md).
 
 The app entry point, new-game mode and storage writer remain unchanged. Q5/Q8
-decisions, v5 save/UI integration, atmosphere/activity adaptation and D5 remain.
+decisions, v5 save/UI integration and D5 remain.

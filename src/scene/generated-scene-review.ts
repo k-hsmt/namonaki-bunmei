@@ -13,7 +13,7 @@ export function observeGeneratedSceneReview(input:GeneratedBridgeReview,year:num
  const review={...input.review,terrain:validateTerrainRecord(input.review.terrain)};
  validateGeneratedBridgeLedger(review);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));
  const site=(['river-bank','hill-side','coast-inlet'] as const)[siteIndex]!,snapshot=snapshotAt(review.state,year,siteIndex,'generated-review-only');
- const ground:GeneratedSceneGround={terrain:review.terrain,site,
+ const ground:GeneratedSceneGround={terrain:review.terrain,site,primaryRoot:review.plans[site].primaryRoot,
   facilities:review.placements.filter(p=>p.site===site&&p.builtYear<=year).map(p=>({id:p.objectId,purpose:p.kind,plot:p.plot})),
   bridges:site==='river-bank'?review.bridgeReview!.bridges.filter(b=>b.builtYear<=year).map(b=>b.geometry):[]};
  return {snapshot,ground,composition:composeGeneratedScene(snapshot,review.state.housing,ground)};

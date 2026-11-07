@@ -22,8 +22,16 @@ test('generated Canvas preserves source geometry, projects west-side coordinates
     if(JSON.stringify(pixel)!==JSON.stringify([69,78,72,255]))throw Error('House door is not at its mirrored saved anchor');
    }
    const g=input.review.bridgeReview.bridges[0].geometry,x=g.deck.x+Math.floor(g.deck.width/2),y=g.deck.y+2,screenX=input.review.terrain.sites['river-bank'].render.mirrorX?319-x:x;
+   // Controlled overlay fixture: the flood paint may change only saved water pixels.
+   const {decodeRecordPhysics}=await import('/terrain/terrain-record-raster-v1.js'),raster=decodeRecordPhysics(input.review.terrain.sites['river-bank'].physics),o=observeGeneratedSceneReview(input,1000,0),dry=canvas(),wet=canvas();
+   drawGeneratedSceneReview(dry,{...o,snapshot:{...o.snapshot,scars:[]}});drawGeneratedSceneReview(wet,{...o,snapshot:{...o.snapshot,scars:['flood']}});
+   const a=pixels(dry),b=pixels(wet);let waterChanges=0;
+   for(let y=96;y<180;y++)for(let sx=0;sx<320;sx++)if([0,1,2,3].some(ch=>a[(y*320+sx)*4+ch]!==b[(y*320+sx)*4+ch])){
+    const x=input.review.terrain.sites['river-bank'].render.mirrorX?319-sx:sx;if(raster.surface[y*320+x]!==2)throw Error('Flood paint changed saved land');waterChanges++;
+   }
+   if(!waterChanges)throw Error('Flood overlay did not paint saved water');
    const pixel=c=>Array.from(c.getContext('2d').getImageData(screenX,y,1,1).data),base=canvas();drawTerrainRecord(base,input.review.terrain,'river-bank');const water=pixel(base),states=[];
-   for(const year of [755,756,1096,1104,1289]){const o=observeGeneratedSceneReview(input,year,0),c=canvas();drawGeneratedSceneReview(c,o);states.push({year,isWater:JSON.stringify(pixel(c))===JSON.stringify(water)});}
+   for(const year of [755,756,1096,1104,1289]){const o=observeGeneratedSceneReview(input,year,0),c=canvas();drawGeneratedSceneReview(c,o);const expected=o.snapshot.scars.includes('flood')?[98,150,160,255]:water;states.push({year,isWater:JSON.stringify(pixel(c))===JSON.stringify(expected)});}
    if(JSON.stringify(input)!==original)throw Error('Rendering mutated saved state');return {images,states};
   },{input,west});
   assert.deepEqual(results.states,[[755,true],[756,false],[1096,true],[1104,false],[1289,true]].map(([year,isWater])=>({year,isWater})));
