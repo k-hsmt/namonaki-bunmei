@@ -1,6 +1,7 @@
 import {findHousingGroundConflicts} from './housing-ground.js';
 import {housingAt,type HousingHistory,type HousingCondition,type HousingUse,type HousingPlot} from '../story/housing-history.js';
 import type {SiteObject,SiteSnapshot,VisualLevel} from './model.js';
+import type {GeneratedSceneGround} from './generated-ground-review.js';
 
 /**
  * View-only projection of a confirmed observation.
@@ -44,6 +45,7 @@ export interface ComposedHousingBlock {
  readonly roofParts:readonly ComposedRoofPart[];
 }
 export interface SceneComposition {
+ readonly generatedGround?:GeneratedSceneGround;
  readonly year:number;
  readonly siteIndex:number;
  readonly scale:VisualLevel;
@@ -72,7 +74,7 @@ function footprint(kind:SiteObject['kind']):ComposedStructure['footprint'] {
  * 描画の屋根部品は住宅数の正本ではない。1部品で複数住戸を表せる。
  * 座標は固定敷地とstyleSeedだけで決まり、規模変更で並び替わらない。
  */
-function projectHousingBlock(b:ReturnType<typeof housingAt>['blocks'][number]):ComposedHousingBlock{
+function projectHousingBlock(b:ReturnType<typeof housingAt>['blocks'][number],generated=false):ComposedHousingBlock{
  const {footprint:f}=b;
  const depth=f.y<106?'far' as const:f.y<132?'middle' as const:'near' as const;
  const step=depth==='far'?6:depth==='middle'?9:12;
@@ -86,7 +88,7 @@ function projectHousingBlock(b:ReturnType<typeof housingAt>['blocks'][number]):C
   roofParts.push({
    partId:b.blockId+':'+i,blockId:b.blockId,
    x:f.x+(i%across)*step+Math.floor(step/2),
-   y:f.y+Math.floor(i/across)*Math.max(4,step-2)+Math.max(4,step-2),
+   y:generated?Math.min(f.y+f.depth-1,f.y+Math.floor(i/across)*Math.max(4,step-2)+Math.max(4,step-2)):f.y+Math.floor(i/across)*Math.max(4,step-2)+Math.max(4,step-2),
    depth,styleId:b.styleId,
    variant:(stableHash(b.blockId+':'+b.styleSeed+':'+i)%4),
    representedUnits:units,condition:b.condition,use:b.use,
@@ -96,7 +98,8 @@ function projectHousingBlock(b:ReturnType<typeof housingAt>['blocks'][number]):C
   housingCount:b.housingCount,condition:b.condition,use:b.use,
   slotCapacity,roofPartCount,roofParts};
 }
-export function composeScene(s:SiteSnapshot,housing?:HousingHistory):SceneComposition {
+/** Internal projection after the caller's ground validator; legacy imports stay terrain-free. */
+export function projectSceneComposition(s:SiteSnapshot,housing?:HousingHistory,generatedGround?:GeneratedSceneGround):SceneComposition {
  const scale=s.visual?.scale??0;
  const trend=s.visual?.trend??'stable';
  const structures=s.objects.map(o=>({
@@ -118,10 +121,11 @@ export function composeScene(s:SiteSnapshot,housing?:HousingHistory):SceneCompos
  const riverUse:SceneComposition['riverUse']=working?'working':bridge?'footpath':'natural';
  const siteId=(['river-bank','hill-side','coast-inlet'] as const)[s.local?.index??0]??'river-bank';
  const historic=housingAt(housing,s.year,siteId);
- const conflicts=findHousingGroundConflicts(historic.blocks,s.objects,s.local?.index??0);
+ const conflicts=generatedGround?[]:findHousingGroundConflicts(historic.blocks,s.objects,s.local?.index??0);
  if(conflicts.length)throw new Error('住宅街区の地表敷地が衝突: '+JSON.stringify(conflicts));
- const residentialBlocks=historic.blocks.map(projectHousingBlock);
- return {year:s.year,siteIndex:s.local?.index??0,scale,trend,
+ const residentialBlocks=historic.blocks.map(b=>projectHousingBlock(b,Boolean(generatedGround)));
+ return {...(generatedGround?{generatedGround}:{}),year:s.year,siteIndex:s.local?.index??0,scale,trend,
   population:s.local?.population??s.population,structures,blocks,riverUse,
  housingStatus:historic.status,residentialBlocks};
 }
+export function composeScene(s:SiteSnapshot,housing?:HousingHistory):SceneComposition{return projectSceneComposition(s,housing);}

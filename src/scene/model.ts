@@ -52,7 +52,8 @@ export function visualProfile(scale:number, trend:VisualProfile['trend'], inhabi
   heightLevel:living,
  };
 }
-export function snapshotAt(s:CivilizationState,year:number,siteIndex=0):SiteSnapshot {
+export function snapshotAt(s:CivilizationState,year:number,siteIndex=0,mode:'legacy-fixed'|'generated-review-only'='legacy-fixed'):SiteSnapshot {
+ if(!['legacy-fixed','generated-review-only'].includes(mode))throw Error('Unknown scene mode');
  if(!Number.isInteger(year)||year<0||year>lastObservedYear(s))throw Error('観測年が不正です');
  const boundary=s.observation?.legacy;
  const legacy=boundary&&year<=boundary.year?boundary:null;
@@ -115,9 +116,9 @@ export function snapshotAt(s:CivilizationState,year:number,siteIndex=0):SiteSnap
  }
  const local=observationAt(s.observation!,year)!.residents[siteIndex]!.population;
  // 旧セーブの空白期間を空地ゼロとして補完しない。確定済みだけを描画へ渡す。
- const publicView=siteIndex===0?publicSpacesAt(s.publicSpaces,year):null;
+ const publicView=mode==='generated-review-only'?publicSpacesAt(s.publicSpaces,year,mode):siteIndex===0?publicSpacesAt(s.publicSpaces,year):null;
  const publicPlots=publicView&&publicView.status!=='unknown'&&publicView.spaces.length
-  ?{publicSpaces:publicView.spaces.map(p=>({...p,footprint:{...p.footprint}}))}:{};
+  ?{publicSpaces:publicView.spaces.filter(p=>mode==='legacy-fixed'||p.siteId===(['river-bank','hill-side','coast-inlet'] as const)[siteIndex]).map(p=>({...p,footprint:{...p.footprint}}))}:{};
 
  const trends={stable:'日々の暮らし',expanding:'建設と往来が続く',contracting:'暮らしが縮みつつある',reorganizing:'暮らしの決まりが変わりつつある'};
  return {...summary,local:{index:siteIndex,population:local},

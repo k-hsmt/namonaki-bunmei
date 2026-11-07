@@ -125,6 +125,7 @@ jobs:
             artifacts/terrain31-legacy/*
             artifacts/terrain31-ground/*
             artifacts/terrain31-bridge-visual/*
+            artifacts/terrain31-scene-tests/*
             artifacts/h4d3-concepts/*
           if-no-files-found: warn
 
@@ -219,4 +220,29 @@ jobs:
             artifacts/terrain31-civic/*
             artifacts/terrain31-public-space/*
             artifacts/terrain31-bridge/*
+          if-no-files-found: error
+
+  generated-scenes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Compare twelve generated worlds and all reservation policies
+        run: node scripts/review-generated-scenes.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain31-scenes-q5
+          path: artifacts/terrain31-scenes/*
           if-no-files-found: error
