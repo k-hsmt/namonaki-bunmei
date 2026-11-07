@@ -250,7 +250,7 @@ function drawHistorySurface(c:C,scene:SceneComposition):void {
  * 住宅・会堂・川とは独立した「占有と利用状態」の表示である。
  * 自然進行での成立判定は後工程。既存の前庭や描画からは遡及作成しない。
  */
-function drawConfirmedPublicSpaces(c:C,spaces:NonNullable<SiteSnapshot['publicSpaces']>):void{
+export function drawConfirmedPublicSpaces(c:C,spaces:NonNullable<SiteSnapshot['publicSpaces']>):void{
  for(const p of [...spaces].sort((a,b)=>a.id.localeCompare(b.id))){
   const f=p.footprint,overgrown=p.condition==='overgrown';
   rect(c,f.x,f.y,f.width,f.depth,overgrown?'#8d9777':'#b7a987');
@@ -337,7 +337,7 @@ function drawStreetscape(
  * 道路・公共施設の履歴を捏造しない。水辺や既存施設への重複は
  * composeSceneの地表占有検証に任せ、敷地外へ描画しない。
  */
-function drawHousingPlotSurface(c:C,scene:SceneComposition):void{
+export function drawHousingPlotSurface(c:C,scene:SceneComposition):void{
  for(const block of scene.residentialBlocks){
   const f=block.footprint;
   const x=Math.round(f.x),y=Math.round(f.y);
@@ -359,7 +359,7 @@ function drawHousingPlotSurface(c:C,scene:SceneComposition):void{
 }
 
 /** H1: 履歴由来の住宅部品だけを描画する。屋根部品は独立施設ではない。 */
-function drawResidentialRoofs(c:C,scene:SceneComposition,depth:'far'|'middle'|'near'):void {
+export function drawResidentialRoofs(c:C,scene:SceneComposition,depth:'far'|'middle'|'near'):void {
  const roofs=scene.residentialBlocks.flatMap(b=>b.roofParts)
   .filter(p=>p.depth===depth).sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId));
  for(const p of roofs){
