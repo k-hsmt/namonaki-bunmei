@@ -53,3 +53,13 @@ test('saved hydrology, geometry, immutable anchors, missing sources and conditio
   assert.throws(()=>advanceGeneratedBridgeReview(bad,1,'automatic'));assert.equal(JSON.stringify(bad),before);
  }
 });
+test('a record-boundary batch matches single-year UI advancement and preserves pending choices',()=>{
+ const original=JSON.stringify(completed),length=completed.review.state.history.length;let repeated=completed;
+ for(let i=0;i<36&&!repeated.review.state.pending;i++){
+  repeated=advanceGeneratedBridgeReview(repeated,1,'stop');if(repeated.review.state.history.length>length)break;
+ }
+ const batch=advanceGeneratedBridgeReview(completed,36,'stop',{stopAtNewRecord:true});assert.deepEqual(batch,repeated);assert.equal(JSON.stringify(completed),original);
+ assert.throws(()=>advanceGeneratedBridgeReview(completed,1,'stop',{stopAtNewRecord:'yes'}));
+ const pending=advanceGeneratedBridgeReview(initial,1000,'stop');assert.ok(pending.review.state.pending);
+ assert.deepEqual(advanceGeneratedBridgeReview(pending,36,'stop',{stopAtNewRecord:true}),pending);
+});

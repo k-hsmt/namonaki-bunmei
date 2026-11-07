@@ -246,3 +246,28 @@ jobs:
           name: terrain31-scenes-q5
           path: artifacts/terrain31-scenes/*
           if-no-files-found: error
+
+  generated-save:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Verify complete generated v5 draft at 10,000 years and preserve the old save
+        run: node scripts/review-generated-save.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain31-v5-save-review
+          path: artifacts/terrain31-save/*
+          if-no-files-found: error

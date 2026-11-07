@@ -5,7 +5,7 @@ import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import {decodeRecordPhysics} from '../terrain/terrain-record-raster-v1.js';
 import {groundContextWindows,groundDistances,reviewGroundAccess,southEntrance,type GroundPlot} from '../terrain/ground-access-review.js';
 import {selectReviewReservations,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
-import {terrainHash} from '../terrain/hill-prototype.js';
+import {terrainHash} from '../terrain/terrain-hash-v1.js';
 import {publicSpacesAt,type PublicSpace,type PublicSpaceHistory,type PublicSpaceEvent} from './public-space-history.js';
 import {housingAt} from './housing-history.js';
 import {siteAt} from './settlement-history.js';

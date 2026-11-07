@@ -2,7 +2,7 @@
 import type {ValidatedTerrainRecord} from './terrain-record.js';
 import type {RecordPoint,RecordSite} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
-import {terrainHash} from './hill-prototype.js';
+import {terrainHash} from './terrain-hash-v1.js';
 import {groundWalkWindows,groundDistances,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot} from './ground-access-review.js';
 const W=320,N=57600;
 const point=(i:number):RecordPoint=>[i%W,Math.floor(i/W)];
