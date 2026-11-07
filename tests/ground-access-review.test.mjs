@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {emptyRecordRaster,encodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
+import {emptyRecordRaster,encodeRecordPhysics,decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {validateTerrainRecord} from '../dist/terrain/terrain-record.js';
-import {reviewGroundAccess,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny} from '../dist/terrain/ground-access-review.js';
+import {reviewGroundAccess,createGroundAccessReviewer,createGroundAccessTransaction,generatedGroundGraphMetrics,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny,groundDistancesToGroups} from '../dist/terrain/ground-access-review.js';
 const plot=(x,y,width=18,depth=7)=>({x,y,width,depth});
 function setup(){
  const raster=emptyRecordRaster();raster.surface.fill(1,96*320);
@@ -22,6 +22,58 @@ test('half-open plots, deterministic shortest path, and input noninterference',(
  assert.deepEqual(a.access.at(-1),a.entrance);
  for(let i=1;i<a.access.length;i++)assert.equal(Math.abs(a.access[i][0]-a.access[i-1][0])+Math.abs(a.access[i][1]-a.access[i-1][1]),1);
  assert.deepEqual(southEntrance(plot(2,100,19)),[10,107]);
+});
+test('owned frozen raster is isolated from public decoding and mutable wires remain fresh',()=>{
+ const {raster,ctx}=setup(),physics=encodeRecordPhysics(raster);
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+ freeze(physics);ctx.terrain={sites:{'river-bank':{physics}}};
+ const before=reviewGroundAccess(ctx,'house','new',plot(20,110));assert.equal(before.status,'clear');
+ decodeRecordPhysics(physics).surface.fill(2);
+ assert.deepEqual(reviewGroundAccess(ctx,'house','new',plot(20,110)),before);
+ const mutable=structuredClone(physics);ctx.terrain={sites:{'river-bank':{physics:mutable}}};
+ assert.equal(reviewGroundAccess(ctx,'house','new',plot(20,110)).status,'clear');
+ mutable.rows[110]=[[320,2,0,0,0]];
+ assert.equal(reviewGroundAccess(ctx,'house','new',plot(20,110)).reason,'water');
+});
+test('search-owned before graph is reused while every hypothetical plot and entrance remains checked',()=>{
+ const {raster,ctx}=setup();ctx.terrain={sites:{'river-bank':{physics:encodeRecordPhysics(raster)}}};
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(ctx.terrain);
+ ctx.occupancy=[{id:'old',plot:plot(20,110),entrance:[28,117]}];
+ const owned=createGroundAccessReviewer(ctx),snapshot=structuredClone(ctx),before=generatedGroundGraphMetrics();
+ const candidates=[plot(38,110),plot(44,120),plot(0,100,2,79)];
+ const actual=candidates.map(p=>owned('house','new',p)),after=generatedGroundGraphMetrics();
+ assert.equal(after.parentTraversals-before.parentTraversals,1+candidates.length);
+ for(let i=0;i<candidates.length;i++)assert.deepEqual(actual[i],reviewGroundAccess(snapshot,'house','new',candidates[i]));
+ ctx.primaryRoot=[300,100];ctx.occupancy.push({id:'later',plot:plot(44,120),entrance:[52,127]});
+ assert.deepEqual(owned('house','new',candidates[1]),actual[1],'transaction must own its occupancy snapshot');
+ assert.equal(reviewGroundAccess(ctx,'house','new',candidates[1]).reason,'occupied');
+});
+test('grouped point distances equal independent reverse fields through narrow passages and disconnected land',()=>{
+ for(const open of [false,true]){
+  const r=emptyRecordRaster();for(let y=100;y<136;y++)r.surface.fill(1,y*320,y*320+80);
+  for(let y=100;y<136;y++)if(!open||y<116||y>119)r.surface.fill(2,y*320+40,y*320+44);
+  const windows=groundWalkWindows(r,[]),groups=[[[2,102]],[[10,110],[70,130]],[[65,105],[65,105]],[]];
+  const fields=groups.map(g=>groundDistancesFromAny(windows,g));
+  for(let y=100;y<136;y+=3)for(let x=0;x<80;x+=5){
+   assert.deepEqual(groundDistancesToGroups(windows,[x,y],groups),fields.map(d=>d[y*320+x]),`${open}/${x},${y}`);
+  }
+ }
+ const r=emptyRecordRaster();r.surface.fill(1,96*320);const windows=groundWalkWindows(r,[]),before=generatedGroundGraphMetrics();
+ assert.deepEqual(groundDistancesToGroups(windows,[10,100],[[[12,100]],[[10,102]],[]]),[2,2,-1]);
+ const after=generatedGroundGraphMetrics();assert.equal(after.distanceFields-before.distanceFields,1);
+ assert.ok(after.visitedVertices-before.visitedVertices<100,'nearby score groups must not traverse the entire map');
+});
+test('placement scoring reads the checked candidate graph without retaining it for later candidates',()=>{
+ const {raster,ctx}=setup();ctx.terrain={sites:{'river-bank':{physics:encodeRecordPhysics(raster)}}};
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(ctx.terrain);
+ ctx.occupancy=[{id:'old',plot:plot(20,110),entrance:[28,117]}];
+ const tx=createGroundAccessTransaction(ctx),candidate=plot(44,120),before=generatedGroundGraphMetrics();
+ assert.equal(tx.review('house','new',candidate).status,'clear');
+ assert.equal(generatedGroundGraphMetrics().walkGraphs-before.walkGraphs,2,'one before and one after graph');
+ const checked=tx.windows;assert.deepEqual(checked,groundWalkWindows(raster,[ctx.occupancy[0].plot,candidate]));
+ checked.fill(0);
+ assert.equal(tx.review('house','new',candidate).status,'clear');assert.notEqual(tx.windows,checked);
+ assert.equal(tx.review('house','new',ctx.occupancy[0].plot).reason,'occupied');assert.equal(tx.windows,null);
 });
 test('interior cells, water, unstable bearing, slope and elevation are inspected',()=>{
  for(const [channel,value,reason] of [['surface',2,'water'],['surface',3,'water'],['surface',0,'outside-ground'],['bearing',1,'unstable'],['bearing',2,'unstable'],['grade',2,'steep'],['elevation',3,'steep']]){
