@@ -31,7 +31,7 @@ export interface GeneratedLandReviewExtension {
 /** A UI batch may stop after its first new record while validating only once. */
 export interface GeneratedAdvanceOptions {readonly stopAtNewRecord?:boolean}
 export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,reservationMode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedFacilityReview|{status:'hold';reason:string}{
- if(growthPattern!==undefined&&growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
+ if(growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(growthPattern))throw Error('Unknown growth pattern');
  const plans={} as Record<RecordSite,ReviewFacilityPlan>;
  for(const site of sites){const result=planFacilitySitesReview(terrain,site,growthPattern);if(result.status==='hold')return result;plans[site]=result;}
  // Validate mode before creating any civilization state.
@@ -46,7 +46,7 @@ export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,res
 }
 function mutableCopy(input:GeneratedFacilityReview):GeneratedFacilityReview {
  if(input.format!=='generated-facility-review'||input.status!=='review-only'||input.placementPolicy!==null||input.state.version!==4||input.state.seed!==input.terrain.source.seed)throw Error('Invalid generated review boundary');
- if(input.growthPattern!==undefined&&input.growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
+ if(input.growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(input.growthPattern))throw Error('Unknown growth pattern');
  const terrain=readOwnedTerrainRecord(input.terrain),next=structuredClone({...input,terrain:null});return {...next,terrain};
 }
 function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):ReviewLandProgression {

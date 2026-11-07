@@ -56,7 +56,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  // The year itself is a gate; occupancy and verified crossings encode all
  // time-dependent geometry. Exhaustive reference searches always recompute.
  const known=ctx.historyStatus==='known'&&Number.isSafeInteger(ctx.year)&&ctx.year>=0&&Number.isSafeInteger(ctx.confirmedYear)&&ctx.year<=ctx.confirmedYear;
- const physics=known&&mode==='bounded'&&req.growthPattern==='organic-v2'?ctx.terrain.sites[ctx.site].physics:null;
+ const physics=known&&mode==='bounded'&&req.growthPattern!==undefined?ctx.terrain.sites[ctx.site].physics:null;
  if(physics&&frozenRecordPhysics(physics)){
   const key=JSON.stringify([ctx.terrain.source.seed,ctx.site,ctx.primaryRoot,ctx.occupancy,ctx.reservations,ctx.crossings,req]);
   let misses=organicMisses.get(physics);if(!misses){misses=new Set();organicMisses.set(physics,misses);}
@@ -80,8 +80,8 @@ function searchPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,m
  // Public space still needs its constrained anchor neighborhood.
  if(!['house','field','housing','hall','market','workshop','granary','civic'].includes(req.purpose))return stop('unsupported-review-purpose');
  if(req.purpose==='civic'&&!req.neighborEntrances.length)return stop('missing-anchor');
- if(req.growthPattern!==undefined&&req.growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
- const organic=req.growthPattern==='organic-v2'?organicAttraction(ctx,req.purpose,req.objectId,req.nucleus,req.neighborEntrances):null;
+ if(req.growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(req.growthPattern))throw Error('Unknown growth pattern');
+ const organic=req.growthPattern!==undefined?organicAttraction(ctx,req.purpose,req.objectId,req.nucleus,req.neighborEntrances,req.growthPattern):null;
  const neighbors=organic?[organic.anchors[anchorIndex]!]:req.neighborEntrances;
  const r=readOwnedRecordPhysics(ctx.terrain.sites[ctx.site].physics);
  const physical=physicalCandidates(ctx,req,r,mode==='bounded');metrics.enumerated=physical.enumerated;metrics.physicalClear=physical.physicalClear;

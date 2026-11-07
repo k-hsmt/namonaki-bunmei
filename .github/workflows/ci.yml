@@ -332,10 +332,20 @@ jobs:
         run: node scripts/review-organic-growth.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify cross-river v3 histories and saved continuation
+        run: node scripts/audit-cross-river-growth.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Compare empty-bank reproduction and future-only opt-in
+        run: node scripts/review-cross-river-growth.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: terrain31-organic-growth
           retention-days: 14
-          path: artifacts/terrain31-organic/*
+          path: |
+            artifacts/terrain31-organic/*
+            artifacts/terrain31-cross-river/*
           if-no-files-found: error

@@ -6,7 +6,7 @@ const span=outer=>{
 };
 test('new-world organic growth spreads natural buildings and preserves policy across save/resume',()=>{
  const compact=advanceGeneratedBridgeReview(createNewWorld(10,'terrain-placement-v1').review,100,'automatic');
- const initial=createNewWorld(10),organic=advanceGeneratedBridgeReview(initial.review,100,'automatic'),before=JSON.stringify(organic),a=span(compact),b=span(organic);
+ const initial=createNewWorld(10,'terrain-placement-v2'),organic=advanceGeneratedBridgeReview(initial.review,100,'automatic'),before=JSON.stringify(organic),a=span(compact),b=span(organic);
  assert.equal(b.count,a.count);assert.ok(b.width>a.width&&b.depth>a.depth,'spread without fabricating extra buildings');
  const save=createGeneratedWorldSave(organic),restored=restoreGeneratedWorld(JSON.parse(JSON.stringify(save)));
  assert.equal(save.progressionPolicy.id,'terrain-placement-v2');assert.equal(restored.review.growthPattern,'organic-v2');

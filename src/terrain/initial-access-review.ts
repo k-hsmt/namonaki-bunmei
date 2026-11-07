@@ -43,7 +43,7 @@ export function proposeInitialAccess(terrain:ValidatedTerrainRecord,site:RecordS
   const sorted=houses.filter(p=>component.members.has(index(southEntrance(p)))).map(p=>{
    let water=N;for(let y=p.y;y<p.y+p.depth;y++)for(let x=p.x;x<p.x+p.width;x++)water=Math.min(water,waterDistance[y*W+x]!);
    const preference=waterQueue.length?(water>=8&&water<=32?0:1):Math.abs(p.x+9-cx)+Math.abs(p.y+3-cy);
-   const room=growthPattern==='organic-v2'?Math.abs(p.y+3-132)*2+Math.max(0,36-p.x)*3+Math.max(0,p.x+18-284)*3:0;
+   const room=growthPattern!==undefined?Math.abs(p.y+3-132)*2+Math.max(0,36-p.x)*3+Math.max(0,p.x+18-284)*3:0;
    return {p,preference,room,tie:terrainHash(['initial-access-review-v1',terrain.source.seed,'house',site,'0',p.x,p.y])};
   }).sort((a,b)=>a.preference-b.preference||a.room-b.room||a.tie-b.tie||a.p.y-b.p.y||a.p.x-b.p.x);
   for(const {p:house} of sorted){

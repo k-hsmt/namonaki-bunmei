@@ -1,8 +1,8 @@
-/** Frozen organic growth v2. All anchors are confirmed local occupation. */
+/** Versioned growth: v2 anchors at homes; v3 also anchors at verified bridge ends. */
 import type {GroundPlot,GroundPurpose,GroundReviewContext} from './ground-access-review.js';
 import type {RecordPoint} from './terrain-record-types.js';
 import {terrainHash} from './terrain-hash-v1.js';
-export type GrowthPattern='organic-v2';
+export type GrowthPattern='organic-v2'|'organic-v3';
 export const organicGrowthLimits=Object.freeze({horizontalGap:6,verticalGap:10,fieldGap:3,civicGap:8,localMin:14,localMax:32,branchMin:34,branchMax:56,maxWalk:80,coreCap:48});
 export function organicPlotClear(p:GroundPlot,others:readonly GroundPlot[],purpose:GroundPurpose):boolean {
  const l=organicGrowthLimits,xgap=purpose==='field'?l.fieldGap:purpose==='civic'?l.civicGap:l.horizontalGap,ygap=purpose==='field'?l.fieldGap:l.verticalGap;
@@ -12,8 +12,11 @@ export function organicPlotClear(p:GroundPlot,others:readonly GroundPlot[],purpo
  });
 }
 export interface OrganicAttraction {readonly anchor:RecordPoint;readonly anchors:readonly RecordPoint[];readonly minimum:number;readonly maximum:number}
-export function organicAttraction(ctx:GroundReviewContext,purpose:GroundPurpose,id:string,nucleus:RecordPoint,neighbors:readonly RecordPoint[]):OrganicAttraction {
- const ordered=[...neighbors].sort((a,b)=>a[1]-b[1]||a[0]-b[0]);
+export function organicAttraction(ctx:GroundReviewContext,purpose:GroundPurpose,id:string,nucleus:RecordPoint,neighbors:readonly RecordPoint[],pattern:GrowthPattern='organic-v2'):OrganicAttraction {
+ // Only verified, currently walkable decks can seed a new bank neighborhood.
+ // Candidate access still has to connect all the way to the original root.
+ const portals:RecordPoint[]=pattern==='organic-v3'&&(purpose==='house'||purpose==='housing')?(ctx.crossings??[]).flatMap(c=>[...c.bankEntrances]):[];
+ const ordered=[...neighbors,...portals].sort((a,b)=>a[1]-b[1]||a[0]-b[0]);
  const ordinal=Number(id.match(/(\d+)$/)?.[1]??0),branch=(purpose==='housing'||purpose==='house')&&ordered.length>=3&&ordinal%4===0;
  const density=(p:RecordPoint)=>ctx.occupancy.reduce((n,o)=>{
   const x=o.plot.x+o.plot.width/2,y=o.plot.y+o.plot.depth/2;return n+Math.max(0,44-Math.abs(p[0]-x)-Math.abs(p[1]-y));
