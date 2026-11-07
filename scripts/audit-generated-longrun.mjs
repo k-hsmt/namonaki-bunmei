@@ -13,6 +13,10 @@ import {generatedPublicSpaceExtension} from '../dist/story/generated-public-spac
 import {createGeneratedWorldSave,restoreGeneratedWorld} from '../dist/story/world-save.js';
 import {encodeWorldSave,decodeWorldSave} from '../dist/story/world-storage.js';
 import {observeGeneratedSceneReview} from '../dist/scene/generated-scene-review.js';
+import {generatedGroundGraphMetrics} from '../dist/terrain/ground-access-review.js';
+import {generatedPlacementSearchMetrics} from '../dist/terrain/placement-search-review.js';
+import {generatedHousingReplayMetrics} from '../dist/story/generated-housing-review.js';
+import {generatedBridgeProposalMetrics} from '../dist/story/generated-bridge-history-review.js';
 const out='artifacts/terrain31-d5',seeds=[1,3,6,29,85,131,7,198,10,12,21,24];
 const sites=['river-bank','hill-side','coast-inlet'],checkpoints=[0,1,99,100,101,1000,2000,10000];
 const sourceSHA=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
@@ -28,6 +32,7 @@ const report={sourceSHA,dirty,rendererId:'generated-scene-v1',mode:'generated',p
 for(const seed of seeds){
  try{
   let outer=createNewWorld(seed).review;
+  const metrics=()=>({...generatedGroundGraphMetrics(),...generatedPlacementSearchMetrics(),...generatedHousingReplayMetrics(),...generatedBridgeProposalMetrics()}),before=metrics();
   const early=new Map(),holds=new Map(),periods={},timings=[];let previous=performance.now();
   const extension={additionalOccupancy:generatedPublicSpaceExtension.additionalOccupancy,afterFacilities(r,s){
    generatedPublicSpaceExtension.afterFacilities(r,s);
@@ -66,6 +71,7 @@ for(const seed of seeds){
    return {site,variants:outer.review.terrain.sites[site].variants,phases,years,unbuilt};
   });
   const row={seed,year:10000,stateSha256:stateHash,saves,districts,holdPeriods:periods,
+   auditCounters:Object.fromEntries(Object.entries(metrics()).map(([key,value])=>[key,value-before[key]])),
    maximumHookInterval:timings.reduce((a,b)=>a.ms>b.ms?a:b,{year:0,ms:0}),pastObservationChecks:early.size};
   await writeFile(`${out}/seed${seed}_review.json`,JSON.stringify(outer));report.cases.push(row);
   console.log(JSON.stringify({seed,status:'longrun/save/past-checked',stateSha256:stateHash}));

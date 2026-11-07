@@ -23,12 +23,15 @@ export function withGeneratedBridgeAccess(review:GeneratedFacilityReview,ctx:Gro
   crossings:[...(ctx.crossings??[]),...bridges.filter(b=>site?.buildings.some(x=>x.id===b.geometry.bridgeId&&x.condition==='intact')).map(b=>bridgeCrossing(b.geometry))]};
 }
 const failed=new WeakMap<object,Set<string>>();
+const proposalMetrics={bridgeProposalRequests:0,bridgeHoldReuses:0};
+export function generatedBridgeProposalMetrics(){return {...proposalMetrics};}
 export function proposeGeneratedBridge(review:GeneratedFacilityReview,ctx:GroundReviewContext,id:string){
  const h=review.bridgeReview;if(!h)throw Error('Missing saved bridge hydrology');
+ proposalMetrics.bridgeProposalRequests++;
  const plan=review.plans['river-bank'];
  const key=JSON.stringify([id,h.hydrology,plan.accessRoots,plan.nucleus,ctx.primaryRoot,ctx.occupancy,ctx.reservations,ctx.crossings]);
  let misses=failed.get(review.terrain);if(!misses){misses=new Set();failed.set(review.terrain,misses);}
- if(misses.has(key))return {status:'hold' as const,reason:'no-safe-bridge'};
+ if(misses.has(key)){proposalMetrics.bridgeHoldReuses++;return {status:'hold' as const,reason:'no-safe-bridge'};}
  const result=proposeBridgeGeometry(ctx,h.hydrology,plan.accessRoots,plan.nucleus,id);
  if(result.status==='hold'&&result.reason==='no-safe-bridge')misses.add(key);return result;
 }

@@ -24,6 +24,10 @@ A CPU profile identified graph traversals and repeated RLE decoding as remaining
 costs. Land queries now share a private raster only for deeply frozen physics;
 the public decoder still returns fresh arrays. Graph traversal retains the exact
 N/E/S/W order while avoiding a temporary neighbor array for every visited vertex.
+When all physical candidates are impossible or occupied, search now returns HOLD
+before constructing any access distance field. The benchmark records actual
+candidate builds/reuse, exclusions, hypothetical checks, graph builds, visited
+vertices, housing replay and bridge/housing HOLD reuse for every measured run.
 
 The full-state reference fixture contains all twelve original field-only Q5
 states at year 2000 (source `55cd3c5`) and the original seed 1 storage probe at

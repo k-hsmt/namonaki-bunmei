@@ -18,6 +18,9 @@ const moduleAt=(root,file)=>import(pathToFileURL(resolve(root,'dist',file)).href
 const load=async root=>({
  ...await moduleAt(root,'story/new-world.js'),...await moduleAt(root,'story/generated-bridge-review.js'),
  ...await moduleAt(root,'story/housing-persistence.js'),...await moduleAt(root,'story/engine.js'),
+ ...await moduleAt(root,'terrain/ground-access-review.js'),...await moduleAt(root,'terrain/placement-search-review.js'),
+ ...await moduleAt(root,'story/generated-housing-review.js'),
+ ...await moduleAt(root,'story/generated-bridge-history-review.js'),
 });
 const current=await load('.'),baseline=await load(baselineRoot);
 const sha=root=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
@@ -35,22 +38,25 @@ for(const seed of seeds)for(const year of [2000,10000]){
    const measured=previous.cases.find(c=>c.seed===seed&&c.year===year)?.[name];
    assert.equal(measured?.measuredMs.length,5,'missing complete baseline measurement');row[name]=measured;continue;
   }
-  const values=[];let expectedHash;
+  const values=[],traces=[];let expectedHash;
   for(let run=0;run<6;run++){
    const initial=legacy?api.createHousingCivilization(seed):api.createNewWorld(seed);
+   const metrics=()=>Object.assign({},api.generatedGroundGraphMetrics?.(),api.generatedPlacementSearchMetrics?.(),api.generatedHousingReplayMetrics?.(),api.generatedBridgeProposalMetrics?.());
+   const before=metrics();
    const start=performance.now();let state;
    if(legacy){state=initial;while(state.year<year){api.step(state);if(state.pending)api.chooseAutomatically(state);}}
    else state=api.advanceGeneratedBridgeReview(initial.review,year,'automatic').review.state;
    const elapsedMs=performance.now()-start;
+   const trace=Object.fromEntries(Object.entries(metrics()).map(([key,value])=>[key,value-(before[key]??0)]));
    const stateSha256=createHash('sha256').update(JSON.stringify(state)).digest('hex');
    assert.equal(state.year,year);assert.ok(!state.pending);
    if(expectedHash)assert.equal(stateSha256,expectedHash,'repeated run changed state');expectedHash=stateSha256;
    const pinned=fixture.cases.find(c=>c.seed===seed&&c.year===year);
    if(pinned&&!legacy)assert.equal(stateSha256,pinned.stateSha256,'complete pre-optimization state changed');
-   if(run)values.push(elapsedMs);
+   if(run){values.push(elapsedMs);traces.push(trace);}
    console.log(JSON.stringify({seed,year,name,run,warmup:run===0,elapsedMs,stateSha256}));
   }
-  row[name]={measuredMs:values,medianMs:median(values),stateSha256:expectedHash};
+  row[name]={measuredMs:values,medianMs:median(values),stateSha256:expectedHash,traces};
  }
  assert.equal(row.mainGenerated.stateSha256,row.currentGenerated.stateSha256);
  row.absoluteBudgetMs=year===2000?5000:25000;

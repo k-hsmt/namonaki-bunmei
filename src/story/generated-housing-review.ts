@@ -21,7 +21,7 @@ const lastYears=new WeakMap<object,Map<string,number>>();
 // overlap against the other blocks. Old prefix entries are removed so the cache
 // does not retain every historical copy of the growing event array.
 const prefixesByLastEvent=new WeakMap<object,{history:HousingHistory;view:ReturnType<typeof housingAt>}>();
-const replayMetrics={wholeHistory:0,changedBlock:0,cacheHits:0};
+const replayMetrics={wholeHistory:0,changedBlock:0,cacheHits:0,plotHoldReuses:0};
 export function generatedHousingReplayMetrics(){return {...replayMetrics};}
 function appendedView(history:HousingHistory,year:number):ReturnType<typeof housingAt>|null {
  const last=history.events.at(-1),previous=history.events.at(-2);if(!last||!previous||last.year>year)return null;
@@ -90,7 +90,8 @@ export function createGeneratedHousingExtension(extra?:GeneratedLandReviewExtens
   const context=withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations});
   const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,context.occupancy,reservations,neighborEntrances,context.crossings]);
   let failed=failedPlots.get(review.terrain);if(!failed){failed=new Set();failedPlots.set(review.terrain,failed);}
-  const result=failed.has(key)?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
+  const reused=failed.has(key);if(reused)replayMetrics.plotHoldReuses++;
+  const result=reused?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
    {objectId:id,purpose:'housing',width:18,depth:8,nucleus:plan.nucleus,neighborEntrances});
   if(result.status==='hold'&&result.reason==='no-safe-plot')failed.add(key);
   if(result.status==='hold'){const key=site+':housing:'+result.reason;holds[key]=(holds[key]??0)+1;continue;}

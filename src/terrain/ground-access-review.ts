@@ -20,6 +20,8 @@ export type GroundHold='unknown-history'|'unconfirmed-year'|'outside-ground'|'wa
 export type GroundReview={readonly status:'hold';readonly reason:GroundHold;readonly conflicts:readonly string[]}
  |{readonly status:'clear';readonly entrance:RecordPoint;readonly access:readonly RecordPoint[];readonly slopeCells:number};
 const W=320,H=180,N=W*H;
+const graphMetrics={walkGraphs:0,parentTraversals:0,distanceFields:0,visitedVertices:0};
+export function generatedGroundGraphMetrics(){return {...graphMetrics};}
 /** Revised Q6 trial values; not an approved or persisted production policy. */
 export const groundReviewLimits=Object.freeze({normalGrade:1,normalRelief:1,flatGrade:0,flatRelief:0,passageWidth:2,candidateStep:2});
 const validPlot=(p:GroundPlot)=>[p.x,p.y,p.width,p.depth].every(Number.isSafeInteger)&&p.width>=2&&p.depth>=1&&p.x>=0&&p.y>=96&&p.x+p.width<=W&&p.y+p.depth<=H;
@@ -50,6 +52,7 @@ export function reviewPhysicalPlot(r:RecordRaster,purpose:GroundPurpose,plot:Gro
 
 /** Canonical coordinates, as stored in physics; mirroring belongs to projection only. */
 export function groundWalkWindows(r:RecordRaster,plots:readonly GroundPlot[],crossings:readonly WalkableBridgeCrossing[]=[],blockingAfterCrossings:readonly GroundPlot[]=plots):Uint8Array {
+ graphMetrics.walkGraphs++;
  const cells=new Uint8Array(N),windows=new Uint8Array(N);
  for(let i=96*W;i<N;i++)cells[i]=+(r.surface[i]===1&&r.bearing[i]===0&&r.grade[i]!<=1);
  for(const p of plots)for(let y=p.y;y<p.y+p.depth;y++)cells.fill(0,y*W+p.x,y*W+p.x+p.width);
@@ -71,6 +74,7 @@ export function groundContextWindows(r:RecordRaster,ctx:GroundReviewContext,extr
  return groundWalkWindows(r,[...ctx.occupancy.map(o=>o.plot),...extra],crossings,[...ctx.occupancy.filter(o=>!owned.has(o.id)).map(o=>o.plot),...extra]);
 }
 export function groundReachParents(windows:Uint8Array,root:RecordPoint):Int32Array {
+ graphMetrics.parentTraversals++;
  const parent=new Int32Array(N);parent.fill(-1);
  if(!validPoint(root))return parent;
  const start=root[1]*W+root[0];if(!windows[start])return parent;
@@ -81,13 +85,14 @@ export function groundReachParents(windows:Uint8Array,root:RecordPoint):Int32Arr
   next=i+1;if(x<W-2&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
   next=i+W;if(y<H-2&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
   next=i-1;if(x>0&&windows[next]&&parent[next]===-1){parent[next]=i;queue[tail++]=next;}
- }return parent;
+ }graphMetrics.visitedVertices+=tail;return parent;
 }
 export function groundDistances(windows:Uint8Array,root:RecordPoint):Int32Array {
  return groundDistancesFromAny(windows,[root]);
 }
 /** Nearest confirmed neighbor distance in one traversal, with sorted N/E/S/W starts. */
 export function groundDistancesFromAny(windows:Uint8Array,roots:readonly RecordPoint[]):Int32Array {
+ graphMetrics.distanceFields++;
  const d=new Int32Array(N);d.fill(-1);const queue=new Int32Array(N);let head=0,tail=0;
  const starts=roots.filter(validPoint).map(p=>p[1]*W+p[0]).sort((a,b)=>a-b);
  for(const i of starts)if(windows[i]&&d[i]===-1){d[i]=0;queue[tail++]=i;}
@@ -96,7 +101,7 @@ export function groundDistancesFromAny(windows:Uint8Array,roots:readonly RecordP
   j=i+1;if(x<W-2&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
   j=i+W;if(y<H-2&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
   j=i-1;if(x>0&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
- }return d;
+ }graphMetrics.visitedVertices+=tail;return d;
 }
 function index(p:RecordPoint):number{return p[1]*W+p[0];}
 

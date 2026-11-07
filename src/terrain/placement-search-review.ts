@@ -17,13 +17,16 @@ const index=(p:RecordPoint)=>p[1]*W+p[0];
 const overlap=(a:GroundPlot,b:GroundPlot)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.depth&&a.y+a.depth>b.y;
 interface StaticPlots {enumerated:number;physicalClear:number;plots:readonly {plot:GroundPlot;slopeCells:number;waterPenalty:number}[]}
 const staticPlots=new WeakMap<object,Map<string,StaticPlots>>();
+const searchMetrics={requests:0,physicalBuilds:0,physicalCacheHits:0,enumerated:0,physicalClear:0,availabilityRejects:0,accessEvaluations:0,scoreEvaluations:0};
+export function generatedPlacementSearchMetrics(){return {...searchMetrics};}
 /** Physics is immutable across births, HOLDs and bridge condition changes.
  * Occupancy, reservations, access, distances and scores remain dynamic.
  */
 function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:ReturnType<typeof decodeRecordPhysics>,cache:boolean):StaticPlots {
  const physics=ctx.terrain.sites[ctx.site].physics,key=JSON.stringify([req.purpose,req.width,req.depth]);
  const frozen=cache&&frozenRecordPhysics(physics);
- const found=frozen?staticPlots.get(physics)?.get(key):undefined;if(found)return found;
+ const found=frozen?staticPlots.get(physics)?.get(key):undefined;if(found){searchMetrics.physicalCacheHits++;return found;}
+ searchMetrics.physicalBuilds++;
  const water=new Int32Array(N);water.fill(N);const queue:number[]=[];
  // Sea proximity must not be interpreted as freshwater irrigation for fields.
  for(let i=96*W;i<N;i++)if(r.surface[i]===2||req.purpose!=='field'&&r.surface[i]===3){water[i]=0;queue.push(i);}
@@ -41,11 +44,13 @@ function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:Re
   result.plots.push({plot,slopeCells:physical.slopeCells,waterPenalty});
  }
  if(frozen){let entries=staticPlots.get(physics);if(!entries){entries=new Map();staticPlots.set(physics,entries);}entries.set(key,result);}
+ searchMetrics.enumerated+=result.enumerated;searchMetrics.physicalClear+=result.physicalClear;
  return result;
 }
 /** Full enumeration mode is retained as an independent check on pruning decisions. */
 export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,mode:'bounded'|'exhaustive'='bounded'){
- const metrics={enumerated:0,physicalClear:0,accessEvaluations:0,scoreEvaluations:0};
+ searchMetrics.requests++;
+ const metrics={enumerated:0,physicalClear:0,accessEvaluations:0,scoreEvaluations:0,distanceFieldBuilds:0};
  const stop=(reason:string)=>({status:'hold' as const,reason,metrics});
  if(ctx.historyStatus!=='known')return stop('unknown-history');
  if(!Number.isSafeInteger(ctx.year)||ctx.year<0||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year>ctx.confirmedYear)return stop('unconfirmed-year');
@@ -53,10 +58,19 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  // Public space still needs its constrained anchor neighborhood.
  if(!['house','field','housing','hall','market','workshop','granary','civic'].includes(req.purpose))return stop('unsupported-review-purpose');
  if(req.purpose==='civic'&&!req.neighborEntrances.length)return stop('missing-anchor');
- const r=readOwnedRecordPhysics(ctx.terrain.sites[ctx.site].physics),baseWindows=groundContextWindows(r,ctx);
+ const r=readOwnedRecordPhysics(ctx.terrain.sites[ctx.site].physics);
+ const physical=physicalCandidates(ctx,req,r,mode==='bounded');metrics.enumerated=physical.enumerated;metrics.physicalClear=physical.physicalClear;
+ const occupied=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==req.objectId)];
+ const available=physical.plots.filter(c=>!occupied.some(o=>overlap(o.plot,c.plot)));
+ // No access graph can make a physically impossible or occupied plot valid.
+ if(!available.length){searchMetrics.availabilityRejects++;return stop('no-safe-plot');}
+ const baseWindows=groundContextWindows(r,ctx);
  const housing=req.purpose==='civic'?req.housingEntrances??[]:[];
- const distancesFor=(windows:Uint8Array)=>[groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances),
-  ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];
+ const distancesFor=(windows:Uint8Array)=>{
+  metrics.distanceFieldBuilds+=2+(housing.length?1:0);
+  return [groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances),
+   ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];
+ };
  const base=distancesFor(baseWindows);
  const rank=(distances:readonly Int32Array[],entry:RecordPoint,penalty:number):number=>{
   const i=index(entry),core=distances[0]![i];if(core===undefined||core<0)return Infinity;
@@ -70,10 +84,8 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+3*homes+fieldNeighborPenalty+penalty;
  };
  const candidates:{plot:GroundPlot;entrance:RecordPoint;penalty:number;lower:number}[]=[];
- const physical=physicalCandidates(ctx,req,r,mode==='bounded');metrics.enumerated=physical.enumerated;metrics.physicalClear=physical.physicalClear;
- const occupied=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==req.objectId)];
- for(const {plot,slopeCells,waterPenalty} of physical.plots){
-  const {x,y}=plot;if(occupied.some(o=>overlap(o.plot,plot)))continue;
+ for(const {plot,slopeCells,waterPenalty} of available){
+  const {x,y}=plot;
   const entrance=southEntrance(plot),penalty=waterPenalty+slopeCells+Math.max(0,y-150)*2+
    terrainHash(['placement-search-review-v2',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId,x,y])%4;
   const lower=rank(base,entrance,penalty);if(Number.isFinite(lower))candidates.push({plot,entrance,penalty,lower});
@@ -83,8 +95,10 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  for(const c of candidates){
   if(mode==='bounded'&&best&&c.lower>best.score)break;
   metrics.accessEvaluations++;
+  searchMetrics.accessEvaluations++;
   const review=reviewGroundAccess(ctx,req.purpose,req.objectId,c.plot);if(review.status!=='clear')continue;
   metrics.scoreEvaluations++;
+  searchMetrics.scoreEvaluations++;
   const windows=groundContextWindows(r,ctx,[c.plot]),distances=distancesFor(windows),score=rank(distances,c.entrance,c.penalty);
   if(!Number.isFinite(score))continue;
   if(!best||score<best.score||score===best.score&&(c.plot.y<best.plot.y||c.plot.y===best.plot.y&&c.plot.x<best.plot.x))best={plot:{...c.plot},entrance:c.entrance,access:review.access,score};

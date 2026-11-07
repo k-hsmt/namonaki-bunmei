@@ -48,7 +48,7 @@ test('HOLD and unsupported semantic purposes do not run a placement search',()=>
  assert.equal(findPlacementReview({...ctx,year:11},req).reason,'unconfirmed-year');
  assert.equal(findPlacementReview(ctx,{...req,purpose:'public-space'}).reason,'unsupported-review-purpose');
  const blocked={...ctx,reservations:[{id:'all',plot:{x:0,y:100,width:80,depth:36}}]};
- const result=findPlacementReview(blocked,req);assert.equal(result.reason,'no-safe-plot');assert.equal(result.metrics.accessEvaluations,0);
+ const result=findPlacementReview(blocked,req);assert.equal(result.reason,'no-safe-plot');assert.equal(result.metrics.accessEvaluations,0);assert.equal(result.metrics.distanceFieldBuilds,0);
 });
 test('large civic plots use hall and housing distances and match exhaustive scoring',()=>{
  const {ctx,req}=fixture(1),hall={id:'hall',plot:{x:30,y:100,width:18,depth:7},entrance:[38,107]};
