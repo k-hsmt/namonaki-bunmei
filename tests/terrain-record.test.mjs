@@ -3,13 +3,23 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {generateWorldPrototype} from '../dist/terrain/world-prototype.js';
 import {captureTerrainRecord} from '../dist/terrain/capture-terrain-record.js';
-import {parseTerrainRecord,serializeTerrainRecord,validateTerrainRecord,terrainRecordAt,sampleTerrainRecord,assertTerrainRecordActivationReady,TerrainRecordError,terrainRecordMaxBytes} from '../dist/terrain/terrain-record.js';
+import {parseTerrainRecord,serializeTerrainRecord,validateTerrainRecord,readOwnedTerrainRecord,terrainRecordAt,sampleTerrainRecord,assertTerrainRecordActivationReady,TerrainRecordError,terrainRecordMaxBytes} from '../dist/terrain/terrain-record.js';
 import {encodeRecordPhysics,decodeRecordPhysics,emptyRecordRaster} from '../dist/terrain/terrain-record-raster-v1.js';
 import {rasterizeHill} from '../dist/terrain/hill-prototype.js';
 import {rasterizeCoast} from '../dist/terrain/coast-prototype.js';
 import {createCivilization,step,chooseAutomatically} from '../dist/story/engine.js';
 const fixture=await readFile(new URL('./fixtures/terrain-record-v1-seed42.json',import.meta.url),'utf8');
 const fresh=()=>JSON.parse(fixture);
+test('owned terrain identity is reused only after strict validation; public validation stays detached',()=>{
+ const raw=fresh(),owned=readOwnedTerrainRecord(raw);assert.notEqual(owned,raw);
+ assert.equal(readOwnedTerrainRecord(owned),owned);assert.ok(Object.isFrozen(owned));
+ assert.notEqual(validateTerrainRecord(owned),owned);
+ raw.source.seed=123;assert.equal(owned.source.seed,42);
+ const forged=fresh();forged.future=true;Object.freeze(forged);
+ assert.throws(()=>readOwnedTerrainRecord(forged),TerrainRecordError);
+ const broken=structuredClone(owned);delete broken.sites['river-bank'].physics;
+ assert.throws(()=>readOwnedTerrainRecord(broken),TerrainRecordError);
+});
 
 test('terrain record fixture loads without regeneration and is deeply detached/frozen',()=>{
  const input=fresh(),before=structuredClone(input),r=validateTerrainRecord(input),s=serializeTerrainRecord(r);

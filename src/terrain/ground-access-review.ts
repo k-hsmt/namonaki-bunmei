@@ -142,14 +142,21 @@ export function reviewGroundAccess(ctx:GroundReviewContext,purpose:GroundPurpose
  * before-graph is reused; each candidate still gets its own after-graph.
  */
 export function createGroundAccessReviewer(ctx:GroundReviewContext):(purpose:GroundPurpose,objectId:string,plot:GroundPlot)=>GroundReview {
- const site=ctx.terrain.sites[ctx.site];
- if(!Object.isFrozen(ctx.terrain)||!Object.isFrozen(ctx.terrain.sites)||!Object.isFrozen(site)||!frozenRecordPhysics(site.physics))return (purpose,id,plot)=>reviewGroundAccess(ctx,purpose,id,plot);
- const owned:GroundReviewContext={...structuredClone({...ctx,terrain:null}),terrain:ctx.terrain};
- let parents:Int32Array|undefined;
- const before=()=>parents??=(groundReachParents(groundContextWindows(readOwnedRecordPhysics(site.physics),owned),owned.primaryRoot));
- return (purpose,id,plot)=>reviewGroundAccessPrepared(owned,purpose,id,plot,before);
+ return createGroundAccessTransaction(ctx).review;
 }
-function reviewGroundAccessPrepared(ctx:GroundReviewContext,purpose:GroundPurpose,objectId:string,plot:GroundPlot,beforeGraph?:()=>Int32Array):GroundReview {
+/** The score query may read the exact after-graph already checked for access.
+ * No graph is reused across different candidates or mutable contexts.
+ */
+export function createGroundAccessTransaction(ctx:GroundReviewContext):{readonly review:(purpose:GroundPurpose,objectId:string,plot:GroundPlot)=>GroundReview;readonly windows:Uint8Array|null} {
+ const site=ctx.terrain.sites[ctx.site];
+ const immutable=Object.isFrozen(ctx.terrain)&&Object.isFrozen(ctx.terrain.sites)&&Object.isFrozen(site)&&frozenRecordPhysics(site.physics);
+ const owned:GroundReviewContext=immutable?{...structuredClone({...ctx,terrain:null}),terrain:ctx.terrain}:ctx;
+ let parents:Int32Array|undefined,lastWindows:Uint8Array|null=null;
+ const before=()=>parents??=(groundReachParents(groundContextWindows(readOwnedRecordPhysics(site.physics),owned),owned.primaryRoot));
+ const after=(r:RecordRaster,plot:GroundPlot)=>lastWindows=groundContextWindows(r,owned,[plot]);
+ return {review:(purpose,id,plot)=>{lastWindows=null;return reviewGroundAccessPrepared(owned,purpose,id,plot,immutable?before:undefined,after);},get windows(){return lastWindows;}};
+}
+function reviewGroundAccessPrepared(ctx:GroundReviewContext,purpose:GroundPurpose,objectId:string,plot:GroundPlot,beforeGraph?:()=>Int32Array,afterWindows?:(r:RecordRaster,plot:GroundPlot)=>Uint8Array):GroundReview {
  if(ctx.historyStatus!=='known')return hold('unknown-history');
  if(!Number.isSafeInteger(ctx.year)||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year<0||ctx.year>ctx.confirmedYear)return hold('unconfirmed-year');
  if(!validPlot(plot))return hold('outside-ground');
@@ -164,7 +171,7 @@ function reviewGroundAccessPrepared(ctx:GroundReviewContext,purpose:GroundPurpos
  const conflicts=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==objectId)].filter(o=>overlap(plot,o.plot)).map(o=>o.id);
  if(conflicts.length)return hold('occupied',[...new Set(conflicts)].sort());
  const entrance=southEntrance(plot);
- const before=beforeGraph?beforeGraph():groundReachParents(groundContextWindows(r,ctx),ctx.primaryRoot),after=groundReachParents(groundContextWindows(r,ctx,[plot]),ctx.primaryRoot);
+ const before=beforeGraph?beforeGraph():groundReachParents(groundContextWindows(r,ctx),ctx.primaryRoot),after=groundReachParents(afterWindows?afterWindows(r,plot):groundContextWindows(r,ctx,[plot]),ctx.primaryRoot);
  if(!validPoint(entrance)||after[index(entrance)]===-1)return hold('no-access');
  for(const o of ctx.occupancy)if(before[index(o.entrance)]!==-1&&after[index(o.entrance)]===-1)return hold('no-access',[o.id]);
  const access:RecordPoint[]=[];let i=index(entrance);

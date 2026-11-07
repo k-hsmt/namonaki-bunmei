@@ -41,6 +41,12 @@ from the candidate entrance. The graph is undirected, so these equal the reverse
 multi-source fields. It stops after reaching each required group or exhausting
 the component; exhaustive mode retains the independent full-field calculation.
 Public spaces reuse their existing entrance field for hall/core distances.
+The access transaction also shares its checked after-graph with scoring, rather
+than rebuilding an identical graph. Only records produced by the strict validator
+enter an internal weak identity set. Progression and observation may share these
+deeply frozen records; unknown wires still undergo full validation, and public
+validation still returns a detached result. Successful deep-freeze checks are
+memoized because frozen rows cannot become mutable again.
 
 The full-state reference fixture contains all twelve original field-only Q5
 states at year 2000 (source `55cd3c5`) and the original seed 1 storage probe at

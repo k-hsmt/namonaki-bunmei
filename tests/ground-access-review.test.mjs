@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {emptyRecordRaster,encodeRecordPhysics,decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {validateTerrainRecord} from '../dist/terrain/terrain-record.js';
-import {reviewGroundAccess,createGroundAccessReviewer,generatedGroundGraphMetrics,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny,groundDistancesToGroups} from '../dist/terrain/ground-access-review.js';
+import {reviewGroundAccess,createGroundAccessReviewer,createGroundAccessTransaction,generatedGroundGraphMetrics,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny,groundDistancesToGroups} from '../dist/terrain/ground-access-review.js';
 const plot=(x,y,width=18,depth=7)=>({x,y,width,depth});
 function setup(){
  const raster=emptyRecordRaster();raster.surface.fill(1,96*320);
@@ -62,6 +62,18 @@ test('grouped point distances equal independent reverse fields through narrow pa
  assert.deepEqual(groundDistancesToGroups(windows,[10,100],[[[12,100]],[[10,102]],[]]),[2,2,-1]);
  const after=generatedGroundGraphMetrics();assert.equal(after.distanceFields-before.distanceFields,1);
  assert.ok(after.visitedVertices-before.visitedVertices<100,'nearby score groups must not traverse the entire map');
+});
+test('placement scoring reads the checked candidate graph without retaining it for later candidates',()=>{
+ const {raster,ctx}=setup();ctx.terrain={sites:{'river-bank':{physics:encodeRecordPhysics(raster)}}};
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(ctx.terrain);
+ ctx.occupancy=[{id:'old',plot:plot(20,110),entrance:[28,117]}];
+ const tx=createGroundAccessTransaction(ctx),candidate=plot(44,120),before=generatedGroundGraphMetrics();
+ assert.equal(tx.review('house','new',candidate).status,'clear');
+ assert.equal(generatedGroundGraphMetrics().walkGraphs-before.walkGraphs,2,'one before and one after graph');
+ const checked=tx.windows;assert.deepEqual(checked,groundWalkWindows(raster,[ctx.occupancy[0].plot,candidate]));
+ checked.fill(0);
+ assert.equal(tx.review('house','new',candidate).status,'clear');assert.notEqual(tx.windows,checked);
+ assert.equal(tx.review('house','new',ctx.occupancy[0].plot).reason,'occupied');assert.equal(tx.windows,null);
 });
 test('interior cells, water, unstable bearing, slope and elevation are inspected',()=>{
  for(const [channel,value,reason] of [['surface',2,'water'],['surface',3,'water'],['surface',0,'outside-ground'],['bearing',1,'unstable'],['bearing',2,'unstable'],['grade',2,'steep'],['elevation',3,'steep']]){
