@@ -4,7 +4,7 @@
 import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
 import {terrainHash} from './hill-prototype.js';
-import {groundWalkWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
+import {groundContextWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;
  readonly nucleus:RecordPoint;readonly neighborEntrances:readonly RecordPoint[];
@@ -24,7 +24,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  // Public space still needs its constrained anchor neighborhood.
  if(!['house','field','housing','hall','market','workshop','granary','civic'].includes(req.purpose))return stop('unsupported-review-purpose');
  if(req.purpose==='civic'&&!req.neighborEntrances.length)return stop('missing-anchor');
- const r=decodeRecordPhysics(ctx.terrain.sites[ctx.site].physics),occupied=ctx.occupancy.map(o=>o.plot),baseWindows=groundWalkWindows(r,occupied);
+ const r=decodeRecordPhysics(ctx.terrain.sites[ctx.site].physics),baseWindows=groundContextWindows(r,ctx);
  const housing=req.purpose==='civic'?req.housingEntrances??[]:[];
  const distancesFor=(windows:Uint8Array)=>[groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances),
   ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];
@@ -67,7 +67,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   metrics.accessEvaluations++;
   const review=reviewGroundAccess(ctx,req.purpose,req.objectId,c.plot);if(review.status!=='clear')continue;
   metrics.scoreEvaluations++;
-  const windows=groundWalkWindows(r,[...occupied,c.plot]),distances=distancesFor(windows),score=rank(distances,c.entrance,c.penalty);
+  const windows=groundContextWindows(r,ctx,[c.plot]),distances=distancesFor(windows),score=rank(distances,c.entrance,c.penalty);
   if(!Number.isFinite(score))continue;
   if(!best||score<best.score||score===best.score&&(c.plot.y<best.plot.y||c.plot.y===best.plot.y&&c.plot.x<best.plot.x))best={plot:c.plot,entrance:c.entrance,access:review.access,score};
  }
