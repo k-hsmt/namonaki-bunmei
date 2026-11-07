@@ -118,28 +118,38 @@ baseline SHA, every measured sample, exact state hashes and diagnostic counters.
 Its `pass` fields are authoritative; the report does not turn an unmet ratio into
 an accepted budget. Further source changes require fresh current measurements.
 
-## Seed 1 measured result, 2026-11-07
+## Final measured result, 2026-11-07
 
-Seed 1, Node v24.22.1, automatic choices; measured source `777787e`, main baseline
+Node v24.22.1, automatic choices; measured source `6d90d68`, main baseline
 `4fac200`, same runner. All complete state hashes match the original references.
 
-| Years | Main generated median | Improved median | Legacy median | Absolute gate | Legacy ratio gate, denominator floor 1000ms |
-| --- | ---: | ---: | ---: | --- | --- |
-| 2000 | 3796ms | 1582ms | 418ms | pass, <=5000ms | pass, 1.582 <= 2 |
-| 10000 | 31859ms | 7888ms | 20581ms | pass, <=25000ms | pass, 0.383 <= 2 |
+| Years | Worlds | Improved median range | Absolute gate | Main and legacy relative gates |
+| --- | ---: | ---: | --- | --- |
+| 2000 | All twelve Q5 worlds | 974–1814ms | all pass, <=5000ms | all pass, <=2x with denominator floor 1000ms |
+| 10000 | 1 / 7 / 21 / 198 | 6857–8594ms | all pass, <=25000ms | all pass, <=2x with denominator floor 1000ms |
 
-The improved simulation is approximately 58% faster at 2000 and 75% faster at
-10000 than main's generated mode. Both seed 1 gates now pass without changing a
-threshold. The former relative-gate failure at source `27bafae` was resolved by
-the bit-identical prefix optimization. Formal measurements for the other eleven
-worlds at 2000 and three additional worlds at 10000 are in progress. Other worlds'
-long-run audits are correctness/IO checks, not substitutes for five isolated
-performance measurements.
+All sixteen cases use one warmup and five measurements for both implementations
+and the retained legacy engine. All five current runs reproduce the complete
+main-generated state hash in each case. Earlier unmet relative gates were
+resolved through exact caching and graph work reduction; no threshold changed.
+The separate twelve-world long-run audit includes IO and is not substituted for
+these isolated medians. Raw samples and counters are in the performance JSON.
 
-## Acceptance boundary
+## Acceptance record
 
-The scripts themselves do not establish D5 acceptance. Record actual measurement
-results and failures before marking gates complete. The complete single-family
-R10/H8/C8/M6 catalog, diagnostic overlays, search/graph counters, old-engine
-long-run regressions, final browser checks and Human scenery decisions remain
-separate requirements in design §10.2–10.4. Human merges PRs and closes #31.
+The user accepted both scenery sets on 2026-11-07 (Asia/Tokyo), replying
+**「可（両セットを受け入れる）」** to the D5 review request. This covers the
+32-family catalog and twelve natural worlds/three districts, fixed years and
+actually reached phases. Do not infer this approval from machine scores.
+
+`issue31-d5-acceptance.json` preserves the review provenance and compact machine
+evidence: 48 production save round trips, 288 past observations, 255 repeated and
+separate-tab PNG comparisons, zero generator reads/failures, complete family and
+sea-side coverage, and four direct-model/choice/disaster comparisons at 10000.
+Maximum plain/stored save sizes were 10,205,879 / 1,051,937 bytes, with the original
+seed 42 year-10000 v4 value retained alongside every production save.
+
+The source implementation passed all 15 CI jobs at `6d90d68`, including the
+complete natural-world acceptance artifact. Two synthetic clock tests also
+verify HOLD at 8, success at 9, next work at 17, and social readiness loss/recovery.
+Human merges PRs and closes #31; these operations are not performed by the agent.

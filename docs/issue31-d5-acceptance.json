@@ -1,0 +1,3297 @@
+{
+  "format": "issue31-d5-acceptance-summary-v1",
+  "auditSourceSHA": "0b37b5436f5f4fd7b617f2fa86f26b74237dbe2a",
+  "coreSourceSHA": "1f0a5cebf792cdcb1762ade64b8a39c68ea60be9",
+  "rendererId": "generated-scene-v1",
+  "seeds": [
+    1,
+    3,
+    6,
+    29,
+    85,
+    131,
+    7,
+    198,
+    10,
+    12,
+    21,
+    24
+  ],
+  "coverage": {
+    "river": [
+      "braided-channels",
+      "broad-bend",
+      "confluence",
+      "diagonal-crossing",
+      "distributary",
+      "island-channels",
+      "narrow-meander",
+      "straight-channel",
+      "twin-islands",
+      "wide-meander"
+    ],
+    "hills": [
+      "H01",
+      "H02",
+      "H03",
+      "H04",
+      "H05",
+      "H06",
+      "H07",
+      "H08"
+    ],
+    "coast": [
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C06",
+      "C07",
+      "C08"
+    ],
+    "mountains": [
+      "M01",
+      "M02",
+      "M03",
+      "M04",
+      "M05",
+      "M06"
+    ]
+  },
+  "seaSides": [
+    "east",
+    "west"
+  ],
+  "worlds": 12,
+  "saveRoundtrips": 48,
+  "pastObservationChecks": 288,
+  "repeatPngChecks": 255,
+  "separateTabPngChecks": 255,
+  "generatorImports": [],
+  "failures": [],
+  "coreChecks": [
+    {
+      "seed": 1,
+      "directModelEqual": true,
+      "choicesEqual": true,
+      "disasterDatesEqual": true
+    },
+    {
+      "seed": 7,
+      "directModelEqual": true,
+      "choicesEqual": true,
+      "disasterDatesEqual": true
+    },
+    {
+      "seed": 21,
+      "directModelEqual": true,
+      "choicesEqual": true,
+      "disasterDatesEqual": true
+    },
+    {
+      "seed": 198,
+      "directModelEqual": true,
+      "choicesEqual": true,
+      "disasterDatesEqual": true
+    }
+  ],
+  "coreFailures": [],
+  "maxPlainBytes": 10205879,
+  "maxStoredBytes": 1051937,
+  "humanSceneryAcceptance": {
+    "status": "accepted",
+    "date": "2026-11-07",
+    "timezone": "Asia/Tokyo",
+    "answer": "可（両セットを受け入れる）",
+    "source": "User reply to request_user_input_async call_531967606f58437483c36a9cf917a0c6",
+    "sets": [
+      "terrain31-families",
+      "terrain31-d5"
+    ]
+  },
+  "legacyCoexistence": {
+    "seed": 42,
+    "year": 10000,
+    "bytes": 3936259,
+    "stateSha256": "129a1bc14a8ecc1203e9cc4d142bd8866d70ea33349ff9c4957393a2b954f9c6",
+    "originalValuePreserved": true
+  },
+  "cases": [
+    {
+      "seed": 1,
+      "seaSide": "west",
+      "stateSha256": "ff1a01a1fb584a7c5ebb5b472df3c48ec8f556dc7f6faa52eadf7d1b29aea5c7",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "narrow-meander",
+            "hills": null,
+            "coast": null,
+            "mountains": "M03"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 55,
+            "town": 1010,
+            "city": 1172,
+            "decline": 201
+          },
+          "years": [
+            0,
+            55,
+            100,
+            201,
+            1000,
+            1010,
+            1172,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H03",
+            "coast": null,
+            "mountains": "M03"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 46,
+            "town": 7204,
+            "city": null,
+            "decline": 136
+          },
+          "years": [
+            0,
+            46,
+            100,
+            136,
+            1000,
+            7204,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C05",
+            "mountains": "M03"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 1264,
+            "town": 1367,
+            "city": null,
+            "decline": 2522
+          },
+          "years": [
+            0,
+            100,
+            1000,
+            1264,
+            1367,
+            2522,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 86466,
+          "storedBytes": 12210,
+          "roundtripMs": 977.1360210000003,
+          "stateSha256": "5b8cc9b665728f6db8046497023f760d8c8257d6a6f1d884d92cda5907ba2bee"
+        },
+        {
+          "year": 100,
+          "plainBytes": 121223,
+          "storedBytes": 20399,
+          "roundtripMs": 996.6721209999996,
+          "stateSha256": "efcfc289e9e7eaf4574dfc319f6ad086911b84aa063ad8f494b2d3b6de2972c7"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 325328,
+          "storedBytes": 45047,
+          "roundtripMs": 1700.3320010000007,
+          "stateSha256": "7cf6c2c9960bb084735aefe0d032537b2021f7bc00336ae964d8950d9899bf3c"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 8817163,
+          "storedBytes": 932960,
+          "roundtripMs": 9978.197673000002,
+          "stateSha256": "ff1a01a1fb584a7c5ebb5b472df3c48ec8f556dc7f6faa52eadf7d1b29aea5c7"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 60,
+        "ms": 220.77384400000028
+      },
+      "auditCounters": {
+        "walkGraphs": 7647,
+        "parentTraversals": 5232,
+        "distanceFields": 3584,
+        "visitedVertices": 150133644,
+        "requests": 178,
+        "physicalBuilds": 27,
+        "physicalCacheHits": 151,
+        "enumerated": 154617,
+        "physicalClear": 107655,
+        "availabilityRejects": 8,
+        "accessEvaluations": 1548,
+        "scoreEvaluations": 781,
+        "wholeHistory": 8,
+        "changedBlock": 8249,
+        "cacheHits": 120487,
+        "plotHoldReuses": 304,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 22,
+      "separateTabPngChecks": 22,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 70,
+          "totalDecisions": 70,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 491,
+          "totalDecisions": 491,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 244,
+          "totalDecisions": 244,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 189,
+          "totalDecisions": 189,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 213,
+          "totalDecisions": 213,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 14,
+          "totalDecisions": 14,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 61,
+          "totalDecisions": 61,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 8,
+          "totalDecisions": 8,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-safe-plot": {
+          "intervalCount": 25,
+          "totalDecisions": 25,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 354,
+          "totalDecisions": 354,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 226,
+          "totalDecisions": 226,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 12,
+          "totalDecisions": 12,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 51,
+          "totalDecisions": 51,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 140,
+          "totalDecisions": 140,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 212,
+          "totalDecisions": 212,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 34,
+          "totalDecisions": 34,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 91,
+          "totalDecisions": 91,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-safe-plot": {
+          "intervalCount": 8,
+          "totalDecisions": 8,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-safe-plot": {
+          "intervalCount": 10,
+          "totalDecisions": 10,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-capacity": {
+          "intervalCount": 17,
+          "totalDecisions": 17,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 77,
+          "totalDecisions": 77,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 9,
+          "totalDecisions": 9,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 3,
+      "seaSide": "east",
+      "stateSha256": "5ccaa68b5cea6919e07ad86c22fbee014ebf48b9fe9631f5a787dc8c06b3ecd3",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "broad-bend",
+            "hills": null,
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 104,
+            "town": 398,
+            "city": 514,
+            "decline": 4042
+          },
+          "years": [
+            0,
+            100,
+            104,
+            398,
+            514,
+            1000,
+            4042,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H04",
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 281,
+            "town": 398,
+            "city": null,
+            "decline": 590
+          },
+          "years": [
+            0,
+            100,
+            281,
+            398,
+            590,
+            1000,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C02",
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 350,
+            "town": 580,
+            "city": 655,
+            "decline": 8866
+          },
+          "years": [
+            0,
+            100,
+            350,
+            580,
+            655,
+            1000,
+            8866,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 50898,
+          "storedBytes": 11678,
+          "roundtripMs": 2039.7857939999958,
+          "stateSha256": "814cac3c82179d2587c1f113f91e701ea50e3bce3a1ea263e8206ec1a64a31af"
+        },
+        {
+          "year": 100,
+          "plainBytes": 75468,
+          "storedBytes": 18502,
+          "roundtripMs": 2380.7285300000003,
+          "stateSha256": "2b552e52ff9e046286a903d9465bf7591fda868608661b3c70bcc210bac6c46b"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 628313,
+          "storedBytes": 87883,
+          "roundtripMs": 4389.425264000005,
+          "stateSha256": "645787255f352c0e2fd4e6e24a4baaad87f44c4de2d17714bf885e4d8c5b6045"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 8728639,
+          "storedBytes": 943160,
+          "roundtripMs": 8995.391895000008,
+          "stateSha256": "5ccaa68b5cea6919e07ad86c22fbee014ebf48b9fe9631f5a787dc8c06b3ecd3"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 8040,
+        "ms": 865.2353120000043
+      },
+      "auditCounters": {
+        "walkGraphs": 20175,
+        "parentTraversals": 17444,
+        "distanceFields": 4913,
+        "visitedVertices": 194939650,
+        "requests": 178,
+        "physicalBuilds": 28,
+        "physicalCacheHits": 150,
+        "enumerated": 161946,
+        "physicalClear": 99000,
+        "availabilityRejects": 4,
+        "accessEvaluations": 13180,
+        "scoreEvaluations": 1786,
+        "wholeHistory": 8,
+        "changedBlock": 8288,
+        "cacheHits": 120520,
+        "plotHoldReuses": 343,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 23,
+      "separateTabPngChecks": 23,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 5,
+          "totalDecisions": 420,
+          "maximumContinuousYears": 416
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 262,
+          "totalDecisions": 262,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 500,
+          "totalDecisions": 500,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 217,
+          "totalDecisions": 217,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 205,
+          "totalDecisions": 205,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 6,
+          "totalDecisions": 6,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 16,
+          "totalDecisions": 16,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 45,
+          "totalDecisions": 45,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 241,
+          "totalDecisions": 241,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 17,
+          "totalDecisions": 331,
+          "maximumContinuousYears": 56
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 15,
+          "totalDecisions": 7629,
+          "maximumContinuousYears": 1641
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 139,
+          "totalDecisions": 139,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 118,
+          "totalDecisions": 118,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 96,
+          "totalDecisions": 96,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 200,
+          "totalDecisions": 200,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-hall": {
+          "intervalCount": 35,
+          "totalDecisions": 35,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-safe-plot": {
+          "intervalCount": 4,
+          "totalDecisions": 4,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-capacity": {
+          "intervalCount": 13,
+          "totalDecisions": 13,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-safe-plot": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 6,
+      "seaSide": "east",
+      "stateSha256": "b44b1eb4a21a7eeb04936601841dabf7201974d235131790e05f0e070d348416",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "straight-channel",
+            "hills": null,
+            "coast": null,
+            "mountains": "M02"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 666,
+            "town": 761,
+            "city": 940,
+            "decline": 5738
+          },
+          "years": [
+            0,
+            100,
+            666,
+            761,
+            940,
+            1000,
+            5738,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H02",
+            "coast": null,
+            "mountains": "M02"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 707,
+            "town": 847,
+            "city": null,
+            "decline": 1021
+          },
+          "years": [
+            0,
+            100,
+            707,
+            847,
+            1000,
+            1021,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C04",
+            "mountains": "M02"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 775,
+            "town": 1000,
+            "city": null,
+            "decline": 5296
+          },
+          "years": [
+            0,
+            100,
+            775,
+            1000,
+            5296,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 54545,
+          "storedBytes": 11566,
+          "roundtripMs": 702.5079109999933,
+          "stateSha256": "58f5197624534e642f9fc4f359680d0b2632fbebbf46078ac8f2ea08354aac1f"
+        },
+        {
+          "year": 100,
+          "plainBytes": 75797,
+          "storedBytes": 18022,
+          "roundtripMs": 735.5399949999992,
+          "stateSha256": "a2ad6a4c9d98197fa02731159bba26ffa3e076aef8b350f72f805e751a3b9c38"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 342820,
+          "storedBytes": 53759,
+          "roundtripMs": 1701.7484289999993,
+          "stateSha256": "3d63859a2414ed99acebad909749681d068216b1d1b21786aa4fa380e3439210"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 9031322,
+          "storedBytes": 963572,
+          "roundtripMs": 5200.257003000006,
+          "stateSha256": "b44b1eb4a21a7eeb04936601841dabf7201974d235131790e05f0e070d348416"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 900,
+        "ms": 138.81140200000664
+      },
+      "auditCounters": {
+        "walkGraphs": 11426,
+        "parentTraversals": 8907,
+        "distanceFields": 3840,
+        "visitedVertices": 185103594,
+        "requests": 171,
+        "physicalBuilds": 26,
+        "physicalCacheHits": 145,
+        "enumerated": 151641,
+        "physicalClear": 100663,
+        "availabilityRejects": 0,
+        "accessEvaluations": 5080,
+        "scoreEvaluations": 932,
+        "wholeHistory": 8,
+        "changedBlock": 8845,
+        "cacheHits": 120492,
+        "plotHoldReuses": 320,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 21,
+      "separateTabPngChecks": 21,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 107,
+          "totalDecisions": 107,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 499,
+          "totalDecisions": 499,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 499,
+          "totalDecisions": 499,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 16,
+          "totalDecisions": 16,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 222,
+          "totalDecisions": 222,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 217,
+          "totalDecisions": 217,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 42,
+          "totalDecisions": 42,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-safe-plot": {
+          "intervalCount": 22,
+          "totalDecisions": 22,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 28,
+          "totalDecisions": 28,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 231,
+          "totalDecisions": 231,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 33,
+          "totalDecisions": 33,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 329,
+          "totalDecisions": 329,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 116,
+          "totalDecisions": 116,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 116,
+          "totalDecisions": 116,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 93,
+          "totalDecisions": 93,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 29,
+      "seaSide": "west",
+      "stateSha256": "8fc001f7fc1aaf1eaec57e6c18abe78e62aa3fe92ffb633c80c863747cdc63e1",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "twin-islands",
+            "hills": null,
+            "coast": null,
+            "mountains": "M06"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 897,
+            "town": 1044,
+            "city": null,
+            "decline": 6660
+          },
+          "years": [
+            0,
+            100,
+            897,
+            1000,
+            1044,
+            6660,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "river-bank-7",
+              "kind": "bridge"
+            },
+            {
+              "id": "river-bank-8",
+              "kind": "house"
+            },
+            {
+              "id": "river-bank-9",
+              "kind": "workshop"
+            },
+            {
+              "id": "river-bank-10",
+              "kind": "house"
+            }
+          ]
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H01",
+            "coast": null,
+            "mountains": "M06"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 839,
+            "town": 6147,
+            "city": null,
+            "decline": 1202
+          },
+          "years": [
+            0,
+            100,
+            839,
+            1000,
+            1202,
+            6147,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C07",
+            "mountains": "M06"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 874,
+            "town": 1350,
+            "city": null,
+            "decline": 2648
+          },
+          "years": [
+            0,
+            100,
+            874,
+            1000,
+            1350,
+            2648,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 65245,
+          "storedBytes": 12366,
+          "roundtripMs": 1117.304798000012,
+          "stateSha256": "5b7771854fcce71c969848cb15423cbd980c6f9842fe9697f222d3974cc19a79"
+        },
+        {
+          "year": 100,
+          "plainBytes": 84473,
+          "storedBytes": 17934,
+          "roundtripMs": 1210.1961550000124,
+          "stateSha256": "456e6cbacb8542de80f435aad89690246adf86653a2be2eb1cdd0124e30d7a99"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 293527,
+          "storedBytes": 45007,
+          "roundtripMs": 1525.549669,
+          "stateSha256": "5b1f0451375f133377944e4f3c4b369f12acdad14cc7d3107dccf3541e40b2da"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 8905711,
+          "storedBytes": 937528,
+          "roundtripMs": 5172.351945999981,
+          "stateSha256": "8fc001f7fc1aaf1eaec57e6c18abe78e62aa3fe92ffb633c80c863747cdc63e1"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 840,
+        "ms": 180.2806869999913
+      },
+      "auditCounters": {
+        "walkGraphs": 9496,
+        "parentTraversals": 7698,
+        "distanceFields": 3564,
+        "visitedVertices": 139836762,
+        "requests": 183,
+        "physicalBuilds": 28,
+        "physicalCacheHits": 155,
+        "enumerated": 161946,
+        "physicalClear": 107687,
+        "availabilityRejects": 0,
+        "accessEvaluations": 3786,
+        "scoreEvaluations": 1426,
+        "wholeHistory": 8,
+        "changedBlock": 8212,
+        "cacheHits": 122613,
+        "plotHoldReuses": 299,
+        "bridgeProposalRequests": 2131,
+        "bridgeHoldReuses": 2102
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 21,
+      "separateTabPngChecks": 21,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 346,
+          "totalDecisions": 346,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 35,
+          "totalDecisions": 5743,
+          "maximumContinuousYears": 3775
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 493,
+          "totalDecisions": 493,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 195,
+          "totalDecisions": 195,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 21,
+          "totalDecisions": 21,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 197,
+          "totalDecisions": 197,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 14,
+          "totalDecisions": 158,
+          "maximumContinuousYears": 38
+        },
+        "hill-side:public-space:no-housing": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-hall": {
+          "intervalCount": 13,
+          "totalDecisions": 2595,
+          "maximumContinuousYears": 1112
+        },
+        "hill-side:civic:no-capacity": {
+          "intervalCount": 4,
+          "totalDecisions": 4,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 53,
+          "totalDecisions": 53,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 49,
+          "totalDecisions": 49,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:bridge:no-safe-bridge": {
+          "intervalCount": 849,
+          "totalDecisions": 2131,
+          "maximumContinuousYears": 124
+        },
+        "hill-side:civic:already-built": {
+          "intervalCount": 224,
+          "totalDecisions": 224,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 118,
+          "totalDecisions": 118,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 111,
+          "totalDecisions": 111,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 137,
+          "totalDecisions": 137,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 16,
+          "totalDecisions": 16,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 6,
+          "totalDecisions": 6,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 73,
+          "totalDecisions": 73,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-safe-plot": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-safe-plot": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 85,
+      "seaSide": "west",
+      "stateSha256": "368486a44f97335cdc389c0c5191a97444ac13de1bd86772368bec99caa823ee",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "wide-meander",
+            "hills": null,
+            "coast": null,
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 54,
+            "town": 1002,
+            "city": 1138,
+            "decline": 136
+          },
+          "years": [
+            0,
+            54,
+            100,
+            136,
+            1000,
+            1002,
+            1138,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H07",
+            "coast": null,
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 1641,
+            "town": 3650,
+            "city": null,
+            "decline": 7046
+          },
+          "years": [
+            0,
+            100,
+            1000,
+            1641,
+            3650,
+            7046,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C01",
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 835,
+            "town": 4677,
+            "city": null,
+            "decline": 1212
+          },
+          "years": [
+            0,
+            100,
+            835,
+            1000,
+            1212,
+            4677,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 43047,
+          "storedBytes": 10722,
+          "roundtripMs": 1428.6090869999898,
+          "stateSha256": "48d49da728a012a25a6952be0accab82c7fbc2c7259adc1229a9fdbd885543d6"
+        },
+        {
+          "year": 100,
+          "plainBytes": 60637,
+          "storedBytes": 16546,
+          "roundtripMs": 1402.401285,
+          "stateSha256": "05481d8d48e3da62335e75202bc876818d7936136d95fc9d1750c86acf916b41"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 274532,
+          "storedBytes": 43047,
+          "roundtripMs": 2497.9649690000224,
+          "stateSha256": "83c6f75071a8c713caf5f79f3204519b55cd49fe84b01de5e8cf03b385119af4"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 9121241,
+          "storedBytes": 962348,
+          "roundtripMs": 6336.4017950000125,
+          "stateSha256": "368486a44f97335cdc389c0c5191a97444ac13de1bd86772368bec99caa823ee"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 957,
+        "ms": 138.19137799998862
+      },
+      "auditCounters": {
+        "walkGraphs": 11279,
+        "parentTraversals": 8766,
+        "distanceFields": 3838,
+        "visitedVertices": 203411920,
+        "requests": 203,
+        "physicalBuilds": 28,
+        "physicalCacheHits": 175,
+        "enumerated": 161946,
+        "physicalClear": 104262,
+        "availabilityRejects": 0,
+        "accessEvaluations": 4860,
+        "scoreEvaluations": 894,
+        "wholeHistory": 8,
+        "changedBlock": 8647,
+        "cacheHits": 120486,
+        "plotHoldReuses": 280,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 22,
+      "separateTabPngChecks": 22,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 191,
+          "totalDecisions": 191,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 500,
+          "totalDecisions": 500,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 463,
+          "totalDecisions": 463,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 76,
+          "totalDecisions": 76,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 203,
+          "totalDecisions": 203,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 31,
+          "totalDecisions": 31,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-housing": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-safe-plot": {
+          "intervalCount": 17,
+          "totalDecisions": 17,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 23,
+          "totalDecisions": 23,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 238,
+          "totalDecisions": 238,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 27,
+          "totalDecisions": 27,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 4,
+          "totalDecisions": 4,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-capacity": {
+          "intervalCount": 5,
+          "totalDecisions": 5,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-safe-plot": {
+          "intervalCount": 8,
+          "totalDecisions": 8,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 24,
+          "totalDecisions": 24,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 47,
+          "totalDecisions": 47,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 5,
+          "totalDecisions": 5,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:already-built": {
+          "intervalCount": 209,
+          "totalDecisions": 209,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 53,
+          "totalDecisions": 53,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 110,
+          "totalDecisions": 110,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-safe-plot": {
+          "intervalCount": 7,
+          "totalDecisions": 7,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 91,
+          "totalDecisions": 91,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 87,
+          "totalDecisions": 87,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 116,
+          "totalDecisions": 116,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 131,
+      "seaSide": "west",
+      "stateSha256": "b2a1a83ad1b79c4aafdbad95ea95d49a5a0e872a30999f66ac464e1f3802dd5d",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "confluence",
+            "hills": null,
+            "coast": null,
+            "mountains": "M01"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 636,
+            "town": 874,
+            "city": 897,
+            "decline": null
+          },
+          "years": [
+            0,
+            100,
+            636,
+            874,
+            897,
+            1000,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H06",
+            "coast": null,
+            "mountains": "M01"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 673,
+            "town": 3258,
+            "city": null,
+            "decline": 970
+          },
+          "years": [
+            0,
+            100,
+            673,
+            970,
+            1000,
+            3258,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C06",
+            "mountains": "M01"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 697,
+            "town": 955,
+            "city": 1102,
+            "decline": null
+          },
+          "years": [
+            0,
+            100,
+            697,
+            955,
+            1000,
+            1102,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 104502,
+          "storedBytes": 14863,
+          "roundtripMs": 2099.319149000017,
+          "stateSha256": "c963c0933b6c19d1812d65a878b3133c139e5f64ec7ce91c8330916a5491213a"
+        },
+        {
+          "year": 100,
+          "plainBytes": 125548,
+          "storedBytes": 20631,
+          "roundtripMs": 2021.268115999992,
+          "stateSha256": "588aab9f5de2c1144375860421a29607173594d5fe57e33a0bdbaf203db37a9a"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 402169,
+          "storedBytes": 58411,
+          "roundtripMs": 3564.5004489999847,
+          "stateSha256": "2ab2ee2a54374c9c7b4a5c7883ea421060f58b3d98751689ac04637af9c21127"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 8079492,
+          "storedBytes": 871576,
+          "roundtripMs": 6891.351503000013,
+          "stateSha256": "b2a1a83ad1b79c4aafdbad95ea95d49a5a0e872a30999f66ac464e1f3802dd5d"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 737,
+        "ms": 183.99580200001947
+      },
+      "auditCounters": {
+        "walkGraphs": 8916,
+        "parentTraversals": 6477,
+        "distanceFields": 4143,
+        "visitedVertices": 142812563,
+        "requests": 180,
+        "physicalBuilds": 25,
+        "physicalCacheHits": 155,
+        "enumerated": 140646,
+        "physicalClear": 88014,
+        "availabilityRejects": 3,
+        "accessEvaluations": 2496,
+        "scoreEvaluations": 1161,
+        "wholeHistory": 8,
+        "changedBlock": 6690,
+        "cacheHits": 120497,
+        "plotHoldReuses": 315,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 21,
+      "separateTabPngChecks": 21,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 8,
+          "totalDecisions": 346,
+          "maximumContinuousYears": 217
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 415,
+          "totalDecisions": 415,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 232,
+          "totalDecisions": 232,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 15,
+          "totalDecisions": 15,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 179,
+          "totalDecisions": 179,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 19,
+          "totalDecisions": 19,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 43,
+          "totalDecisions": 549,
+          "maximumContinuousYears": 69
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 31,
+          "totalDecisions": 6061,
+          "maximumContinuousYears": 1389
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 6,
+          "totalDecisions": 6,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 63,
+          "totalDecisions": 63,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 14,
+          "totalDecisions": 14,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 228,
+          "totalDecisions": 228,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 197,
+          "totalDecisions": 197,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 49,
+          "totalDecisions": 49,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:already-built": {
+          "intervalCount": 216,
+          "totalDecisions": 216,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-safe-plot": {
+          "intervalCount": 22,
+          "totalDecisions": 22,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 121,
+          "totalDecisions": 121,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 125,
+          "totalDecisions": 125,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 80,
+          "totalDecisions": 80,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 72,
+          "totalDecisions": 72,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-hall": {
+          "intervalCount": 11,
+          "totalDecisions": 11,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-safe-plot": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-capacity": {
+          "intervalCount": 5,
+          "totalDecisions": 5,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-safe-plot": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 7,
+      "seaSide": "east",
+      "stateSha256": "9a8a6ed5739eedfc01c6f9565db09819525d29640a4f5fd27f221fb9f8138a20",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "distributary",
+            "hills": null,
+            "coast": null,
+            "mountains": "M06"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 60,
+            "town": 834,
+            "city": null,
+            "decline": 197
+          },
+          "years": [
+            0,
+            60,
+            100,
+            197,
+            834,
+            1000,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H04",
+            "coast": null,
+            "mountains": "M06"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 832,
+            "town": 1026,
+            "city": null,
+            "decline": 1118
+          },
+          "years": [
+            0,
+            100,
+            832,
+            1000,
+            1026,
+            1118,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C03",
+            "mountains": "M06"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 797,
+            "town": 1050,
+            "city": null,
+            "decline": 2322
+          },
+          "years": [
+            0,
+            100,
+            797,
+            1000,
+            1050,
+            2322,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 56516,
+          "storedBytes": 12614,
+          "roundtripMs": 1954.4484039999952,
+          "stateSha256": "ecf1f4c6c83531f906111cef48541a797ff5975ac0ede00d8e4a93e0fe31b87b"
+        },
+        {
+          "year": 100,
+          "plainBytes": 84489,
+          "storedBytes": 19110,
+          "roundtripMs": 2117.905461999995,
+          "stateSha256": "e85e3ed48687509eb3ba6c40b48ae8de28f49832c1b28b2fae1e8e3bd1b6e1a2"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 326372,
+          "storedBytes": 51571,
+          "roundtripMs": 3429.899948999984,
+          "stateSha256": "cc2e5cf069c96de4fca3a396c8ee79aab2a8557bbfb318003dcdf9f20dff5dd1"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 10205879,
+          "storedBytes": 1051937,
+          "roundtripMs": 7245.938685000001,
+          "stateSha256": "9a8a6ed5739eedfc01c6f9565db09819525d29640a4f5fd27f221fb9f8138a20"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 812,
+        "ms": 165.45784899999853
+      },
+      "auditCounters": {
+        "walkGraphs": 7301,
+        "parentTraversals": 5560,
+        "distanceFields": 2788,
+        "visitedVertices": 112036412,
+        "requests": 172,
+        "physicalBuilds": 26,
+        "physicalCacheHits": 146,
+        "enumerated": 150921,
+        "physicalClear": 95081,
+        "availabilityRejects": 0,
+        "accessEvaluations": 1562,
+        "scoreEvaluations": 531,
+        "wholeHistory": 8,
+        "changedBlock": 10665,
+        "cacheHits": 120491,
+        "plotHoldReuses": 318,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 21,
+      "separateTabPngChecks": 21,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 15,
+          "totalDecisions": 1186,
+          "maximumContinuousYears": 731
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 500,
+          "totalDecisions": 500,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 490,
+          "totalDecisions": 490,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 224,
+          "totalDecisions": 224,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 228,
+          "totalDecisions": 228,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 5,
+          "totalDecisions": 5,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 28,
+          "totalDecisions": 306,
+          "maximumContinuousYears": 61
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 14,
+          "totalDecisions": 14,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 22,
+          "totalDecisions": 22,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 26,
+          "totalDecisions": 26,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 229,
+          "totalDecisions": 229,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 11,
+          "totalDecisions": 7186,
+          "maximumContinuousYears": 1639
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 136,
+          "totalDecisions": 136,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 97,
+          "totalDecisions": 97,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 91,
+          "totalDecisions": 91,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 9,
+          "totalDecisions": 9,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 198,
+      "seaSide": "west",
+      "stateSha256": "b6c2b513127e37bff728c7d2ac2336a57c0e3622b492d805df02ae5ede78f81c",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "straight-channel",
+            "hills": null,
+            "coast": null,
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 46,
+            "town": 577,
+            "city": null,
+            "decline": 165
+          },
+          "years": [
+            0,
+            46,
+            100,
+            165,
+            577,
+            1000,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H08",
+            "coast": null,
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 513,
+            "town": 5690,
+            "city": null,
+            "decline": 790
+          },
+          "years": [
+            0,
+            100,
+            513,
+            790,
+            1000,
+            5690,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C08",
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 568,
+            "town": 761,
+            "city": 783,
+            "decline": 6629
+          },
+          "years": [
+            0,
+            100,
+            568,
+            761,
+            783,
+            1000,
+            6629,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 65411,
+          "storedBytes": 12734,
+          "roundtripMs": 724.0931240000064,
+          "stateSha256": "72c5315487f5e09af4ada100954601349809371e84f1b120280371f3b78bab1e"
+        },
+        {
+          "year": 100,
+          "plainBytes": 88760,
+          "storedBytes": 19706,
+          "roundtripMs": 818.8880839999765,
+          "stateSha256": "9646d8a4cbe0ae601087356792c95373d81f12aa3661a1b48a41ff82f4e322da"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 454951,
+          "storedBytes": 67411,
+          "roundtripMs": 1740.3856859999942,
+          "stateSha256": "93f00d7629b4c3f3d51d107119ee060ca7e37ed5e0461c8eea4846501876e9d3"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 8786350,
+          "storedBytes": 949124,
+          "roundtripMs": 5044.225304999971,
+          "stateSha256": "b6c2b513127e37bff728c7d2ac2336a57c0e3622b492d805df02ae5ede78f81c"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 480,
+        "ms": 158.51211799995508
+      },
+      "auditCounters": {
+        "walkGraphs": 10853,
+        "parentTraversals": 8033,
+        "distanceFields": 4387,
+        "visitedVertices": 151542922,
+        "requests": 184,
+        "physicalBuilds": 29,
+        "physicalCacheHits": 155,
+        "enumerated": 166362,
+        "physicalClear": 95730,
+        "availabilityRejects": 5,
+        "accessEvaluations": 3868,
+        "scoreEvaluations": 1166,
+        "wholeHistory": 8,
+        "changedBlock": 7957,
+        "cacheHits": 120508,
+        "plotHoldReuses": 324,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 22,
+      "separateTabPngChecks": 22,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 16,
+          "totalDecisions": 4804,
+          "maximumContinuousYears": 2324
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 373,
+          "totalDecisions": 373,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 491,
+          "totalDecisions": 491,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 194,
+          "totalDecisions": 194,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 195,
+          "totalDecisions": 195,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 4,
+          "totalDecisions": 4,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 20,
+          "totalDecisions": 237,
+          "maximumContinuousYears": 57
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 8,
+          "totalDecisions": 8,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 39,
+          "totalDecisions": 39,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 236,
+          "totalDecisions": 236,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 52,
+          "totalDecisions": 52,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 16,
+          "totalDecisions": 3348,
+          "maximumContinuousYears": 1160
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 131,
+          "totalDecisions": 131,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 99,
+          "totalDecisions": 99,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 104,
+          "totalDecisions": 104,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-hall": {
+          "intervalCount": 20,
+          "totalDecisions": 20,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-capacity": {
+          "intervalCount": 13,
+          "totalDecisions": 13,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-safe-plot": {
+          "intervalCount": 8,
+          "totalDecisions": 8,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-safe-plot": {
+          "intervalCount": 4,
+          "totalDecisions": 4,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 100,
+          "totalDecisions": 100,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 5,
+          "totalDecisions": 5,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-capacity": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-safe-plot": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-safe-plot": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 10,
+      "seaSide": "west",
+      "stateSha256": "e7939f21ba5f043adffa6e61fdacea90e87761a298b97820d80e7a8d0df3154c",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "island-channels",
+            "hills": null,
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 46,
+            "town": 775,
+            "city": 797,
+            "decline": 263
+          },
+          "years": [
+            0,
+            46,
+            100,
+            263,
+            775,
+            797,
+            1000,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H03",
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 553,
+            "town": null,
+            "city": null,
+            "decline": 841
+          },
+          "years": [
+            0,
+            100,
+            553,
+            841,
+            1000,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C03",
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 599,
+            "town": 821,
+            "city": null,
+            "decline": null
+          },
+          "years": [
+            0,
+            100,
+            599,
+            821,
+            1000,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 124105,
+          "storedBytes": 13171,
+          "roundtripMs": 1258.3603940000175,
+          "stateSha256": "acee46cbbba92f39d73591ba8d64728b6b39d5a121429d2f4acbe6f278de1fde"
+        },
+        {
+          "year": 100,
+          "plainBytes": 157407,
+          "storedBytes": 20911,
+          "roundtripMs": 1299.6443430000218,
+          "stateSha256": "6411e7aa60d5e5e42640b124609c52315d7b72353207c5fc75528e9c66307952"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 529218,
+          "storedBytes": 69043,
+          "roundtripMs": 2322.4380050000036,
+          "stateSha256": "e45fc46f39822c15dadd9c61efb39098ac4ab9038b42decb36eb0e18aad15fcc"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 8554333,
+          "storedBytes": 909616,
+          "roundtripMs": 5792.290645000001,
+          "stateSha256": "e7939f21ba5f043adffa6e61fdacea90e87761a298b97820d80e7a8d0df3154c"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 518,
+        "ms": 144.48984399996698
+      },
+      "auditCounters": {
+        "walkGraphs": 8872,
+        "parentTraversals": 7140,
+        "distanceFields": 3418,
+        "visitedVertices": 158981462,
+        "requests": 184,
+        "physicalBuilds": 31,
+        "physicalCacheHits": 153,
+        "enumerated": 179613,
+        "physicalClear": 113492,
+        "availabilityRejects": 1,
+        "accessEvaluations": 2895,
+        "scoreEvaluations": 1285,
+        "wholeHistory": 8,
+        "changedBlock": 7719,
+        "cacheHits": 120508,
+        "plotHoldReuses": 325,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 20,
+      "separateTabPngChecks": 20,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 131,
+          "totalDecisions": 131,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 474,
+          "totalDecisions": 474,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 491,
+          "totalDecisions": 491,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 216,
+          "totalDecisions": 216,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 199,
+          "totalDecisions": 199,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 7,
+          "totalDecisions": 7,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 282,
+          "totalDecisions": 282,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 10,
+          "totalDecisions": 10,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-safe-plot": {
+          "intervalCount": 30,
+          "totalDecisions": 30,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 32,
+          "totalDecisions": 32,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 48,
+          "totalDecisions": 48,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 231,
+          "totalDecisions": 231,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 57,
+          "totalDecisions": 57,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 125,
+          "totalDecisions": 125,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 110,
+          "totalDecisions": 110,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 98,
+          "totalDecisions": 98,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 22,
+          "totalDecisions": 22,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 5,
+          "totalDecisions": 5,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-hall": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-capacity": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-capacity": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-safe-plot": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-safe-plot": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-safe-plot": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 12,
+      "seaSide": "east",
+      "stateSha256": "9a83e0896999e608ba20fab5cb80702494e8cb218e52b36baa445d5322ca7387",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "wide-meander",
+            "hills": null,
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 46,
+            "town": 754,
+            "city": null,
+            "decline": 196
+          },
+          "years": [
+            0,
+            46,
+            100,
+            196,
+            754,
+            1000,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H05",
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 648,
+            "town": null,
+            "city": null,
+            "decline": 931
+          },
+          "years": [
+            0,
+            100,
+            648,
+            931,
+            1000,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C02",
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 686,
+            "town": 930,
+            "city": null,
+            "decline": 4921
+          },
+          "years": [
+            0,
+            100,
+            686,
+            930,
+            1000,
+            4921,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 54571,
+          "storedBytes": 12026,
+          "roundtripMs": 1444.9025189999957,
+          "stateSha256": "6f72b88bfdf097de6c86b44f206ef7409fa46420570cfb95f1f78877492377c5"
+        },
+        {
+          "year": 100,
+          "plainBytes": 88624,
+          "storedBytes": 20450,
+          "roundtripMs": 1570.1731659999932,
+          "stateSha256": "2a014f43a32c73452a780e957fc4daf2df31e5381616621f92be56fe69c61458"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 401951,
+          "storedBytes": 60659,
+          "roundtripMs": 2632.463987999945,
+          "stateSha256": "63e3e2eac710dc4c4437a7edf09b9c452e53b128e1a66997ff34c16e4e18d173"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 10077172,
+          "storedBytes": 1050813,
+          "roundtripMs": 6421.074745999998,
+          "stateSha256": "9a83e0896999e608ba20fab5cb80702494e8cb218e52b36baa445d5322ca7387"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 600,
+        "ms": 176.79091700003482
+      },
+      "auditCounters": {
+        "walkGraphs": 8600,
+        "parentTraversals": 6442,
+        "distanceFields": 3436,
+        "visitedVertices": 150173498,
+        "requests": 168,
+        "physicalBuilds": 26,
+        "physicalCacheHits": 142,
+        "enumerated": 151641,
+        "physicalClear": 90975,
+        "availabilityRejects": 0,
+        "accessEvaluations": 2307,
+        "scoreEvaluations": 882,
+        "wholeHistory": 8,
+        "changedBlock": 10283,
+        "cacheHits": 120498,
+        "plotHoldReuses": 328,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 20,
+      "separateTabPngChecks": 20,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 5,
+          "totalDecisions": 1925,
+          "maximumContinuousYears": 1219
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 461,
+          "totalDecisions": 461,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 461,
+          "totalDecisions": 461,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 214,
+          "totalDecisions": 214,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 207,
+          "totalDecisions": 207,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 13,
+          "totalDecisions": 257,
+          "maximumContinuousYears": 53
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 15,
+          "totalDecisions": 15,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 36,
+          "totalDecisions": 36,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 233,
+          "totalDecisions": 233,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 43,
+          "totalDecisions": 43,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 14,
+          "totalDecisions": 6293,
+          "maximumContinuousYears": 1954
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 121,
+          "totalDecisions": 121,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 37,
+          "totalDecisions": 37,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-capacity": {
+          "intervalCount": 37,
+          "totalDecisions": 37,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 109,
+          "totalDecisions": 109,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-hall": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-hall": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 103,
+          "totalDecisions": 103,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 21,
+      "seaSide": "east",
+      "stateSha256": "b21854a78c5b04e01506b630cccb7af05d051bc0ea9402ce961891149f2cc0ac",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "braided-channels",
+            "hills": null,
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 64,
+            "town": 796,
+            "city": null,
+            "decline": 161
+          },
+          "years": [
+            0,
+            64,
+            100,
+            161,
+            796,
+            1000,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "river-bank-7",
+              "kind": "bridge"
+            },
+            {
+              "id": "river-bank-8",
+              "kind": "house"
+            },
+            {
+              "id": "river-bank-9",
+              "kind": "workshop"
+            },
+            {
+              "id": "river-bank-10",
+              "kind": "house"
+            }
+          ]
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H07",
+            "coast": null,
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 755,
+            "town": 905,
+            "city": null,
+            "decline": 1022
+          },
+          "years": [
+            0,
+            100,
+            755,
+            905,
+            1000,
+            1022,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C01",
+            "mountains": "M04"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 733,
+            "town": 1113,
+            "city": 2696,
+            "decline": 9281
+          },
+          "years": [
+            0,
+            100,
+            733,
+            1000,
+            1113,
+            2696,
+            9281,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 47719,
+          "storedBytes": 11598,
+          "roundtripMs": 2045.8605819999939,
+          "stateSha256": "70e35dbc47bbf9cef9006ddd770c9371db8df8e6c975e08d7de74e315009efdc"
+        },
+        {
+          "year": 100,
+          "plainBytes": 73281,
+          "storedBytes": 18678,
+          "roundtripMs": 2081.8500559999957,
+          "stateSha256": "7bb4bb8b0dc4f34a21629719d180463f2b6f974625aa121a130620e771366f95"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 327795,
+          "storedBytes": 52679,
+          "roundtripMs": 2462.030632000009,
+          "stateSha256": "f7c5b765a448eadf310d361ea8b06c65e0f58c927034e192273d678d92a8c345"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 7799764,
+          "storedBytes": 845064,
+          "roundtripMs": 5603.884363999998,
+          "stateSha256": "b21854a78c5b04e01506b630cccb7af05d051bc0ea9402ce961891149f2cc0ac"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 1003,
+        "ms": 193.6982989999815
+      },
+      "auditCounters": {
+        "walkGraphs": 7051,
+        "parentTraversals": 5998,
+        "distanceFields": 2037,
+        "visitedVertices": 112366297,
+        "requests": 158,
+        "physicalBuilds": 25,
+        "physicalCacheHits": 133,
+        "enumerated": 145032,
+        "physicalClear": 86857,
+        "availabilityRejects": 0,
+        "accessEvaluations": 2189,
+        "scoreEvaluations": 710,
+        "wholeHistory": 8,
+        "changedBlock": 6670,
+        "cacheHits": 122973,
+        "plotHoldReuses": 328,
+        "bridgeProposalRequests": 2485,
+        "bridgeHoldReuses": 2463
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 22,
+      "separateTabPngChecks": 22,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 9,
+          "totalDecisions": 164,
+          "maximumContinuousYears": 156
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 487,
+          "totalDecisions": 487,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 500,
+          "totalDecisions": 500,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 1,
+          "totalDecisions": 1,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 179,
+          "totalDecisions": 179,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 167,
+          "totalDecisions": 167,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 48,
+          "totalDecisions": 470,
+          "maximumContinuousYears": 76
+        },
+        "river-bank:civic:no-capacity": {
+          "intervalCount": 15,
+          "totalDecisions": 15,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 69,
+          "totalDecisions": 69,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 83,
+          "totalDecisions": 83,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:bridge:no-safe-bridge": {
+          "intervalCount": 906,
+          "totalDecisions": 2485,
+          "maximumContinuousYears": 193
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 230,
+          "totalDecisions": 230,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 23,
+          "totalDecisions": 6579,
+          "maximumContinuousYears": 887
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 134,
+          "totalDecisions": 134,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 109,
+          "totalDecisions": 109,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 89,
+          "totalDecisions": 89,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-capacity": {
+          "intervalCount": 10,
+          "totalDecisions": 10,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-hall": {
+          "intervalCount": 3,
+          "totalDecisions": 3,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-capacity": {
+          "intervalCount": 2,
+          "totalDecisions": 2,
+          "maximumContinuousYears": 1
+        }
+      }
+    },
+    {
+      "seed": 24,
+      "seaSide": "west",
+      "stateSha256": "ff2d251729a206bc97fd51ee97e8c8ce0cb0de3a3acaf1e16f1639c476f53902",
+      "districts": [
+        {
+          "site": "river-bank",
+          "variants": {
+            "river": "diagonal-crossing",
+            "hills": null,
+            "coast": null,
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 973,
+            "town": 1076,
+            "city": null,
+            "decline": 1328
+          },
+          "years": [
+            0,
+            100,
+            973,
+            1000,
+            1076,
+            1328,
+            10000
+          ],
+          "unbuilt": []
+        },
+        {
+          "site": "hill-side",
+          "variants": {
+            "river": null,
+            "hills": "H01",
+            "coast": null,
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 1503,
+            "town": 1525,
+            "city": null,
+            "decline": null
+          },
+          "years": [
+            0,
+            100,
+            1000,
+            1503,
+            1525,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "hill-side-7",
+              "kind": "bridge"
+            }
+          ]
+        },
+        {
+          "site": "coast-inlet",
+          "variants": {
+            "river": null,
+            "hills": null,
+            "coast": "C04",
+            "mountains": "M05"
+          },
+          "phases": {
+            "settlement": 0,
+            "village": 1358,
+            "town": 1476,
+            "city": null,
+            "decline": 4160
+          },
+          "years": [
+            0,
+            100,
+            1000,
+            1358,
+            1476,
+            4160,
+            10000
+          ],
+          "unbuilt": [
+            {
+              "id": "coast-inlet-7",
+              "kind": "bridge"
+            }
+          ]
+        }
+      ],
+      "saves": [
+        {
+          "year": 0,
+          "plainBytes": 70566,
+          "storedBytes": 12202,
+          "roundtripMs": 2256.1767690000124,
+          "stateSha256": "05381e213d84c374cb9c9d3e2e4cf6b21ac831a97d4f699a9d1380ab14ebf7f7"
+        },
+        {
+          "year": 100,
+          "plainBytes": 95465,
+          "storedBytes": 18430,
+          "roundtripMs": 2144.838957,
+          "stateSha256": "f1f0759c429ea76f5094ba4c42519373b15eecc1d68362247e705c1f38cb395a"
+        },
+        {
+          "year": 1000,
+          "plainBytes": 259123,
+          "storedBytes": 38431,
+          "roundtripMs": 2248.6209519999684,
+          "stateSha256": "a74dee12d8bb372c628e69f802d3962b9539e292cd8c6ba530ba252679fd2ba7"
+        },
+        {
+          "year": 10000,
+          "plainBytes": 7695289,
+          "storedBytes": 830500,
+          "roundtripMs": 9091.930277000007,
+          "stateSha256": "ff2d251729a206bc97fd51ee97e8c8ce0cb0de3a3acaf1e16f1639c476f53902"
+        }
+      ],
+      "maximumHookInterval": {
+        "year": 3240,
+        "ms": 286.86746499995934
+      },
+      "auditCounters": {
+        "walkGraphs": 9771,
+        "parentTraversals": 7260,
+        "distanceFields": 4331,
+        "visitedVertices": 160157861,
+        "requests": 206,
+        "physicalBuilds": 24,
+        "physicalCacheHits": 182,
+        "enumerated": 139143,
+        "physicalClear": 104057,
+        "availabilityRejects": 0,
+        "accessEvaluations": 3449,
+        "scoreEvaluations": 1435,
+        "wholeHistory": 8,
+        "changedBlock": 6430,
+        "cacheHits": 120463,
+        "plotHoldReuses": 255,
+        "bridgeProposalRequests": 1,
+        "bridgeHoldReuses": 0
+      },
+      "browserStorageRoundtrip": true,
+      "repeatPngChecks": 20,
+      "separateTabPngChecks": 20,
+      "holdSummary": {
+        "river-bank:public-space:no-council": {
+          "intervalCount": 259,
+          "totalDecisions": 259,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:public-space:no-council": {
+          "intervalCount": 500,
+          "totalDecisions": 500,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:public-space:no-council": {
+          "intervalCount": 500,
+          "totalDecisions": 500,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-hall": {
+          "intervalCount": 41,
+          "totalDecisions": 41,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-hall": {
+          "intervalCount": 199,
+          "totalDecisions": 199,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-hall": {
+          "intervalCount": 195,
+          "totalDecisions": 195,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:no-council": {
+          "intervalCount": 12,
+          "totalDecisions": 12,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:civic:no-council": {
+          "intervalCount": 55,
+          "totalDecisions": 55,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:civic:no-council": {
+          "intervalCount": 51,
+          "totalDecisions": 51,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-safe-plot": {
+          "intervalCount": 7,
+          "totalDecisions": 7,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-capacity": {
+          "intervalCount": 195,
+          "totalDecisions": 195,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:civic:already-built": {
+          "intervalCount": 196,
+          "totalDecisions": 196,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:public-space:no-hall": {
+          "intervalCount": 39,
+          "totalDecisions": 39,
+          "maximumContinuousYears": 1
+        },
+        "river-bank:housing:no-safe-plot": {
+          "intervalCount": 88,
+          "totalDecisions": 88,
+          "maximumContinuousYears": 1
+        },
+        "hill-side:housing:no-safe-plot": {
+          "intervalCount": 98,
+          "totalDecisions": 98,
+          "maximumContinuousYears": 1
+        },
+        "coast-inlet:housing:no-safe-plot": {
+          "intervalCount": 76,
+          "totalDecisions": 76,
+          "maximumContinuousYears": 1
+        }
+      }
+    }
+  ]
+}
