@@ -7,11 +7,17 @@ import {captureTerrainRecord} from '../dist/terrain/capture-terrain-record.js';
 import {decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {reviewPhysicalPlot} from '../dist/terrain/ground-access-review.js';
 import {createGeneratedHousingReview,advanceGeneratedHousingReview} from '../dist/story/generated-housing-review.js';
+import {createGeneratedCivicReview,advanceGeneratedCivicReview} from '../dist/story/generated-civic-review.js';
+import {validateCivicLedger} from '../dist/story/civic-architecture.js';
 import {housingAt} from '../dist/story/housing-history.js';
 import {siteAt} from '../dist/story/settlement-history.js';
 import {step,chooseAutomatically} from '../dist/story/engine.js';
 import {createHousingCivilization} from '../dist/story/housing-persistence.js';
-const output='artifacts/terrain31-housing',allSeeds=[1,21,198],allModes=['wide','field-only','none'];
+if(process.env.AUDIT_CIVIC!==undefined&&process.env.AUDIT_CIVIC!=='1')throw Error('Invalid civic audit stage');
+const civic=process.env.AUDIT_CIVIC==='1';
+const createReview=civic?createGeneratedCivicReview:createGeneratedHousingReview;
+const advanceReview=civic?advanceGeneratedCivicReview:advanceGeneratedHousingReview;
+const output=civic?'artifacts/terrain31-civic':'artifacts/terrain31-housing',allSeeds=[1,21,198],allModes=['wide','field-only','none'];
 const selectedSeed=process.env.AUDIT_HOUSING_SEED,selectedMode=process.env.AUDIT_HOUSING_MODE;
 if((selectedSeed===undefined)!==(selectedMode===undefined)||selectedSeed!==undefined&&(!allSeeds.some(s=>String(s)===selectedSeed)||!allModes.includes(selectedMode)))throw Error('Invalid housing audit shard');
 const seeds=selectedSeed===undefined?allSeeds:[Number(selectedSeed)],modes=selectedMode===undefined?allModes:[selectedMode];
@@ -23,6 +29,7 @@ function baselineTo(s,year){while(s.year<year){step(s);if(s.pending)chooseAutoma
 function past(review,years){return years.map(year=>sites.map((site,i)=>({year,site,housing:housingAt(review.state.housing,year,site),facilities:siteAt(review.state.observation.sites,i,year)})));}
 function inspect(outer){
  const {review}=outer,{state}=review;const built=new Map(),sequences=new Set();
+ if(civic)validateCivicLedger(state.observation.sites,state.history,state.year,'generated-review-only');
  for(const e of state.housing.events){
   assert.ok(!sequences.has(e.year+':'+e.seq));sequences.add(e.year+':'+e.seq);
   assert.ok(state.history.some(r=>r.id===e.causeRecordId&&r.year===e.year&&r.buildingId===e.blockId));
@@ -37,7 +44,7 @@ function inspect(outer){
   for(let a=0;a<occupied.length;a++)for(let b=a+1;b<occupied.length;b++){
    const p=occupied[a],q=occupied[b];assert.ok(!(p.x<q.x+q.width&&p.x+p.width>q.x&&p.y<q.y+q.depth&&p.y+p.depth>q.y));
   }
-  const ledger=state.observation.sites[i];return {site,housing:blocks,facilityCount:facilities.length,cityFirstYear:ledger.changes.find(c=>c.view.scale===3)?.year??null,
+  const ledger=state.observation.sites[i];return {site,housing:blocks,facilityCount:facilities.length,...(civic?{civicBuildings:ledger.view.buildings.filter(b=>b.civic)}:{}),cityFirstYear:ledger.changes.find(c=>c.view.scale===3)?.year??null,
    declineFirstYear:ledger.changes.find((c,n)=>n>0&&c.view.scale<ledger.changes[n-1].view.scale)?.year??null};
  });
  return {year:state.year,core:core(state),stateSha256:hash(state),housingEvents:state.housing.events.length,districts,diagnostics:review.diagnostics};
@@ -46,7 +53,7 @@ await mkdir(output,{recursive:true});
 for(const seed of seeds){
  try{
   const world=generateWorldPrototype(seed);if(world.status!=='ok'){failures.push({seed,stage:'generation',result:world});continue;}
-  const terrain=captureTerrainRecord(world.world,process.env.REVIEW_SOURCE_SHA??'local-unidentified'),initial=createGeneratedHousingReview(terrain,'none');
+  const terrain=captureTerrainRecord(world.world,process.env.REVIEW_SOURCE_SHA??'local-unidentified'),initial=createReview(terrain,'none');
   if(initial.status!=='review-only'){failures.push({seed,stage:'initial-plan',result:initial});continue;}
   await writeFile(output+'/seed'+seed+'_terrain-record.json',JSON.stringify(terrain));
   const base=createHousingCivilization(seed);baselineTo(base,2000);const base2000={core:core(base),decisions:structuredClone(base.decisions),hazards:hazards(base)};
@@ -54,21 +61,21 @@ for(const seed of seeds){
   const results=[];
   for(const mode of modes){
    console.log(JSON.stringify({seed,mode,status:'started',target:seed===1?10000:2000}));
-   const start={...initial,review:{...initial.review,reservationMode:mode}},began=performance.now(),at2000=advanceGeneratedHousingReview(start,2000,'automatic');
+   const start={...initial,review:{...initial.review,reservationMode:mode}},began=performance.now(),at2000=advanceReview(start,2000,'automatic');
    assert.deepEqual(core(at2000.review.state),base2000.core);assert.deepEqual(at2000.review.state.decisions,base2000.decisions);assert.deepEqual(hazards(at2000.review.state),base2000.hazards);
    const snapshot2000=inspect(at2000),years=[0,100,1000,2000],oldViews=past(at2000.review,years);let snapshot10000=null;
    console.log(JSON.stringify({seed,mode,status:'checked',year:2000}));
-   if(seed===1){const later=advanceGeneratedHousingReview(at2000,8000,'automatic');
+   if(seed===1){const later=advanceReview(at2000,8000,'automatic');
     assert.deepEqual(core(later.review.state),base10000.core);assert.deepEqual(later.review.state.decisions,base10000.decisions);assert.deepEqual(hazards(later.review.state),base10000.hazards);
     assert.deepEqual(past(later.review,years),oldViews);snapshot10000=inspect(later);
    }
    results.push({mode,at2000:snapshot2000,at10000:snapshot10000,elapsedMs:Math.round(performance.now()-began),directModelEqual:true,pastViewsEqual:seed===1?true:null});
-   console.log(JSON.stringify({seed,mode,status:'housing-stage-only',year:seed===1?10000:2000}));
+   console.log(JSON.stringify({seed,mode,status:civic?'civic-stage-only':'housing-stage-only',year:seed===1?10000:2000}));
   }cases.push({seed,results});
  }catch(error){failures.push({seed,error:String(error),stack:error.stack});}
 }
-const report={status:'D3B_HOUSING_REVIEW_ONLY',sourceSHA:process.env.REVIEW_SOURCE_SHA??'local-unidentified',seeds,
+const report={status:civic?'D3B_CIVIC_REVIEW_ONLY':'D3B_HOUSING_REVIEW_ONLY',sourceSHA:process.env.REVIEW_SOURCE_SHA??'local-unidentified',seeds,
  seedSelection:'Fixed before the trial: narrow river, braided river/terrace, rocky valley/coast. No replacement after failures.',modes,cases,failures,
- limitations:['No generated civic/public-space or bridges yet','No v5 save validation or live UI integration','Only 3 seeds at 2000 years, only seed1 at10000; not D5','No final Q5 reservation-policy approval from this partial stage']};
+ limitations:[civic?'No generated public-space or bridges yet':'No generated civic/public-space or bridges yet','No v5 save validation or live UI integration','Only 3 seeds at 2000 years, only seed1 at10000; not D5','No final Q5 reservation-policy approval from this partial stage']};
 await writeFile(output+'/longrun-report.json',JSON.stringify(report,null,2));assert.equal(failures.length,0);
 console.log(JSON.stringify({status:report.status,worlds:cases.length,trials:cases.length*modes.length,longrunTrials:cases.filter(c=>c.seed===1).length*modes.length,failures:failures.length}));

@@ -34,7 +34,16 @@ test('HOLD and unsupported semantic purposes do not run a placement search',()=>
  const {ctx,req}=fixture(1);
  assert.equal(findPlacementReview({...ctx,historyStatus:'partial'},req).reason,'unknown-history');
  assert.equal(findPlacementReview({...ctx,year:11},req).reason,'unconfirmed-year');
- assert.equal(findPlacementReview(ctx,{...req,purpose:'civic'}).reason,'unsupported-review-purpose');
+ assert.equal(findPlacementReview(ctx,{...req,purpose:'public-space'}).reason,'unsupported-review-purpose');
  const blocked={...ctx,reservations:[{id:'all',plot:{x:0,y:100,width:80,depth:36}}]};
  const result=findPlacementReview(blocked,req);assert.equal(result.reason,'no-safe-plot');assert.equal(result.metrics.accessEvaluations,0);
+});
+test('large civic plots use hall and housing distances and match exhaustive scoring',()=>{
+ const {ctx,req}=fixture(1),hall={id:'hall',plot:{x:30,y:100,width:18,depth:7},entrance:[38,107]};
+ ctx.occupancy.push(hall);
+ const civic={...req,purpose:'civic',width:44,depth:22,neighborEntrances:[hall.entrance],housingEntrances:[ctx.occupancy[0].entrance]};
+ const fast=findPlacementReview(ctx,civic),slow=findPlacementReview(ctx,civic,'exhaustive');
+ assert.equal(fast.status,'review-only');assert.equal(slow.status,'review-only');
+ for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key]);
+ assert.equal(findPlacementReview(ctx,{...civic,neighborEntrances:[]}).reason,'missing-anchor');
 });

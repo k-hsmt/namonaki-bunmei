@@ -38,8 +38,8 @@ const intersects=(a:HousingPlot,b:HousingPlot)=>a.x<b.x+b.width&&b.x<a.x+a.width
  a.y<b.y+b.depth&&b.y<a.y+a.depth;
 
 /** 様式なしは旧hall：勝手に改築しない。存在するcivicは必ず全フィールドを検査。 */
-export function validateCivicBuilding(raw:unknown):raw is CivicBuilding{
- if(!isObj(raw)||raw.kind!=='hall'||typeof raw.id!=='string'||!raw.id.startsWith('civic-river-bank-')||
+export function validateCivicBuilding(raw:unknown,siteId:'river-bank'|'hill-side'|'coast-inlet'='river-bank'):raw is CivicBuilding{
+ if(!isObj(raw)||raw.kind!=='hall'||typeof raw.id!=='string'||!raw.id.startsWith('civic-'+siteId+'-')||
   !nat(raw.builtYear)||!nat(raw.x)||!nat(raw.y)||!['intact','damaged','ruined'].includes(String(raw.condition))||
   !isObj(raw.civic))return false;
  const c=raw.civic;
@@ -107,10 +107,12 @@ export function appendConfirmedCivicConstruction(params:{
 }
 
 /** v4で追加のcivic情報がある場合だけ厳格に検査。旧セーブの欠損は推測補完しない。 */
-export function validateCivicLedger(sites:unknown,records:unknown,confirmedYear:number):void{
+export function validateCivicLedger(sites:unknown,records:unknown,confirmedYear:number,mode:'legacy-fixed'|'generated-review-only'='legacy-fixed'):void{
+ if(!['legacy-fixed','generated-review-only'].includes(mode))throw Error('大型公共建築: 不明な検証モード');
  if(!Array.isArray(sites))return; // 移行済みだが旧地点履歴がまだ無いセーブの互換
  if(!Array.isArray(records))throw Error('大型公共建築: イベント一覧が不正');
  for(let i=0;i<sites.length;i++){
+  const expectedSite=mode==='legacy-fixed'?'river-bank':(['river-bank','hill-side','coast-inlet'] as const)[i];
   const site=sites[i];
   if(!isObj(site)||!Array.isArray(site.buildingChanges)||!isObj(site.view)||
    !Array.isArray(site.view.buildings))continue;
@@ -127,7 +129,7 @@ export function validateCivicLedger(sites:unknown,records:unknown,confirmedYear:
     byId.set(String(b.id),false);
     continue;
    }
-   if(!validateCivicBuilding(b)||i!==0)
+   if(!expectedSite||!validateCivicBuilding(b,expectedSite)||mode==='legacy-fixed'&&i!==0)
     throw Error('大型公共建築: 不正な建築様式または地点');
    if(!nat(change.year)||Number(change.year)>confirmedYear)throw Error('大型公共建築: 未確定年');
    if(!matchingRecord(b,records as CivicConstructionRecord[]))throw Error('大型公共建築: 建設出典が不正');
@@ -146,7 +148,7 @@ export function validateCivicLedger(sites:unknown,records:unknown,confirmedYear:
    if(!isObj(b))continue;
    const previous=byId.get(String(b.id));
    if(Object.hasOwn(b,'civic')){
-    if(!validateCivicBuilding(b)||!previous||
+    if(!expectedSite||!validateCivicBuilding(b,expectedSite)||!previous||
      JSON.stringify(b.civic)!==JSON.stringify(previous.civic)||
      b.builtYear!==previous.builtYear||b.x!==previous.x||b.y!==previous.y)
      throw Error('大型公共建築: 現在の施設と確定履歴が一致しない');
