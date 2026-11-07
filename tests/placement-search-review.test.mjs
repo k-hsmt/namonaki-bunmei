@@ -88,3 +88,15 @@ test('organic growth tries another confirmed anchor when the preferred edge has 
  assert.ok(Math.abs(fast.entrance[0]-preferred[0])>80,'remaining land is beyond the first anchor walking radius');
  for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key],key);
 });
+test('organic failed-site reuse requires frozen physics and current occupancy, reservations and crossings',()=>{
+ const {ctx,req}=fixture(1),organic={...req,growthPattern:'organic-v2'};
+ const freeze=o=>{if(o&&typeof o==='object'){Object.values(o).forEach(freeze);Object.freeze(o);}return o;};freeze(ctx.terrain);
+ ctx.reservations.push({id:'blocked',plot:{x:0,y:100,width:80,depth:36}});
+ assert.equal(findPlacementReview(ctx,organic).status,'hold');
+ const repeated=findPlacementReview({...ctx,year:11,confirmedYear:11},organic);assert.equal(repeated.status,'hold');assert.equal(repeated.metrics.enumerated,0);
+ assert.equal(findPlacementReview({...ctx,confirmedYear:9},organic).reason,'unconfirmed-year');
+ const changed={...ctx,reservations:[]},fast=findPlacementReview(changed,organic),slow=findPlacementReview(changed,organic,'exhaustive');assert.equal(fast.status,'review-only');assert.deepEqual(fast.plot,slow.plot);
+ assert.equal(findPlacementReview({...changed,occupancy:[...ctx.occupancy,{id:'blocked-now',plot:{x:0,y:100,width:80,depth:36},entrance:[38,136]}]},organic).status,'hold');
+ // A crossing change must trigger recomputation even when the result stays HOLD.
+ assert.ok(findPlacementReview({...ctx,crossings:[]},organic).metrics.enumerated>0);
+});

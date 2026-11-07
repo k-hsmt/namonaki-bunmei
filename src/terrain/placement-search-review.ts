@@ -19,7 +19,8 @@ const index=(p:RecordPoint)=>p[1]*W+p[0];
 const overlap=(a:GroundPlot,b:GroundPlot)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.depth&&a.y+a.depth>b.y;
 interface StaticPlots {enumerated:number;physicalClear:number;plots:readonly {plot:GroundPlot;slopeCells:number;waterPenalty:number}[]}
 const staticPlots=new WeakMap<object,Map<string,StaticPlots>>();
-const searchMetrics={requests:0,physicalBuilds:0,physicalCacheHits:0,enumerated:0,physicalClear:0,availabilityRejects:0,accessEvaluations:0,scoreEvaluations:0};
+const organicMisses=new WeakMap<object,Set<string>>();
+const searchMetrics={requests:0,physicalBuilds:0,physicalCacheHits:0,enumerated:0,physicalClear:0,availabilityRejects:0,holdReuses:0,accessEvaluations:0,scoreEvaluations:0};
 export function generatedPlacementSearchMetrics(){return {...searchMetrics};}
 /** Physics is immutable across births, HOLDs and bridge condition changes.
  * Occupancy, reservations, access, distances and scores remain dynamic.
@@ -51,6 +52,20 @@ function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:Re
 }
 /** Full enumeration mode is retained as an independent check on pruning decisions. */
 export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,mode:'bounded'|'exhaustive'='bounded'){
+ // Only immutable physics and a complete dynamic context can reuse a miss.
+ // The year itself is a gate; occupancy and verified crossings encode all
+ // time-dependent geometry. Exhaustive reference searches always recompute.
+ const known=ctx.historyStatus==='known'&&Number.isSafeInteger(ctx.year)&&ctx.year>=0&&Number.isSafeInteger(ctx.confirmedYear)&&ctx.year<=ctx.confirmedYear;
+ const physics=known&&mode==='bounded'&&req.growthPattern==='organic-v2'?ctx.terrain.sites[ctx.site].physics:null;
+ if(physics&&frozenRecordPhysics(physics)){
+  const key=JSON.stringify([ctx.terrain.source.seed,ctx.site,ctx.primaryRoot,ctx.occupancy,ctx.reservations,ctx.crossings,req]);
+  let misses=organicMisses.get(physics);if(!misses){misses=new Set();organicMisses.set(physics,misses);}
+  if(misses.has(key)){
+   searchMetrics.requests++;searchMetrics.holdReuses++;
+   return {status:'hold' as const,reason:'no-safe-plot',metrics:{enumerated:0,physicalClear:0,accessEvaluations:0,scoreEvaluations:0,distanceFieldBuilds:0,targetedDistanceQueries:0}};
+  }
+  const result=searchPlacementReview(ctx,req,mode,0);if(result.status==='hold'&&result.reason==='no-safe-plot')misses.add(key);return result;
+ }
  return searchPlacementReview(ctx,req,mode,0);
 }
 type SearchMetrics={enumerated:number;physicalClear:number;accessEvaluations:number;scoreEvaluations:number;distanceFieldBuilds:number;targetedDistanceQueries:number};
