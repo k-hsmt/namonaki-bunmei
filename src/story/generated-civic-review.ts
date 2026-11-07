@@ -5,6 +5,7 @@ import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import {reviewNeighborEntrances,reviewFacilityAnchor,selectReviewReservations} from '../terrain/facility-plan-review.js';
 import type {ReservationReviewMode,TypedGroundOccupation} from '../terrain/facility-plan-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
+import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import {southEntrance} from '../terrain/ground-access-review.js';
 import {siteAt} from './settlement-history.js';
 import {validateCivicBuilding,validateCivicLedger,type CivicBuilding} from './civic-architecture.js';
@@ -12,11 +13,11 @@ import {housingAt} from './housing-history.js';
 import {regions} from './population.js';
 import {tradeYearsFor} from './regional-economy.js';
 import {siteNames} from './society.js';
-import {generatedHousingExtension,createGeneratedHousingReview} from './generated-housing-review.js';
+import {generatedHousingExtension,createGeneratedHousingReview,createGeneratedHousingExtension} from './generated-housing-review.js';
 import {advanceGeneratedFacilityReview,chooseGeneratedFacilityReview,type GeneratedFacilityReview,type GeneratedLandReviewExtension,type ReviewFacilityPlacement} from './generated-facility-review.js';
 import {lastObservedYear,type RecordEntry} from './engine.js';
 const sites:readonly RecordSite[]=['river-bank','hill-side','coast-inlet'];
-export function proposeGeneratedCivic(review:GeneratedFacilityReview,index:number){
+export function proposeGeneratedCivic(review:GeneratedFacilityReview,index:number,extra:readonly TypedGroundOccupation[]=[]){
  const {state}=review,year=state.year,siteId=sites[index];
  const hold=(reason:string)=>({status:'hold' as const,reason});
  if(!siteId)return hold('unsupported-terrain');
@@ -32,9 +33,9 @@ export function proposeGeneratedCivic(review:GeneratedFacilityReview,index:numbe
  const district=state.economy?.districts[index];
  if((state.observation!.people[index]??0)<4500||(district?.coverage.at(-1)??0)<.94||(district?.shortageYears??1)>0||!state.economy||tradeYearsFor(state.economy,regions[index]!.id)<3)return hold('no-capacity');
  const style=hash01(state.seed,14,0)<.5?'great-hall':'courtyard-hall',id='civic-'+siteId+'-'+year+'-'+style;
- const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===siteId&&p.builtYear<=year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...generatedHousingExtension.additionalOccupancy(review,state,siteId)];
- const plan=review.plans[siteId],result=findPlacementReview({terrain:review.terrain,site:siteId,year,confirmedYear:year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,
-  reservations:selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id)))},
+ const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===siteId&&p.builtYear<=year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...generatedHousingExtension.additionalOccupancy(review,state,siteId),...extra];
+ const plan=review.plans[siteId],result=findPlacementReview(withGeneratedBridgeAccess(review,{terrain:review.terrain,site:siteId,year,confirmedYear:year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,
+  reservations:selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id)))}),
   {objectId:id,purpose:'civic',width:style==='great-hall'?44:56,depth:style==='great-hall'?22:30,nucleus:plan.nucleus,
    neighborEntrances:reviewNeighborEntrances('civic',occupied),housingEntrances:housing.blocks.map(b=>southEntrance(b.footprint))});
  if(result.status==='hold')return hold(result.reason);
@@ -46,9 +47,11 @@ export function proposeGeneratedCivic(review:GeneratedFacilityReview,index:numbe
   causes:['24年間続いた寄り合い','維持するための食糧と交易','空いていた地表敷地'],relatedIds:[...new Set([now.recordId,earlier.recordId,hall.recordId].filter((x):x is string=>Boolean(x)))]};
  return {status:'proposed' as const,candidate,event,placement:{objectId:id,site:siteId,kind:'civic' as const,plot:result.plot,entrance:result.entrance,builtYear:year,sourceRecordId:recordId}};
 }
-const extension:GeneratedLandReviewExtension={additionalOccupancy:generatedHousingExtension.additionalOccupancy,afterFacilities(review,state){
+export function createGeneratedCivicExtension(extra?:GeneratedLandReviewExtension['additionalOccupancy']):GeneratedLandReviewExtension {
+ const housing=createGeneratedHousingExtension(extra);
+ return {additionalOccupancy:housing.additionalOccupancy,afterFacilities(review,state){
  for(let index=0;index<sites.length;index++){
-  const result=proposeGeneratedCivic(review,index);
+  const result=proposeGeneratedCivic(review,index,extra?.(review,state,sites[index]!)??[]);
   if(result.status==='hold'){
    if(state.year%40===0){const holds=review.diagnostics.holds as Record<string,number>,key=sites[index]+':civic:'+result.reason;holds[key]=(holds[key]??0)+1;}continue;
   }
@@ -58,8 +61,10 @@ const extension:GeneratedLandReviewExtension={additionalOccupancy:generatedHousi
   (review.placements as ReviewFacilityPlacement[]).push(result.placement);
   validateCivicLedger(state.observation!.sites,state.history,state.year,'generated-review-only');
  }
- generatedHousingExtension.afterFacilities(review,state);
-}};
+ housing.afterFacilities(review,state);
+ }};
+}
+const extension=createGeneratedCivicExtension();
 export interface GeneratedCivicReview {readonly format:'generated-civic-review';readonly status:'review-only';readonly review:GeneratedFacilityReview}
 export function createGeneratedCivicReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode):GeneratedCivicReview|{status:'hold';reason:string}{
  const parent=createGeneratedHousingReview(terrain,mode);return parent.status==='hold'?parent:{format:'generated-civic-review',status:'review-only',review:parent.review};

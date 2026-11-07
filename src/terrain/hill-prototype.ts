@@ -1,4 +1,6 @@
 /** D1-B only: initial hill geometry and diagnostics; never imported by the live game. */
+import {terrainHash} from './terrain-hash-v1.js';
+export {terrainHash} from './terrain-hash-v1.js';
 export const hillVariants = ['H01','H02','H03','H04','H05','H06','H07','H08'] as const;
 export type HillVariant = typeof hillVariants[number];
 export const hillLabels:Record<HillVariant,string> = {
@@ -18,18 +20,6 @@ export interface HillRaster {
  width:320;height:180;elevation:Uint8Array;grade:Uint8Array;bearing:Uint8Array;
 }
 export interface Plot {x:number;y:number;width:number;depth:number}
-/** Length-prefixed UTF-8 FNV-1a + integer mix, as specified by D0 A.6. */
-export function terrainHash(parts:readonly (string|number)[]):number {
- let h=2166136261;
- const byte=(b:number)=>{h=Math.imul(h^b,16777619);};
- for(const part of parts){
-  const data=new TextEncoder().encode(String(part));
-  for(let n=0;n<4;n++)byte((data.length>>>(n*8))&255);
-  for(const b of data)byte(b);
- }
- h^=h>>>16;h=Math.imul(h,0x7feb352d);h^=h>>>15;
- h=Math.imul(h,0x846ca68b);h^=h>>>16;return h>>>0;
-}
 export function hillVariantForSeed(input:number):HillVariant {
  const seed=(input>>>0)||1;
  return hillVariants[terrainHash(['hill-prototype-v1',seed,'hills','hill-side','',0,'variant'])%8]!;

@@ -2,6 +2,7 @@
 import {hash01} from '../engine/rng.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
+import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import {southEntrance} from '../terrain/ground-access-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
 import {reviewNeighborEntrances,selectReviewReservations,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
@@ -26,6 +27,8 @@ const readHousing:typeof housingAt=(history,year,site)=>{
  }
  return {status:cached.view.status,blocks:cached.view.blocks.filter(b=>!site||b.siteId===site)};
 };
+/** Only for immutable, privately owned histories inside a generated transaction. */
+export const readOwnedGeneratedHousing=readHousing;
 const failedPlots=new WeakMap<object,Set<string>>();
 const lastYears=new WeakMap<object,Map<string,number>>();
 function latestYears(state:CivilizationState){
@@ -54,18 +57,20 @@ function nextId(state:CivilizationState,site:RecordSite):{id:string;ordinal:numb
  }
  if(!Number.isSafeInteger(last+1))throw Error('Residential ID space exhausted');return {id:prefixes[site]+String(last+1).padStart(5,'0'),ordinal:last+1};
 }
-export const generatedHousingExtension:GeneratedLandReviewExtension={additionalOccupancy,afterFacilities(review,state){
+export function createGeneratedHousingExtension(extra?:GeneratedLandReviewExtension['additionalOccupancy']):GeneratedLandReviewExtension {
+ return {additionalOccupancy:(r,s,site)=>[...additionalOccupancy(r,s,site),...(extra?.(r,s,site)??[])],afterFacilities(review,state){
  const holds=review.diagnostics.holds as Record<string,number>;
  // All same-year ordinary facilities are already committed before housing.
  for(let i=0;i<sites.length;i++){
   const site=sites[i]!,population=state.observation!.people[i]??0;tracked(state,site);
   if(state.year===0||state.year%60!==0||population<900)continue;
   const {id,ordinal}=nextId(state,site),plan=review.plans[site];
-  const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...additionalOccupancy(review,state,site)];
+  const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...additionalOccupancy(review,state,site),...(extra?.(review,state,site)??[])];
   const reservations=selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id))),neighborEntrances=reviewNeighborEntrances('housing',occupied);
-  const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,occupied,reservations,neighborEntrances]);
+  const context=withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations});
+  const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,context.occupancy,reservations,neighborEntrances,context.crossings]);
   let failed=failedPlots.get(review.terrain);if(!failed){failed=new Set();failedPlots.set(review.terrain,failed);}
-  const result=failed.has(key)?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview({terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations},
+  const result=failed.has(key)?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
    {objectId:id,purpose:'housing',width:18,depth:8,nucleus:plan.nucleus,neighborEntrances});
   if(result.status==='hold'&&result.reason==='no-safe-plot')failed.add(key);
   if(result.status==='hold'){const key=site+':housing:'+result.reason;holds[key]=(holds[key]??0)+1;continue;}
@@ -92,7 +97,9 @@ export const generatedHousingExtension:GeneratedLandReviewExtension={additionalO
   const cause=record(state,'housing-'+life.kind,life.blockId,siteNames[i]+'で'+titles[life.kind],life.causeRecordId?[life.causeRecordId]:[]);
   const next=appendHousingLifecycle(state.housing!,state.year,life,cause.id,readHousing);state.history.push(cause);state.housing=next;
  }
-}};
+ }};
+}
+export const generatedHousingExtension=createGeneratedHousingExtension();
 export function createGeneratedHousingReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode):GeneratedHousingReview|{status:'hold';reason:string}{
  const review=createGeneratedFacilityReview(terrain,mode);return review.status==='hold'?review:{format:'generated-housing-review',status:'review-only',review};
 }

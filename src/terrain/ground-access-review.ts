@@ -2,6 +2,7 @@
 import type {RecordPoint, RecordSite} from './terrain-record-types.js';
 import type {ValidatedTerrainRecord} from './terrain-record.js';
 import {decodeRecordPhysics, type RecordRaster} from './terrain-record-raster-v1.js';
+import type {WalkableBridgeCrossing} from './bridge-access-types.js';
 
 export interface GroundPlot {readonly x:number;readonly y:number;readonly width:number;readonly depth:number}
 export type GroundPurpose='house'|'field'|'hall'|'workshop'|'market'|'granary'|'housing'|'civic'|'public-space';
@@ -12,6 +13,7 @@ export interface GroundReviewContext {
  readonly primaryRoot:RecordPoint;readonly occupancy:readonly GroundOccupation[];
  /** Reservations are separate from real occupancy; the requesting ID excludes its own. */
  readonly reservations:readonly {readonly id:string;readonly plot:GroundPlot}[];
+ readonly crossings?:readonly WalkableBridgeCrossing[];
 }
 export type GroundHold='unknown-history'|'unconfirmed-year'|'outside-ground'|'water'|'unstable'|'steep'|'occupied'|'no-access';
 export type GroundReview={readonly status:'hold';readonly reason:GroundHold;readonly conflicts:readonly string[]}
@@ -42,13 +44,26 @@ export function reviewPhysicalPlot(r:RecordRaster,purpose:GroundPurpose,plot:Gro
 }
 
 /** Canonical coordinates, as stored in physics; mirroring belongs to projection only. */
-export function groundWalkWindows(r:RecordRaster,plots:readonly GroundPlot[]):Uint8Array {
+export function groundWalkWindows(r:RecordRaster,plots:readonly GroundPlot[],crossings:readonly WalkableBridgeCrossing[]=[],blockingAfterCrossings:readonly GroundPlot[]=plots):Uint8Array {
  const cells=new Uint8Array(N),windows=new Uint8Array(N);
  for(let i=96*W;i<N;i++)cells[i]=+(r.surface[i]===1&&r.bearing[i]===0&&r.grade[i]!<=1);
  for(const p of plots)for(let y=p.y;y<p.y+p.depth;y++)cells.fill(0,y*W+p.x,y*W+p.x+p.width);
+ if(crossings.length){
+  for(const crossing of crossings){const p=crossing.deck;if(!validPlot(p)||p.depth!==4)throw Error('Invalid verified bridge deck');
+   for(let y=p.y;y<p.y+p.depth;y++)cells.fill(1,y*W+p.x,y*W+p.x+p.width);
+  }
+  // Ordinary buildings and new candidates stay blocked even above a bridge.
+  for(const p of blockingAfterCrossings)for(let y=p.y;y<p.y+p.depth;y++)cells.fill(0,y*W+p.x,y*W+p.x+p.width);
+ }
  for(let y=96;y<H-1;y++)for(let x=0;x<W-1;x++){
   const i=y*W+x;windows[i]=+(cells[i]===1&&cells[i+1]===1&&cells[i+W]===1&&cells[i+W+1]===1);
  }return windows;
+}
+export function groundContextWindows(r:RecordRaster,ctx:GroundReviewContext,extra:readonly GroundPlot[]=[]):Uint8Array {
+ const crossings=ctx.crossings??[];if(crossings.some(c=>c.site!==ctx.site))throw Error('Bridge crossing site mismatch');
+ if(!crossings.length)return groundWalkWindows(r,[...ctx.occupancy.map(o=>o.plot),...extra]);
+ const owned=new Set(crossings.flatMap(c=>[...c.occupiedIds]));
+ return groundWalkWindows(r,[...ctx.occupancy.map(o=>o.plot),...extra],crossings,[...ctx.occupancy.filter(o=>!owned.has(o.id)).map(o=>o.plot),...extra]);
 }
 export function groundReachParents(windows:Uint8Array,root:RecordPoint):Int32Array {
  const parent=new Int32Array(N);parent.fill(-1);
@@ -96,8 +111,8 @@ export function reviewGroundAccess(ctx:GroundReviewContext,purpose:GroundPurpose
  }
  const conflicts=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==objectId)].filter(o=>overlap(plot,o.plot)).map(o=>o.id);
  if(conflicts.length)return hold('occupied',[...new Set(conflicts)].sort());
- const entrance=southEntrance(plot),plots=ctx.occupancy.map(o=>o.plot);
- const before=groundReachParents(groundWalkWindows(r,plots),ctx.primaryRoot),after=groundReachParents(groundWalkWindows(r,[...plots,plot]),ctx.primaryRoot);
+ const entrance=southEntrance(plot);
+ const before=groundReachParents(groundContextWindows(r,ctx),ctx.primaryRoot),after=groundReachParents(groundContextWindows(r,ctx,[plot]),ctx.primaryRoot);
  if(!validPoint(entrance)||after[index(entrance)]===-1)return hold('no-access');
  for(const o of ctx.occupancy)if(before[index(o.entrance)]!==-1&&after[index(o.entrance)]===-1)return hold('no-access',[o.id]);
  const access:RecordPoint[]=[];let i=index(entrance);
