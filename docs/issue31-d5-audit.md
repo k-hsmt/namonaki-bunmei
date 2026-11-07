@@ -28,6 +28,10 @@ Within one search, a private occupancy snapshot shares the unchanged before-grap
 across candidates. Each hypothetical after-graph and every previously connected
 entrance is still checked. Mutable terrain uses the original uncached path;
 the exhaustive comparison also bypasses the transaction cache.
+The placement jitter hash also reuses its constant, unfinalized FNV prefix and
+the original decimal UTF-8 coordinate bytes. The original frozen hash is
+unchanged. Every ground coordinate, Unicode prefixes, numeric edge cases and the
+complete 13 original reference states are checked for bit-identical results.
 When all physical candidates are impossible or occupied, search now returns HOLD
 before constructing any access distance field. The benchmark records actual
 candidate builds/reuse, exclusions, hypothetical checks, graph builds, visited
@@ -58,6 +62,7 @@ mandatory gate; a fast comparison against already-generated main does not erase
 it. Absolute budgets remain 5000ms and 25000ms. Unmet gates are reported as false.
 
 `BENCHMARK_SEEDS=1,21,7,198` selects additional seeds.
+`BENCHMARK_YEARS=2000` or `10000` selects a single horizon for the wider matrix.
 `BENCHMARK_OUT` selects an output directory. `BENCHMARK_BASELINE_REPORT` may
 reuse a prior complete baseline measured on this runner; its SHA, Node version,
 platform and five measured samples are checked. Only baseline samples are reused,

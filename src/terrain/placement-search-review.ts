@@ -4,7 +4,7 @@
 import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
 import {readOwnedRecordPhysics,frozenRecordPhysics} from './owned-record-physics.js';
-import {terrainHash} from './terrain-hash-v1.js';
+import {terrainHash,terrainCoordinateHasher} from './terrain-hash-v1.js';
 import {groundContextWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,createGroundAccessReviewer,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;
@@ -84,10 +84,12 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+3*homes+fieldNeighborPenalty+penalty;
  };
  const candidates:{plot:GroundPlot;entrance:RecordPoint;penalty:number;lower:number}[]=[];
+ const hashPrefix=['placement-search-review-v2',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId];
+ const coordinateHash=mode==='bounded'?terrainCoordinateHasher(hashPrefix):(x:number,y:number)=>terrainHash([...hashPrefix,x,y]);
  for(const {plot,slopeCells,waterPenalty} of available){
   const {x,y}=plot;
   const entrance=southEntrance(plot),penalty=waterPenalty+slopeCells+Math.max(0,y-150)*2+
-   terrainHash(['placement-search-review-v2',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId,x,y])%4;
+   coordinateHash(x,y)%4;
   const lower=rank(base,entrance,penalty);if(Number.isFinite(lower))candidates.push({plot,entrance,penalty,lower});
  }
  candidates.sort((a,b)=>a.lower-b.lower||a.plot.y-b.plot.y||a.plot.x-b.plot.x);

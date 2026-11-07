@@ -12,6 +12,8 @@ const baselineRoot=process.env.BASELINE_ROOT;
 assert.ok(baselineRoot,'BASELINE_ROOT is required; never substitute an unmeasured baseline');
 const seeds=(process.env.BENCHMARK_SEEDS??'1').split(',').map(Number);
 assert.ok(seeds.length&&seeds.every(s=>Number.isSafeInteger(s)&&s>0&&s<=0xffffffff));
+const years=(process.env.BENCHMARK_YEARS??'2000,10000').split(',').map(Number);
+assert.ok(years.length&&new Set(years).size===years.length&&years.every(y=>y===2000||y===10000),'BENCHMARK_YEARS must select 2000 and/or 10000');
 const fixture=JSON.parse(await readFile('tests/fixtures/generated-progression-reference-v1.json','utf8'));
 const out=process.env.BENCHMARK_OUT??'artifacts/terrain31-performance';await mkdir(out,{recursive:true});
 const moduleAt=(root,file)=>import(pathToFileURL(resolve(root,'dist',file)).href);
@@ -26,12 +28,12 @@ const current=await load('.'),baseline=await load(baselineRoot);
 const sha=root=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();
 const report={node:process.version,platform:process.platform,sourceSHA:sha('.'),baselineSHA:sha(baselineRoot),
  diffSha256:createHash('sha256').update(execFileSync('git',['diff'],{encoding:'utf8'})).digest('hex'),
- choices:'automatic',reservation:'field-only',warmups:1,measuredRuns:5,
+ choices:'automatic',reservation:'field-only',seeds,years,warmups:1,measuredRuns:5,
  excludes:['world initialization','rendering','hashing','save/load'],cases:[]};
 const previous=process.env.BENCHMARK_BASELINE_REPORT?JSON.parse(await readFile(process.env.BENCHMARK_BASELINE_REPORT,'utf8')):null;
 if(previous){assert.equal(previous.baselineSHA,report.baselineSHA);assert.equal(previous.node,report.node);assert.equal(previous.platform,report.platform);report.reusedBaselineReport=process.env.BENCHMARK_BASELINE_REPORT;}
 const median=values=>[...values].sort((a,b)=>a-b)[Math.floor(values.length/2)];
-for(const seed of seeds)for(const year of [2000,10000]){
+for(const seed of seeds)for(const year of years){
  const row={seed,year};
  for(const [name,api,legacy] of [['mainGenerated',baseline,false],['currentGenerated',current,false],['mainLegacy',baseline,true]]){
   if(previous&&name!=='currentGenerated'){
