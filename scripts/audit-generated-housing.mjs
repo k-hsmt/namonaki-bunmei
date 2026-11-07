@@ -11,7 +11,11 @@ import {housingAt} from '../dist/story/housing-history.js';
 import {siteAt} from '../dist/story/settlement-history.js';
 import {step,chooseAutomatically} from '../dist/story/engine.js';
 import {createHousingCivilization} from '../dist/story/housing-persistence.js';
-const output='artifacts/terrain31-housing',seeds=[1,21,198],modes=['wide','field-only','none'],sites=['river-bank','hill-side','coast-inlet'],cases=[],failures=[];
+const output='artifacts/terrain31-housing',allSeeds=[1,21,198],allModes=['wide','field-only','none'];
+const selectedSeed=process.env.AUDIT_HOUSING_SEED,selectedMode=process.env.AUDIT_HOUSING_MODE;
+if((selectedSeed===undefined)!==(selectedMode===undefined)||selectedSeed!==undefined&&(!allSeeds.some(s=>String(s)===selectedSeed)||!allModes.includes(selectedMode)))throw Error('Invalid housing audit shard');
+const seeds=selectedSeed===undefined?allSeeds:[Number(selectedSeed)],modes=selectedMode===undefined?allModes:[selectedMode];
+const sites=['river-bank','hill-side','coast-inlet'],cases=[],failures=[];
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const core=s=>Object.fromEntries(['rngState','population','food','cohesion','knowledge','exchange','culture','drought','epidemic'].map(k=>[k,s[k]]));
 const hazards=s=>s.history.filter(r=>['flood','fire','storm','earthquake'].includes(r.kind)).map(r=>[r.year,r.kind]);
@@ -49,9 +53,11 @@ for(const seed of seeds){
   let base10000=null;if(seed===1){baselineTo(base,10000);base10000={core:core(base),decisions:structuredClone(base.decisions),hazards:hazards(base)};}
   const results=[];
   for(const mode of modes){
+   console.log(JSON.stringify({seed,mode,status:'started',target:seed===1?10000:2000}));
    const start={...initial,review:{...initial.review,reservationMode:mode}},began=performance.now(),at2000=advanceGeneratedHousingReview(start,2000,'automatic');
    assert.deepEqual(core(at2000.review.state),base2000.core);assert.deepEqual(at2000.review.state.decisions,base2000.decisions);assert.deepEqual(hazards(at2000.review.state),base2000.hazards);
    const snapshot2000=inspect(at2000),years=[0,100,1000,2000],oldViews=past(at2000.review,years);let snapshot10000=null;
+   console.log(JSON.stringify({seed,mode,status:'checked',year:2000}));
    if(seed===1){const later=advanceGeneratedHousingReview(at2000,8000,'automatic');
     assert.deepEqual(core(later.review.state),base10000.core);assert.deepEqual(later.review.state.decisions,base10000.decisions);assert.deepEqual(hazards(later.review.state),base10000.hazards);
     assert.deepEqual(past(later.review,years),oldViews);snapshot10000=inspect(later);
@@ -65,4 +71,4 @@ const report={status:'D3B_HOUSING_REVIEW_ONLY',sourceSHA:process.env.REVIEW_SOUR
  seedSelection:'Fixed before the trial: narrow river, braided river/terrace, rocky valley/coast. No replacement after failures.',modes,cases,failures,
  limitations:['No generated civic/public-space or bridges yet','No v5 save validation or live UI integration','Only 3 seeds at 2000 years, only seed1 at10000; not D5','No final Q5 reservation-policy approval from this partial stage']};
 await writeFile(output+'/longrun-report.json',JSON.stringify(report,null,2));assert.equal(failures.length,0);
-console.log(JSON.stringify({status:report.status,worlds:cases.length,trials:cases.length*3,longrunTrials:cases.filter(c=>c.seed===1).length*3,failures:failures.length}));
+console.log(JSON.stringify({status:report.status,worlds:cases.length,trials:cases.length*modes.length,longrunTrials:cases.filter(c=>c.seed===1).length*modes.length,failures:failures.length}));
