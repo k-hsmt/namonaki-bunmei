@@ -27,7 +27,7 @@ function exact(x:unknown,keys:readonly string[],where:string):Record<string,unkn
 const integer=(x:unknown,min=0,max=Number.MAX_SAFE_INTEGER):x is number=>typeof x==='number'&&Number.isSafeInteger(x)&&x>=min&&x<=max;
 const fixedTerrain=():LegacyFixedTerrain=>({schemaVersion:1,mode:'legacy-fixed',rendererId:'legacy-d2f7cb1',groundRule:'legacy-ground-d2f7cb1'});
 function freeze<T>(v:T):T{if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
-function checkStateHeader(raw:unknown,versions:readonly number[]):asserts raw is Record<string,unknown>{
+export function checkStateHeader(raw:unknown,versions:readonly number[]):asserts raw is Record<string,unknown>{
  if(!isObject(raw)||!versions.includes(raw.version as number)||typeof raw.version!=='number')fail('STATE_VERSION','numeric v2/v3/v4 required');
  if(!integer(raw.seed,0,0xffffffff)||!integer(raw.rngState,0,0xffffffff)||!integer(raw.year))fail('STATE_HEADER','seed/rng/year');
  for(const key of ['initialTerrain','terrain','placementPolicy','progressionPolicy','format'])if(Object.hasOwn(raw,key))fail('MIXED_STATE',key);

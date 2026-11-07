@@ -3,7 +3,7 @@
  */
 import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
-import {terrainHash} from './hill-prototype.js';
+import {terrainHash} from './terrain-hash-v1.js';
 import {groundContextWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;

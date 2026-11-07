@@ -22,7 +22,7 @@ const integer=(x:unknown)=>Number.isSafeInteger(x)&&Number(x)>=0;
 function keysOnly(x:Record<string,unknown>,allowed:readonly string[]):void{
  for(const key of Object.keys(x))if(!allowed.includes(key))fail('未知の住宅属性: '+key);
 }
-function validateHousing(input:unknown,confirmedYear:number):PersistedHousingHistory{
+export function validateHousingHistory(input:unknown,confirmedYear:number):PersistedHousingHistory{
  if(!isRecord(input))throw Error('住宅保存形式: 住宅履歴が欠損');
  keysOnly(input,['schemaVersion','introducedYear','legacyUntracked','events']);
  if(input.schemaVersion!==1||!integer(input.introducedYear)||
@@ -78,7 +78,7 @@ export function prepareHousingSave(raw:unknown):HousingSaveState{
  if(copy.version===4){
   const current=copy as unknown as HousingSaveState;
   const confirmed=confirmedYear(current);
-  current.housing=validateHousing(current.housing,confirmed);
+  current.housing=validateHousingHistory(current.housing,confirmed);
   // 新しく記録された大型公共建築のみ検査。旧v4の欠損はそのまま維持する。
   validateCivicLedger(current.observation?.sites,current.history,confirmed);
   validatePublicSpaceLedger(current.publicSpaces,{confirmedYear:confirmed,
