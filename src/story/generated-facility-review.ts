@@ -99,3 +99,6 @@ export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,yea
 export function chooseGeneratedFacilityReview(input:GeneratedFacilityReview,index:number,source:'manual'|'auto'='manual',extension?:GeneratedLandReviewExtension):GeneratedFacilityReview {
  const next=mutableCopy(input);choose(next.state,index,source,policyFor(next,extension));return next;
 }
+export function chooseAutomaticallyGeneratedFacilityReview(input:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):GeneratedFacilityReview {
+ const next=mutableCopy(input);chooseAutomatically(next.state,policyFor(next,extension));return next;
+}

@@ -4,12 +4,12 @@ import {wireObject} from './generated-state-review.js';
 import {parseReviewSaveDraft,serializeReviewSaveDraft,REVIEW_V5_SAVE_KEY,type ReviewSaveDraft} from './save-draft-dispatch-review.js';
 import {CURRENT_SAVE_KEY,LEGACY_SAVE_KEYS} from './housing-persistence.js';
 const encoding='gzip-base64-v1',format='namonaki-compressed-save-draft';
-function base64(bytes:Uint8Array):string {const parts:string[]=[];for(let i=0;i<bytes.length;i+=32768)parts.push(String.fromCharCode(...bytes.subarray(i,i+32768)));return btoa(parts.join(''));}
-function unbase64(value:unknown):Uint8Array {
+export function base64(bytes:Uint8Array):string {const parts:string[]=[];for(let i=0;i<bytes.length;i+=32768)parts.push(String.fromCharCode(...bytes.subarray(i,i+32768)));return btoa(parts.join(''));}
+export function unbase64(value:unknown):Uint8Array {
  if(typeof value!=='string'||value.length>generatedDraftMaxBytes||!value.length||value.length%4||!(/^[A-Za-z0-9+/]*={0,2}$/).test(value))throw Error('Invalid compressed base64');
  const binary=atob(value),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));if(base64(bytes)!==value)throw Error('Noncanonical base64');return bytes;
 }
-async function bounded(stream:ReadableStream<Uint8Array>,limit:number):Promise<Uint8Array> {
+export async function bounded(stream:ReadableStream<Uint8Array>,limit:number):Promise<Uint8Array> {
  const reader=stream.getReader(),chunks:Uint8Array[]=[];let size=0;
  try{while(true){const next=await reader.read();if(next.done)break;size+=next.value.byteLength;
    if(size>limit){try{await reader.cancel();}catch{}throw Error('Expanded save exceeds its size limit');}chunks.push(next.value);

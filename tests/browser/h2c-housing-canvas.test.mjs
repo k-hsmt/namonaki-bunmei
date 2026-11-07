@@ -7,6 +7,7 @@ import {createCivilization,step,chooseAutomatically} from '../../dist/story/engi
 import {createHousingCivilization} from '../../dist/story/housing-persistence.js';
 import {housingAt} from '../../dist/story/housing-history.js';
 import {composeScene} from '../../dist/scene/composition.js';
+import {decodeWorldSave} from '../../dist/story/world-storage.js';
 import {snapshotAt} from '../../dist/scene/model.js';
 
 const port=process.env.H2C_TEST_PORT??'5202';
@@ -56,6 +57,7 @@ test('確定住宅の描画は年・地点・巻戻し・再読込で決定的�
  const saved=JSON.stringify(s);
  await page.evaluate(([key,val])=>localStorage.setItem(key,val),[KEY,saved]);
  await page.locator('#load').click();
+ await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
  assert.match(await page.locator('#feedback').textContent(),/保存された歴史を開きました/);
  const current=await image(page);
  await rewind(page,4);
@@ -71,7 +73,8 @@ test('確定住宅の描画は年・地点・巻戻し・再読込で決定的�
  await page.locator('#site-select').selectOption('0');
  assert.equal(await image(page),current);
  await page.locator('#save').click();
- const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
+ await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
+ const stored=(await decodeWorldSave(await page.evaluate(()=>localStorage.getItem('namonaki-story-v5')))).state;
  assert.deepEqual(stored.housing,s.housing);
  assert.deepEqual(stored.observation,s.observation);
  await page.reload();
@@ -88,6 +91,7 @@ test('旧v3の住宅未記録期間は従来のCanvasと同じ。partialをゼ�
  await page.evaluate(([key,val])=>localStorage.setItem(key,val),
   ['namonaki-story-v3',JSON.stringify(old)]);
  await page.locator('#load').click();
+ await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
  assert.match(await page.locator('#feedback').textContent(),/保存された歴史を開きました/);
  const y=old.observation.lastYear;
  const shown=await image(page);
@@ -100,7 +104,8 @@ test('旧v3の住宅未記録期間は従来のCanvasと同じ。partialをゼ�
  },{state:old,y});
  assert.equal(shown,expected,'旧セーブの未記録住宅を表示に加えない');
  await page.locator('#save').click();
- const after=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
+ await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
+ const after=(await decodeWorldSave(await page.evaluate(()=>localStorage.getItem('namonaki-story-v5')))).state;
  assert.equal(after.housing.legacyUntracked,true);
  assert.equal(after.housing.introducedYear,y+1);
  assert.deepEqual(after.housing.events,[]);
