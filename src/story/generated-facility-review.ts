@@ -26,6 +26,8 @@ export interface GeneratedLandReviewExtension {
  additionalOccupancy:(review:GeneratedFacilityReview,state:CivilizationState,site:RecordSite)=>readonly TypedGroundOccupation[];
  afterFacilities:(review:GeneratedFacilityReview,state:CivilizationState)=>void;
 }
+/** A UI batch may stop after its first new record while validating only once. */
+export interface GeneratedAdvanceOptions {readonly stopAtNewRecord?:boolean}
 export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,reservationMode:ReservationReviewMode):GeneratedFacilityReview|{status:'hold';reason:string}{
  const plans={} as Record<RecordSite,ReviewFacilityPlan>;
  for(const site of sites){const result=planFacilitySitesReview(terrain,site);if(result.status==='hold')return result;plans[site]=result;}
@@ -84,10 +86,13 @@ function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReview
  }};
 }
 /** Input remains untouched even if proposal or commit throws. years counts new years, not choices. */
-export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,years:number,choices:'stop'|'automatic'='stop',extension?:GeneratedLandReviewExtension):GeneratedFacilityReview {
+export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,years:number,choices:'stop'|'automatic'='stop',extension?:GeneratedLandReviewExtension,options:GeneratedAdvanceOptions={}):GeneratedFacilityReview {
  if(!Number.isSafeInteger(years)||years<0||years>10000||!['stop','automatic'].includes(choices))throw Error('Invalid generated review advance');
- const next=mutableCopy(input),policy=policyFor(next,extension),target=next.state.year+years;
- while(next.state.year<target){if(next.state.pending){if(choices==='stop')break;chooseAutomatically(next.state,policy);}else step(next.state,policy);}
+ if(options.stopAtNewRecord!==undefined&&typeof options.stopAtNewRecord!=='boolean')throw Error('Invalid generated record boundary');
+ const next=mutableCopy(input),policy=policyFor(next,extension),target=next.state.year+years,historyLength=next.state.history.length;
+ while(next.state.year<target){if(next.state.pending){if(choices==='stop')break;chooseAutomatically(next.state,policy);}else step(next.state,policy);
+  if(options.stopAtNewRecord&&next.state.history.length>historyLength)break;
+ }
  if(years>0&&next.state.pending&&choices==='automatic')chooseAutomatically(next.state,policy);
  return next;
 }
