@@ -6,6 +6,7 @@ import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
 import {practiceNames} from './story/society.js';
 const el=(id:string)=>document.getElementById(id)!;
+const randomSeed=()=>Math.floor(Math.random()*4294967295)+1;
 function verifyWorldCandidate(candidate:WorldSession){for(let i=0;i<3;i++){const s=drawWorldSession(document.createElement('canvas'),candidate,lastObservedYear(candidate.state),i);if(!Number.isFinite(s.population)||s.population<0||s.local&&(!Number.isFinite(s.local.population)||s.local.population<0)||s.objects.some(o=>typeof o.id!=='string'||!['house','hall','bridge','field','ruin','memorial','market','workshop','granary'].includes(o.kind)||![o.x,o.y,o.builtYear].every(Number.isSafeInteger)||o.x<0||o.x>320||o.y<0||o.y>180||o.builtYear<0||o.builtYear>s.year||!['intact','damaged','ruined'].includes(o.condition)))throw Error('Invalid observed world');}}
 function mount(initial:WorldSession){
 const input=el('seed') as HTMLInputElement;
@@ -154,8 +155,8 @@ async function restart(seed:number){
  catch{el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
  finally{setBusy(false);render();}
 }
-el('restart').addEventListener('click',()=>void restart(Number(input.value)||1));
-el('random').addEventListener('click',()=>void restart(Math.floor(Math.random()*4294967295)+1));
+el('restart').addEventListener('click',()=>void restart(Number(input.value)||randomSeed()));
+el('random').addEventListener('click',()=>void restart(randomSeed()));
 function download(json:string){const blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`namonaki-${state.seed}-${state.year}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 el('save').addEventListener('click',async()=>{
  if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を保存しています。';
@@ -199,7 +200,7 @@ async function boot(){
  el('feedback').textContent='文明の記録を準備しています。';
  try{
   const saved=await findWorldSave(key=>localStorage.getItem(key));
-  const world=saved?restoreWorldSession(saved):(await import('./story/new-world.js')).createNewWorld(42);
+  const world=saved?restoreWorldSession(saved):(await import('./story/new-world.js')).createNewWorld(randomSeed());
   startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
  }catch{
   el('feedback').textContent='記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
@@ -212,7 +213,7 @@ async function boot(){
    finally{bootBusy=false;}
   };
   const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewWorld(seed));
-  el('restart').onclick=()=>void fresh(Number((el('seed') as HTMLInputElement).value)||1);el('random').onclick=()=>void fresh(Math.floor(Math.random()*4294967295)+1);
+  el('restart').onclick=()=>void fresh(Number((el('seed') as HTMLInputElement).value)||randomSeed());el('random').onclick=()=>void fresh(randomSeed());
   const file=el('import-file') as HTMLInputElement;el('import').onclick=()=>file.click();file.onchange=()=>{const f=file.files?.[0];if(!f)return;void recover(async()=>{if(f.size>16*1024*1024)throw Error('File too large');return restoreWorldSession(await decodeWorldSave(await f.text()));});file.value='';};
  }finally{bootBusy=false;}
 }
