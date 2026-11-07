@@ -65,7 +65,7 @@ export function bridgeOccupancy(g:ValidatedBridgeGeometry){
 }
 /** A hypothetical intact deck during proposal, or a verified intact saved bridge. */
 export function bridgeCrossing(g:ValidatedBridgeGeometry):WalkableBridgeCrossing {
- return freeze({bridgeId:g.bridgeId,site:'river-bank',deck:g.deck,bankEntrances:[g.bankA,g.bankB],occupiedIds:bridgeOccupiedIds(g.bridgeId)}) as WalkableBridgeCrossing;
+ return freeze({bridgeId:g.bridgeId,site:'river-bank',deck:g.deck,bankEntrances:[g.bankA,g.bankB] as const,occupiedIds:bridgeOccupiedIds(g.bridgeId)}) as WalkableBridgeCrossing;
 }
 export function validateBridgeGeometry(raw:unknown,t:ValidatedTerrainRecord,h:ValidatedRiverReaches):ValidatedBridgeGeometry {
  const object=(v:unknown,keys:readonly string[]):Record<string,unknown>=>{

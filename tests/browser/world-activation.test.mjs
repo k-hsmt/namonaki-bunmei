@@ -39,7 +39,7 @@ test('a corrupt cold-start v5 stops fallback and a valid file recovers without a
  assert.match(await p.locator('#year').textContent(),/2,000/);assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')),'broken-v5');assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v4')),old);
 });
 test('saved organic v2 can opt into cross-river growth without moving the present or changing its saved history',async t=>{
- const oldSession=createNewWorld(42,'terrain-placement-v2'),oldSave=saveWorldSession(oldSession),oldWire=serializeWorldSave(oldSave),p=await browser.newPage();t.after(()=>p.close());
+ const oldSession=createNewWorld(42,'terrain-placement-v2'),oldSave=saveWorldSession(oldSession),oldWire=serializeWorldSave(oldSave),context=await browser.newContext(),p=await context.newPage();t.after(()=>context.close());
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.addInitScript(wire=>localStorage.setItem('namonaki-story-v5',wire),oldWire);await p.goto(origin);await feedback(p,'保存された歴史を開きました');const before=await png(p);
  await p.locator('#improve-growth').click();await feedback(p,'今後の建設');assert.equal(await png(p),before);assert.equal(await p.locator('#improve-growth').isVisible(),false);
