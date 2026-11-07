@@ -51,6 +51,11 @@ function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:Re
 }
 /** Full enumeration mode is retained as an independent check on pruning decisions. */
 export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,mode:'bounded'|'exhaustive'='bounded'){
+ return searchPlacementReview(ctx,req,mode,0);
+}
+type SearchMetrics={enumerated:number;physicalClear:number;accessEvaluations:number;scoreEvaluations:number;distanceFieldBuilds:number;targetedDistanceQueries:number};
+type SearchResult={status:'hold';reason:string;metrics:SearchMetrics}|{status:'review-only';plot:GroundPlot;entrance:RecordPoint;access:readonly RecordPoint[];score:number;metrics:SearchMetrics};
+function searchPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,mode:'bounded'|'exhaustive',anchorIndex:number):SearchResult {
  searchMetrics.requests++;
  const metrics={enumerated:0,physicalClear:0,accessEvaluations:0,scoreEvaluations:0,distanceFieldBuilds:0,targetedDistanceQueries:0};
  const stop=(reason:string)=>({status:'hold' as const,reason,metrics});
@@ -62,7 +67,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  if(req.purpose==='civic'&&!req.neighborEntrances.length)return stop('missing-anchor');
  if(req.growthPattern!==undefined&&req.growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
  const organic=req.growthPattern==='organic-v2'?organicAttraction(ctx,req.purpose,req.objectId,req.nucleus,req.neighborEntrances):null;
- const neighbors=organic?[organic.anchor]:req.neighborEntrances;
+ const neighbors=organic?[organic.anchors[anchorIndex]!]:req.neighborEntrances;
  const r=readOwnedRecordPhysics(ctx.terrain.sites[ctx.site].physics);
  const physical=physicalCandidates(ctx,req,r,mode==='bounded');metrics.enumerated=physical.enumerated;metrics.physicalClear=physical.physicalClear;
  const occupied=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==req.objectId)];
@@ -125,6 +130,13 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   }
   if(!Number.isFinite(score))continue;
   if(!best||score<best.score||score===best.score&&(c.plot.y<best.plot.y||c.plot.y===best.plot.y&&c.plot.x<best.plot.x))best={plot:{...c.plot},entrance:c.entrance,access:review.access,score};
+ }
+ if(!best&&organic&&anchorIndex+1<organic.anchors.length){
+  // A sparse edge anchor may have no room. Try the next confirmed anchor
+  // before concluding that the whole settlement has no safe growth site.
+  const next=searchPlacementReview(ctx,req,mode,anchorIndex+1);
+  for(const key of Object.keys(metrics) as (keyof SearchMetrics)[])next.metrics[key]+=metrics[key];
+  return next;
  }
  return best?{status:'review-only' as const,...best,metrics}:stop('no-safe-plot');
 }

@@ -77,3 +77,14 @@ test('organic branching uses confirmed anchors deterministically and keeps exact
  assert.deepEqual(findPlacementReview(ctx,{...organic,neighborEntrances:[...organic.neighborEntrances].reverse()}).plot,fast.plot);
  assert.throws(()=>findPlacementReview(ctx,{...req,growthPattern:'future'}));
 });
+test('organic growth tries another confirmed anchor when the preferred edge has no space',async()=>{
+ const {organicAttraction}=await import('../dist/terrain/organic-placement-v2.js');
+ const {ctx,req}=fixture(1),r=emptyRecordRaster();for(let y=100;y<136;y++)r.surface.fill(1,y*320,y*320+240);ctx.terrain.sites['river-bank'].physics=encodeRecordPhysics(r);
+ const other={id:'other-house',plot:{x:188,y:102,width:18,depth:7},entrance:[196,109]};ctx.occupancy.push(other);
+ const organic={...req,objectId:'growth-2',growthPattern:'organic-v2',neighborEntrances:ctx.occupancy.map(o=>o.entrance)};
+ const preferred=organicAttraction(ctx,'house',organic.objectId,req.nucleus,organic.neighborEntrances).anchor;
+ ctx.reservations.push({id:'reserved-edge',plot:{x:preferred[0]<100?0:130,y:100,width:110,depth:36}});
+ const fast=findPlacementReview(ctx,organic),slow=findPlacementReview(ctx,organic,'exhaustive');assert.equal(fast.status,'review-only');
+ assert.ok(Math.abs(fast.entrance[0]-preferred[0])>80,'remaining land is beyond the first anchor walking radius');
+ for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key],key);
+});

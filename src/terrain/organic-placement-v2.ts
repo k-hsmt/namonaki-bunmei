@@ -11,7 +11,7 @@ export function organicPlotClear(p:GroundPlot,others:readonly GroundPlot[],purpo
   return dx>=xgap||dy>=ygap;
  });
 }
-export interface OrganicAttraction {readonly anchor:RecordPoint;readonly minimum:number;readonly maximum:number}
+export interface OrganicAttraction {readonly anchor:RecordPoint;readonly anchors:readonly RecordPoint[];readonly minimum:number;readonly maximum:number}
 export function organicAttraction(ctx:GroundReviewContext,purpose:GroundPurpose,id:string,nucleus:RecordPoint,neighbors:readonly RecordPoint[]):OrganicAttraction {
  const ordered=[...neighbors].sort((a,b)=>a[1]-b[1]||a[0]-b[0]);
  const ordinal=Number(id.match(/(\d+)$/)?.[1]??0),branch=(purpose==='housing'||purpose==='house')&&ordered.length>=3&&ordinal%4===0;
@@ -23,7 +23,7 @@ export function organicAttraction(ctx:GroundReviewContext,purpose:GroundPurpose,
   return density(a)*4+outward(a)-density(b)*4-outward(b)||
    terrainHash(['organic-anchor-v2',ctx.terrain.source.seed,ctx.site,id,...a])-terrainHash(['organic-anchor-v2',ctx.terrain.source.seed,ctx.site,id,...b])||a[1]-b[1]||a[0]-b[0];
  });
- return {anchor:ordered[0]??nucleus,minimum:purpose==='field'?12:branch?organicGrowthLimits.branchMin:organicGrowthLimits.localMin,maximum:purpose==='field'?42:branch?organicGrowthLimits.branchMax:organicGrowthLimits.localMax};
+ return {anchor:ordered[0]??nucleus,anchors:ordered.length?ordered:[nucleus],minimum:purpose==='field'?12:branch?organicGrowthLimits.branchMin:organicGrowthLimits.localMin,maximum:purpose==='field'?42:branch?organicGrowthLimits.branchMax:organicGrowthLimits.localMax};
 }
 /** Static repulsion is shared by the exact score and its admissible lower bound. */
 export function organicDensityPenalty(p:GroundPlot,others:readonly GroundPlot[]):number {
