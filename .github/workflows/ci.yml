@@ -184,9 +184,18 @@ jobs:
           AUDIT_HOUSING_SEED: ${{ matrix.seed }}
           AUDIT_HOUSING_MODE: ${{ matrix.reservation }}
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit civic construction with the same seeds, modes and years
+        run: node scripts/audit-generated-housing.mjs
+        env:
+          AUDIT_CIVIC: '1'
+          AUDIT_HOUSING_SEED: ${{ matrix.seed }}
+          AUDIT_HOUSING_MODE: ${{ matrix.reservation }}
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: terrain31-housing-${{ matrix.seed }}-${{ matrix.reservation }}
-          path: artifacts/terrain31-housing/*
+          path: |
+            artifacts/terrain31-housing/*
+            artifacts/terrain31-civic/*
           if-no-files-found: error

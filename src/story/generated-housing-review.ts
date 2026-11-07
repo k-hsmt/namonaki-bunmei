@@ -54,7 +54,7 @@ function nextId(state:CivilizationState,site:RecordSite):{id:string;ordinal:numb
  }
  if(!Number.isSafeInteger(last+1))throw Error('Residential ID space exhausted');return {id:prefixes[site]+String(last+1).padStart(5,'0'),ordinal:last+1};
 }
-const extension:GeneratedLandReviewExtension={additionalOccupancy,afterFacilities(review,state){
+export const generatedHousingExtension:GeneratedLandReviewExtension={additionalOccupancy,afterFacilities(review,state){
  const holds=review.diagnostics.holds as Record<string,number>;
  // All same-year ordinary facilities are already committed before housing.
  for(let i=0;i<sites.length;i++){
@@ -98,8 +98,8 @@ export function createGeneratedHousingReview(terrain:ValidatedTerrainRecord,mode
 }
 function check(input:GeneratedHousingReview){if(input.format!=='generated-housing-review'||input.status!=='review-only')throw Error('Invalid generated housing boundary');}
 export function advanceGeneratedHousingReview(input:GeneratedHousingReview,years:number,choices:'stop'|'automatic'='stop'):GeneratedHousingReview {
- check(input);return {...input,review:advanceGeneratedFacilityReview(input.review,years,choices,extension)};
+ check(input);return {...input,review:advanceGeneratedFacilityReview(input.review,years,choices,generatedHousingExtension)};
 }
 export function chooseGeneratedHousingReview(input:GeneratedHousingReview,index:number):GeneratedHousingReview {
- check(input);return {...input,review:chooseGeneratedFacilityReview(input.review,index,'manual',extension)};
+ check(input);return {...input,review:chooseGeneratedFacilityReview(input.review,index,'manual',generatedHousingExtension)};
 }
