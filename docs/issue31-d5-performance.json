@@ -1,11 +1,18 @@
 {
   "node": "v24.22.1",
   "platform": "linux",
-  "sourceSHA": "27bafae66ffba6a1b0f785ca7dd159fa3b5bf442",
+  "sourceSHA": "777787ecdd677c9a36b6421ca66455225a4927fe",
   "baselineSHA": "4fac200cbf7bcb3f5546b3f97819b52f52dae7ce",
   "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "choices": "automatic",
   "reservation": "field-only",
+  "seeds": [
+    1
+  ],
+  "years": [
+    2000,
+    10000
+  ],
   "warmups": 1,
   "measuredRuns": 5,
   "excludes": [
@@ -31,13 +38,13 @@
       },
       "currentGenerated": {
         "measuredMs": [
-          2528.4712800000007,
-          2242.4771,
-          2385.5436310000005,
-          2562.5402250000006,
-          2313.041890999997
+          1593.814375,
+          1562.6827469999998,
+          1517.176872,
+          1582.3309229999995,
+          1599.102644999999
         ],
-        "medianMs": 2385.5436310000005,
+        "medianMs": 1582.3309229999995,
         "stateSha256": "0c7f85676b3387f10130c14a39d639955e1667a4ff4a1185866946d2b9bc942c",
         "traces": [
           {
@@ -154,12 +161,12 @@
         "stateSha256": "756d4c96901bd04c432350c0a01b2eefcd83636b86bb9d059f5c9cdbe3caca03"
       },
       "absoluteBudgetMs": 5000,
-      "mainRatio": 0.6283849240331386,
-      "legacyRatio": 2.3855436310000004,
+      "mainRatio": 0.41680767600458135,
+      "legacyRatio": 1.5823309229999996,
       "absolutePass": true,
       "mainRatioPass": true,
-      "legacyRatioPass": false,
-      "pass": false
+      "legacyRatioPass": true,
+      "pass": true
     },
     {
       "seed": 1,
@@ -177,13 +184,13 @@
       },
       "currentGenerated": {
         "measuredMs": [
-          9547.816328,
-          8520.955291999999,
-          8152.925670000004,
-          8705.294746,
-          9074.412486000001
+          8726.909345999997,
+          8322.707435999997,
+          7888.111568,
+          7326.656961000001,
+          7272.034297999999
         ],
-        "medianMs": 8705.294746,
+        "medianMs": 7888.111568,
         "stateSha256": "ff1a01a1fb584a7c5ebb5b472df3c48ec8f556dc7f6faa52eadf7d1b29aea5c7",
         "traces": [
           {
@@ -300,8 +307,8 @@
         "stateSha256": "195bf4853e47f5910f8992d752beaf55604cfb25af38596386e0d54131ed20ed"
       },
       "absoluteBudgetMs": 25000,
-      "mainRatio": 0.2732432767947544,
-      "legacyRatio": 0.4229737198474263,
+      "mainRatio": 0.24759339177496567,
+      "legacyRatio": 0.38326834298419915,
       "absolutePass": true,
       "mainRatioPass": true,
       "legacyRatioPass": true,
@@ -309,5 +316,5 @@
     }
   ],
   "reusedBaselineReport": "artifacts/terrain31-performance/report.json",
-  "pass": false
+  "pass": true
 }

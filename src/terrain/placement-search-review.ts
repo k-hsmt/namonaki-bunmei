@@ -5,7 +5,7 @@ import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
 import {readOwnedRecordPhysics,frozenRecordPhysics} from './owned-record-physics.js';
 import {terrainHash,terrainCoordinateHasher} from './terrain-hash-v1.js';
-import {groundContextWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,createGroundAccessReviewer,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
+import {groundContextWindows,groundDistances,groundDistancesFromAny,groundDistancesToGroups,reviewPhysicalPlot,reviewGroundAccess,createGroundAccessReviewer,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;
  readonly nucleus:RecordPoint;readonly neighborEntrances:readonly RecordPoint[];
@@ -50,7 +50,7 @@ function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:Re
 /** Full enumeration mode is retained as an independent check on pruning decisions. */
 export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,mode:'bounded'|'exhaustive'='bounded'){
  searchMetrics.requests++;
- const metrics={enumerated:0,physicalClear:0,accessEvaluations:0,scoreEvaluations:0,distanceFieldBuilds:0};
+ const metrics={enumerated:0,physicalClear:0,accessEvaluations:0,scoreEvaluations:0,distanceFieldBuilds:0,targetedDistanceQueries:0};
  const stop=(reason:string)=>({status:'hold' as const,reason,metrics});
  if(ctx.historyStatus!=='known')return stop('unknown-history');
  if(!Number.isSafeInteger(ctx.year)||ctx.year<0||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year>ctx.confirmedYear)return stop('unconfirmed-year');
@@ -72,16 +72,18 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
    ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];
  };
  const base=distancesFor(baseWindows);
- const rank=(distances:readonly Int32Array[],entry:RecordPoint,penalty:number):number=>{
-  const i=index(entry),core=distances[0]![i];if(core===undefined||core<0)return Infinity;
-  const closest=distances[1]![i],near=closest!==undefined&&closest>=0?closest:Infinity;
+ const rankValues=(core:number|undefined,closest:number|undefined,homes:number|undefined,penalty:number):number=>{
+  if(core===undefined||core<0)return Infinity;
+  const near=closest!==undefined&&closest>=0?closest:Infinity;
   if(req.neighborEntrances.length&&!Number.isFinite(near))return Infinity;
-  const homes=housing.length?distances[2]![i]:0;
   if(homes===undefined||homes<0)return Infinity;
   // For fields the 2/px preference outside 12..64 is monotone together with
   // the 3*Dneighbor term: total derivative is 1,3,5. Lower-bound pruning is safe.
   const fieldNeighborPenalty=req.purpose==='field'&&Number.isFinite(near)?2*(Math.max(0,12-near)+Math.max(0,near-64)):0;
   return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+3*homes+fieldNeighborPenalty+penalty;
+ };
+ const rank=(distances:readonly Int32Array[],entry:RecordPoint,penalty:number)=>{
+  const i=index(entry);return rankValues(distances[0]![i],distances[1]![i],housing.length?distances[2]![i]:0,penalty);
  };
  const candidates:{plot:GroundPlot;entrance:RecordPoint;penalty:number;lower:number}[]=[];
  const hashPrefix=['placement-search-review-v2',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId];
@@ -102,7 +104,12 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   const review=reviewCandidate(req.purpose,req.objectId,c.plot);if(review.status!=='clear')continue;
   metrics.scoreEvaluations++;
   searchMetrics.scoreEvaluations++;
-  const windows=groundContextWindows(r,ctx,[c.plot]),distances=distancesFor(windows),score=rank(distances,c.entrance,c.penalty);
+  const windows=groundContextWindows(r,ctx,[c.plot]);let score:number;
+  if(mode==='exhaustive')score=rank(distancesFor(windows),c.entrance,c.penalty);
+  else {
+   metrics.targetedDistanceQueries++;const distances=groundDistancesToGroups(windows,c.entrance,[[req.nucleus],req.neighborEntrances,housing]);
+   score=rankValues(distances[0],distances[1],housing.length?distances[2]:0,c.penalty);
+  }
   if(!Number.isFinite(score))continue;
   if(!best||score<best.score||score===best.score&&(c.plot.y<best.plot.y||c.plot.y===best.plot.y&&c.plot.x<best.plot.x))best={plot:{...c.plot},entrance:c.entrance,access:review.access,score};
  }

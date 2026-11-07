@@ -36,6 +36,11 @@ When all physical candidates are impossible or occupied, search now returns HOLD
 before constructing any access distance field. The benchmark records actual
 candidate builds/reuse, exclusions, hypothetical checks, graph builds, visited
 vertices, housing replay and bridge/housing HOLD reuse for every measured run.
+Candidate scoring obtains the exact core/neighbor/housing distances in one BFS
+from the candidate entrance. The graph is undirected, so these equal the reverse
+multi-source fields. It stops after reaching each required group or exhausting
+the component; exhaustive mode retains the independent full-field calculation.
+Public spaces reuse their existing entrance field for hall/core distances.
 
 The full-state reference fixture contains all twelve original field-only Q5
 states at year 2000 (source `55cd3c5`) and the original seed 1 storage probe at
@@ -107,24 +112,23 @@ baseline SHA, every measured sample, exact state hashes and diagnostic counters.
 Its `pass` fields are authoritative; the report does not turn an unmet ratio into
 an accepted budget. Further source changes require fresh current measurements.
 
-## Measured result, 2026-11-07
+## Seed 1 measured result, 2026-11-07
 
-Seed 1, Node v24.22.1, automatic choices; measured source `27bafae`, main baseline
+Seed 1, Node v24.22.1, automatic choices; measured source `777787e`, main baseline
 `4fac200`, same runner. All complete state hashes match the original references.
 
 | Years | Main generated median | Improved median | Legacy median | Absolute gate | Legacy ratio gate, denominator floor 1000ms |
 | --- | ---: | ---: | ---: | --- | --- |
-| 2000 | 3796ms | 2386ms | 418ms | pass, <=5000ms | **unmet**, 2.386 > 2 |
-| 10000 | 31859ms | 8705ms | 20581ms | pass, <=25000ms | pass, 0.423 <= 2 |
+| 2000 | 3796ms | 1582ms | 418ms | pass, <=5000ms | pass, 1.582 <= 2 |
+| 10000 | 31859ms | 7888ms | 20581ms | pass, <=25000ms | pass, 0.383 <= 2 |
 
-The improved simulation is approximately 37% faster at 2000 and 73% faster at
-10000 than main's generated mode. The 2000-year original relative gate remains
-unmet by about 386ms after applying its denominator floor. This is not a D5
-performance pass. No threshold was changed. Retaining the ratio and continuing
-graph/cache optimization, or explicitly accepting the absolute budgets with this
-recorded cost, are alternatives for Human after reviewing the complete evidence.
-Other worlds' long-run audits are correctness/IO checks, not substitutes for five
-isolated performance measurements.
+The improved simulation is approximately 58% faster at 2000 and 75% faster at
+10000 than main's generated mode. Both seed 1 gates now pass without changing a
+threshold. The former relative-gate failure at source `27bafae` was resolved by
+the bit-identical prefix optimization. Formal measurements for the other eleven
+worlds at 2000 and three additional worlds at 10000 are in progress. Other worlds'
+long-run audits are correctness/IO checks, not substitutes for five isolated
+performance measurements.
 
 ## Acceptance boundary
 

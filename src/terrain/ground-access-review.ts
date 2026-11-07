@@ -20,7 +20,7 @@ export type GroundHold='unknown-history'|'unconfirmed-year'|'outside-ground'|'wa
 export type GroundReview={readonly status:'hold';readonly reason:GroundHold;readonly conflicts:readonly string[]}
  |{readonly status:'clear';readonly entrance:RecordPoint;readonly access:readonly RecordPoint[];readonly slopeCells:number};
 const W=320,H=180,N=W*H;
-const graphMetrics={walkGraphs:0,parentTraversals:0,distanceFields:0,visitedVertices:0};
+const graphMetrics={walkGraphs:0,parentTraversals:0,distanceFields:0,targetedQueries:0,visitedVertices:0};
 export function generatedGroundGraphMetrics(){return {...graphMetrics};}
 /** Revised Q6 trial values; not an approved or persisted production policy. */
 export const groundReviewLimits=Object.freeze({normalGrade:1,normalRelief:1,flatGrade:0,flatRelief:0,passageWidth:2,candidateStep:2});
@@ -102,6 +102,32 @@ export function groundDistancesFromAny(windows:Uint8Array,roots:readonly RecordP
   j=i+W;if(y<H-2&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
   j=i-1;if(x>0&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
  }graphMetrics.visitedVertices+=tail;return d;
+}
+/** Exact distances from one window to the nearest member of each group.
+ * Walking is undirected, so these equal the reverse multi-source fields at that
+ * window. Stop only after every reachable required group has been found, or
+ * after exhausting the component. Empty/unreachable groups return -1.
+ */
+export function groundDistancesToGroups(windows:Uint8Array,from:RecordPoint,groups:readonly (readonly RecordPoint[])[]):readonly number[] {
+ graphMetrics.targetedQueries++;const result=groups.map(()=>-1);
+ if(!validPoint(from)||!windows[from[1]*W+from[0]])return result;
+ const members=new Map<number,number[]>(),active=new Set<number>();
+ groups.forEach((group,g)=>{for(const p of group){if(!validPoint(p))continue;const i=p[1]*W+p[0];if(!windows[i])continue;
+  const ids=members.get(i)??[];ids.push(g);members.set(i,ids);active.add(g);
+ }});
+ let remaining=active.size;if(!remaining)return result;
+ graphMetrics.distanceFields++;
+ const d=new Int32Array(N);d.fill(-1);const queue=new Int32Array(N),start=from[1]*W+from[0];
+ let head=0,tail=1;queue[0]=start;d[start]=0;
+ while(head<tail){const i=queue[head++]!,x=i%W,y=Math.floor(i/W);
+  const ids=members.get(i);if(ids)for(const g of ids)if(result[g]===-1){result[g]=d[i]!;remaining--;}
+  if(!remaining)break;
+  let j=i-W;if(y>96&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+  j=i+1;if(x<W-2&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+  j=i+W;if(y<H-2&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+  j=i-1;if(x>0&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+ }
+ graphMetrics.visitedVertices+=tail;return result;
 }
 function index(p:RecordPoint):number{return p[1]*W+p[0];}
 

@@ -38,7 +38,7 @@ function nearestHomes(review:GeneratedFacilityReview,space:PublicSpace,year:numb
  const entry=southEntrance(space.footprint),distances=groundDistances(windows,entry);
  const ranked=homes.map(b=>{const p=southEntrance(b.footprint),d=distances[p[1]*320+p[0]];return {b,d:d===undefined||d<0?Infinity:d};})
   .sort((a,b)=>a.d-b.d||(a.b.blockId<b.b.blockId?-1:a.b.blockId>b.b.blockId?1:0));
- return {ctx,windows,entry,distance:ranked[0]?.d??Infinity,nearest:ranked[0]?.b,homes};
+ return {ctx,windows,entry,distances,distance:ranked[0]?.d??Infinity,nearest:ranked[0]?.b,homes};
 }
 function passage(ground:GroundPlot,plot:GroundPlot):GroundPlot|null {
  const left=Math.max(ground.x,plot.x),right=Math.min(ground.x+ground.width,plot.x+plot.width),top=Math.max(ground.y,plot.y),bottom=Math.min(ground.y+ground.depth,plot.y+plot.depth);
@@ -107,7 +107,10 @@ export function proposeGeneratedPublicSpace(review:GeneratedFacilityReview,index
    const space:PublicSpace={id:'public-'+siteId+'-assembly-'+year,siteId,kind:'assembly-ground',footprint,establishedYear:year,anchorBuildingId:anchor.id,foundationRecordId:year+'-'+state.history.length,condition:'used'};
    const ctx=context(review,siteId,year,prefix),gate=reviewGroundAccess(ctx,'public-space',space.id,footprint);if(gate.status!=='clear'||!passageClear(review,space,ground,ctx))continue;
    const near=nearestHomes(review,space,year,prefix);if(near.distance>80)continue;
-   const i=near.entry[1]*320+near.entry[0],hallDistance=groundDistances(near.windows,southEntrance(ground))[i]!,coreDistance=groundDistances(near.windows,review.plans[siteId].nucleus)[i]!;
+   // The already computed entry field gives the same undirected distances as
+   // separate hall/core fields queried at the entry.
+   const hall=southEntrance(ground),core=review.plans[siteId].nucleus;
+   const hallDistance=near.distances[hall[1]*320+hall[0]]!,coreDistance=near.distances[core[1]*320+core[0]]!;
    if(hallDistance<0||coreDistance<0)continue;
    const score=4*coreDistance+3*hallDistance+waterPenalty(review,space)+Math.max(0,footprint.y-150)*2+terrainHash(['public-space-review-v1',state.seed,siteId,space.id,footprint.x,footprint.y])%4;
    const homeSource=state.housing!.events.find(e=>e.kind==='built'&&e.blockId===near.nearest?.blockId)?.causeRecordId;

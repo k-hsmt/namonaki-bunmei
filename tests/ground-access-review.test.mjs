@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {emptyRecordRaster,encodeRecordPhysics,decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {validateTerrainRecord} from '../dist/terrain/terrain-record.js';
-import {reviewGroundAccess,createGroundAccessReviewer,generatedGroundGraphMetrics,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny} from '../dist/terrain/ground-access-review.js';
+import {reviewGroundAccess,createGroundAccessReviewer,generatedGroundGraphMetrics,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny,groundDistancesToGroups} from '../dist/terrain/ground-access-review.js';
 const plot=(x,y,width=18,depth=7)=>({x,y,width,depth});
 function setup(){
  const raster=emptyRecordRaster();raster.surface.fill(1,96*320);
@@ -47,6 +47,21 @@ test('search-owned before graph is reused while every hypothetical plot and entr
  ctx.primaryRoot=[300,100];ctx.occupancy.push({id:'later',plot:plot(44,120),entrance:[52,127]});
  assert.deepEqual(owned('house','new',candidates[1]),actual[1],'transaction must own its occupancy snapshot');
  assert.equal(reviewGroundAccess(ctx,'house','new',candidates[1]).reason,'occupied');
+});
+test('grouped point distances equal independent reverse fields through narrow passages and disconnected land',()=>{
+ for(const open of [false,true]){
+  const r=emptyRecordRaster();for(let y=100;y<136;y++)r.surface.fill(1,y*320,y*320+80);
+  for(let y=100;y<136;y++)if(!open||y<116||y>119)r.surface.fill(2,y*320+40,y*320+44);
+  const windows=groundWalkWindows(r,[]),groups=[[[2,102]],[[10,110],[70,130]],[[65,105],[65,105]],[]];
+  const fields=groups.map(g=>groundDistancesFromAny(windows,g));
+  for(let y=100;y<136;y+=3)for(let x=0;x<80;x+=5){
+   assert.deepEqual(groundDistancesToGroups(windows,[x,y],groups),fields.map(d=>d[y*320+x]),`${open}/${x},${y}`);
+  }
+ }
+ const r=emptyRecordRaster();r.surface.fill(1,96*320);const windows=groundWalkWindows(r,[]),before=generatedGroundGraphMetrics();
+ assert.deepEqual(groundDistancesToGroups(windows,[10,100],[[[12,100]],[[10,102]],[]]),[2,2,-1]);
+ const after=generatedGroundGraphMetrics();assert.equal(after.distanceFields-before.distanceFields,1);
+ assert.ok(after.visitedVertices-before.visitedVertices<100,'nearby score groups must not traverse the entire map');
 });
 test('interior cells, water, unstable bearing, slope and elevation are inspected',()=>{
  for(const [channel,value,reason] of [['surface',2,'water'],['surface',3,'water'],['surface',0,'outside-ground'],['bearing',1,'unstable'],['bearing',2,'unstable'],['grade',2,'steep'],['elevation',3,'steep']]){
