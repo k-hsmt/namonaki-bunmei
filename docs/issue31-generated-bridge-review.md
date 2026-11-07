@@ -52,3 +52,18 @@ claim that the future complete v5 import/export validator is finished.
 Remaining work includes D4 terrain-aware scene composition, full v5 save and UI
 integration, the twelve-world Q5 comparison, production-policy approval, and D5
 mechanical and human scenery acceptance. This stage does not complete #31.
+
+## Local verification result
+
+The full suite passed 257/257 tests. The final geometry normalization change was
+also checked by rerunning all 18 geometry/history tests. Chromium legacy review
+passed all 66 scenes with exact PNG/RGBA equality and the old key preserved.
+
+The bridge audit completed all nine 2,000-year trials and all three 10,000-year
+continuations without failures; direct model, choices, hazard years and past
+observations matched their baselines. In all reservation modes, seed 1 built in
+994 (24-pixel water span), seed 198 built in 555 (30-pixel span), and seed 21
+remained without a safe bridge (474 HOLD decisions). Seed 198's bridge was
+damaged in 901, repaired in 912, and abandoned in 1113. No replacement seed was
+substituted for the braided-river HOLD. These three worlds are a D3 regression
+sample, not the twelve-world Q5 comparison or D5 acceptance.
