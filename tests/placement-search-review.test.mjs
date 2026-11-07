@@ -16,6 +16,20 @@ for(const seed of [1,2,3])test('bounded search selects the same exact minimum as
  assert.ok(fast.metrics.accessEvaluations<slow.metrics.accessEvaluations);
  assert.equal(JSON.stringify(ctx),before);
 });
+for(const seed of [1,2])test('field distance preference preserves exact pruning seed '+seed,()=>{
+ const {ctx,req}=fixture(seed),field={...req,purpose:'field',width:26,depth:14};
+ const fast=findPlacementReview(ctx,field),slow=findPlacementReview(ctx,field,'exhaustive');
+ assert.equal(fast.status,'review-only');assert.equal(slow.status,'review-only');
+ for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key],key);
+});
+test('remote sea does not add an irrigation penalty or attract fields',()=>{
+ const {ctx,req}=fixture(1),field={...req,purpose:'field',width:26,depth:14};
+ const baseline=findPlacementReview(ctx,field),changed=structuredClone(ctx);
+ // Preserve the actual land row; only the otherwise inaccessible background changes to sea.
+ changed.terrain.sites['river-bank'].physics.rows[120]=[[80,1,0,0,0],[120,0,0,0,0],[1,3,0,0,0],[119,0,0,0,0]];
+ const result=findPlacementReview(changed,field);
+ assert.equal(result.status,'review-only');assert.deepEqual(result.plot,baseline.plot);assert.equal(result.score,baseline.score);
+});
 test('HOLD and unsupported semantic purposes do not run a placement search',()=>{
  const {ctx,req}=fixture(1);
  assert.equal(findPlacementReview({...ctx,historyStatus:'partial'},req).reason,'unknown-history');

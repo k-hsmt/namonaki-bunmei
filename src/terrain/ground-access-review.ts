@@ -63,11 +63,17 @@ export function groundReachParents(windows:Uint8Array,root:RecordPoint):Int32Arr
  }return parent;
 }
 export function groundDistances(windows:Uint8Array,root:RecordPoint):Int32Array {
- const parents=groundReachParents(windows,root),d=new Int32Array(N);d.fill(-1);
- for(let i=0;i<N;i++)if(parents[i]===i)d[i]=0;
- for(let i=0;i<N;i++)if(parents[i]!==-1&&d[i]===-1){
-  const stack:number[]=[];let j=i;while(d[j]===-1){stack.push(j);j=parents[j]!;}
-  while(stack.length){const k=stack.pop()!;d[k]=d[parents[k]!]!+1;}
+ return groundDistancesFromAny(windows,[root]);
+}
+/** Nearest confirmed neighbor distance in one traversal, with sorted N/E/S/W starts. */
+export function groundDistancesFromAny(windows:Uint8Array,roots:readonly RecordPoint[]):Int32Array {
+ const d=new Int32Array(N);d.fill(-1);const queue=new Int32Array(N);let head=0,tail=0;
+ const starts=roots.filter(validPoint).map(p=>p[1]*W+p[0]).sort((a,b)=>a-b);
+ for(const i of starts)if(windows[i]&&d[i]===-1){d[i]=0;queue[tail++]=i;}
+ while(head<tail){const i=queue[head++]!,x=i%W,y=Math.floor(i/W);
+  for(const j of [y>96?i-W:-1,x<W-2?i+1:-1,y<H-2?i+W:-1,x>0?i-1:-1]){
+   if(j>=0&&windows[j]&&d[j]===-1){d[j]=d[i]!+1;queue[tail++]=j;}
+  }
  }return d;
 }
 function index(p:RecordPoint):number{return p[1]*W+p[0];}

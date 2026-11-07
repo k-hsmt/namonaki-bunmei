@@ -4,7 +4,7 @@
 import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
 import {terrainHash} from './hill-prototype.js';
-import {groundWalkWindows,groundDistances,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
+import {groundWalkWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;
  readonly nucleus:RecordPoint;readonly neighborEntrances:readonly RecordPoint[];
@@ -19,21 +19,26 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  if(ctx.historyStatus!=='known')return stop('unknown-history');
  if(!Number.isSafeInteger(ctx.year)||ctx.year<0||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year>ctx.confirmedYear)return stop('unconfirmed-year');
  if(!Number.isSafeInteger(req.width)||!Number.isSafeInteger(req.depth)||req.width<2||req.width>320||req.depth<1||req.depth>84)return stop('outside-ground');
- // Field/civic/public-space have additional semantic ranking/anchor rules not implemented here.
- if(!['house','housing','hall','market','workshop','granary'].includes(req.purpose))return stop('unsupported-review-purpose');
+ // Civic/public-space still need their own anchor and social rules.
+ if(!['house','field','housing','hall','market','workshop','granary'].includes(req.purpose))return stop('unsupported-review-purpose');
  const r=decodeRecordPhysics(ctx.terrain.sites[ctx.site].physics),occupied=ctx.occupancy.map(o=>o.plot),baseWindows=groundWalkWindows(r,occupied);
- const sources=[req.nucleus,...req.neighborEntrances],base=sources.map(p=>groundDistances(baseWindows,p));
+ const distancesFor=(windows:Uint8Array)=>[groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances)];
+ const base=distancesFor(baseWindows);
  const water=new Int32Array(N);water.fill(N);const queue:number[]=[];
- for(let i=96*W;i<N;i++)if(r.surface[i]===2||r.surface[i]===3){water[i]=0;queue.push(i);}
+ // Sea proximity must not be interpreted as freshwater irrigation for fields.
+ for(let i=96*W;i<N;i++)if(r.surface[i]===2||req.purpose!=='field'&&r.surface[i]===3){water[i]=0;queue.push(i);}
  for(let head=0;head<queue.length;head++){
   const i=queue[head]!,x=i%W,y=Math.floor(i/W);
   for(const j of [y>96?i-W:-1,x<319?i+1:-1,y<179?i+W:-1,x>0?i-1:-1])if(j>=0&&water[j]!>water[i]!+1){water[j]=water[i]!+1;queue.push(j);}
  }
  const rank=(distances:readonly Int32Array[],entry:RecordPoint,penalty:number):number=>{
   const i=index(entry),core=distances[0]![i];if(core===undefined||core<0)return Infinity;
-  let near=Infinity;for(const d of distances.slice(1))if(d[i]!==undefined&&d[i]!>=0)near=Math.min(near,d[i]!);
+  const closest=distances[1]![i],near=closest!==undefined&&closest>=0?closest:Infinity;
   if(req.neighborEntrances.length&&!Number.isFinite(near))return Infinity;
-  return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+penalty;
+  // For fields the 2/px preference outside 12..64 is monotone together with
+  // the 3*Dneighbor term: total derivative is 1,3,5. Lower-bound pruning is safe.
+  const fieldNeighborPenalty=req.purpose==='field'&&Number.isFinite(near)?2*(Math.max(0,12-near)+Math.max(0,near-64)):0;
+  return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+fieldNeighborPenalty+penalty;
  };
  const candidates:{plot:GroundPlot;entrance:RecordPoint;penalty:number;lower:number}[]=[];
  for(let y=96;y+req.depth<=180;y+=2)for(let x=2;x+req.width<=320;x+=2){
@@ -42,9 +47,10 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   metrics.physicalClear++;
   if([...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==req.objectId)].some(o=>overlap(o.plot,plot)))continue;
   let dwater=N;for(let py=y;py<y+req.depth;py++)for(let px=x;px<x+req.width;px++)dwater=Math.min(dwater,water[py*W+px]!);
-  if(dwater<2)continue;
-  const entrance=southEntrance(plot),penalty=(dwater<8?(8-dwater)*4:0)+physical.slopeCells+Math.max(0,y-150)*2+
-   terrainHash(['placement-search-review-v1',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId,x,y])%4;
+  if(req.purpose!=='field'&&dwater<2)continue;
+  const waterPenalty=req.purpose==='field'?(queue.length?2*(Math.max(0,8-dwater)+Math.max(0,dwater-40)):0):(dwater<8?(8-dwater)*4:0);
+  const entrance=southEntrance(plot),penalty=waterPenalty+physical.slopeCells+Math.max(0,y-150)*2+
+   terrainHash(['placement-search-review-v2',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId,x,y])%4;
   const lower=rank(base,entrance,penalty);if(Number.isFinite(lower))candidates.push({plot,entrance,penalty,lower});
  }
  candidates.sort((a,b)=>a.lower-b.lower||a.plot.y-b.plot.y||a.plot.x-b.plot.x);
@@ -54,7 +60,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   metrics.accessEvaluations++;
   const review=reviewGroundAccess(ctx,req.purpose,req.objectId,c.plot);if(review.status!=='clear')continue;
   metrics.scoreEvaluations++;
-  const windows=groundWalkWindows(r,[...occupied,c.plot]),distances=sources.map(p=>groundDistances(windows,p)),score=rank(distances,c.entrance,c.penalty);
+  const windows=groundWalkWindows(r,[...occupied,c.plot]),distances=distancesFor(windows),score=rank(distances,c.entrance,c.penalty);
   if(!Number.isFinite(score))continue;
   if(!best||score<best.score||score===best.score&&(c.plot.y<best.plot.y||c.plot.y===best.plot.y&&c.plot.x<best.plot.x))best={plot:c.plot,entrance:c.entrance,access:review.access,score};
  }

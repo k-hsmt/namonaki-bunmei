@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {emptyRecordRaster,encodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {validateTerrainRecord} from '../dist/terrain/terrain-record.js';
-import {reviewGroundAccess,southEntrance,reviewPhysicalPlot,groundReviewLimits} from '../dist/terrain/ground-access-review.js';
+import {reviewGroundAccess,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny} from '../dist/terrain/ground-access-review.js';
 const plot=(x,y,width=18,depth=7)=>({x,y,width,depth});
 function setup(){
  const raster=emptyRecordRaster();raster.surface.fill(1,96*320);
@@ -80,4 +80,10 @@ test('validated saved terrain is consumed unchanged across all three districts',
   assert.deepEqual(reviewGroundAccess(ctx,'house','test',plot(20,110)),reviewGroundAccess(ctx,'house','test',plot(20,110)));
  }
  assert.equal(JSON.stringify(terrain),before);
+});
+test('multi-source distances equal independent nearest-source distances cell for cell',()=>{
+ const {raster}=setup();for(let y=100;y<155;y++)raster.surface[y*320+80]=2;
+ const windows=groundWalkWindows(raster,[]),a=groundDistances(windows,[10,110]),b=groundDistances(windows,[130,140]);
+ const together=groundDistancesFromAny(windows,[[130,140],[10,110],[10,110],[-1,100]]);
+ for(let i=0;i<together.length;i++)assert.equal(together[i],a[i]<0?b[i]:b[i]<0?a[i]:Math.min(a[i],b[i]));
 });
