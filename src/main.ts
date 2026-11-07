@@ -1,11 +1,13 @@
-import {advance,choose,chooseAutomatically,lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
-import {createHousingCivilization,findSavedHousing,parseHousingSave,serializeHousingSave,CURRENT_SAVE_KEY} from './story/housing-persistence.js';
+import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
+import {findWorldSave,storeWorldSave,decodeWorldSave} from './story/world-storage.js';
+import {restoreWorldSession,saveWorldSession,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
+import {serializeWorldSave} from './story/world-save.js';
 import type {RecordEntry} from './story/engine.js';
-import {snapshotAt} from './scene/model.js';
 import {siteAt} from './story/settlement-history.js';
 import {practiceNames} from './story/society.js';
-import {drawScene} from './scene/draw.js';
 const el=(id:string)=>document.getElementById(id)!;
+function verifyWorldCandidate(candidate:WorldSession){for(let i=0;i<3;i++){const s=drawWorldSession(document.createElement('canvas'),candidate,lastObservedYear(candidate.state),i);if(!Number.isFinite(s.population)||s.population<0||s.local&&(!Number.isFinite(s.local.population)||s.local.population<0)||s.objects.some(o=>typeof o.id!=='string'||!['house','hall','bridge','field','ruin','memorial','market','workshop','granary'].includes(o.kind)||![o.x,o.y,o.builtYear].every(Number.isSafeInteger)||o.x<0||o.x>320||o.y<0||o.y>180||o.builtYear<0||o.builtYear>s.year||!['intact','damaged','ruined'].includes(o.condition)))throw Error('Invalid observed world');}}
+function mount(initial:WorldSession){
 const input=el('seed') as HTMLInputElement;
 const scrubber=el('rewind-year') as HTMLInputElement;
 const siteSelect=el('site-select') as HTMLSelectElement;
@@ -16,7 +18,9 @@ const autoChoiceInput=el('auto-choice') as HTMLInputElement;
 const autoDelayInput=el('auto-delay') as HTMLSelectElement;
 const autoStatus=el('auto-choice-status');
 const speedDelays:Record<string,number>={slow:2100,normal:850,fast:250,rapid:75};
-let state=createHousingCivilization(42);
+let world=initial;
+let state=world.state;
+let busy=false;
 let active:RecordEntry=state.history[0]!;
 let timer:ReturnType<typeof setInterval>|null=null;
 let expanded=false;
@@ -25,9 +29,9 @@ let choiceDeadline=0;
 let choiceId:string|null=null;
 function clearChoiceTimer(){if(choiceTimeout!==null){clearTimeout(choiceTimeout);choiceTimeout=null;}choiceId=null;choiceDeadline=0;autoStatus.textContent='';}
 function resolvePending(index:number|'random'){
- if(!state.pending)return;
+ if(busy||!state.pending)return;
  clearChoiceTimer();
- if(index==='random')chooseAutomatically(state);else choose(state,index);
+ world=chooseWorldSession(world,index);state=world.state;
  viewedYear=null;render();
 }
 function scheduleChoice(){
@@ -45,7 +49,6 @@ function scheduleChoice(){
 }
 
 let viewedYear:number|null=null;
-const STORAGE=CURRENT_SAVE_KEY;
 function stop(){clearChoiceTimer();if(timer!==null){clearInterval(timer);timer=null;}el('play').textContent='自動で見守る ▷';}
 function start(){if(timer!==null)clearInterval(timer);timer=setInterval(forward,speedDelays[speedInput.value]??850);el('play').textContent='自動進行を停止 Ⅱ';scheduleChoice();}
 function chapter(entries:RecordEntry[]){
@@ -72,7 +75,7 @@ function render(){
  const awaitingChoice=!viewingPast&&Boolean(state.pending);
  const historicalStats=viewingPast||awaitingChoice||estimating;
  const siteIndex=Number(siteSelect.value);
- const scene=snapshotAt(state,y,siteIndex);
+ const scene=drawWorldSession(canvas,world,y,siteIndex);
  const site=siteAt(state.observation?.sites,siteIndex,y);
  el('scene-place').hidden=!site;
  if(site&&scene.local){
@@ -83,7 +86,7 @@ function render(){
  }
  // H2-C: 同じ観測年・地点の確定住宅履歴だけを描画へ投影する。
  // unknown / partial は建設履歴を推測で補完しない（H1のhousingAtに委譲）。
- drawScene(canvas,scene,state.seed,state.housing);
+
  el('scene-year').textContent=`世界暦 ${format(y)}年${!scene.local?' · 推定情景':''}`;
  el('scene-phase').textContent=scene.phase;
  el('scene-atmosphere').textContent=scene.atmosphere;
@@ -111,8 +114,8 @@ function render(){
   }
  }
  slot.hidden=viewingPast||!state.pending;
- el('step').toggleAttribute('disabled',Boolean(state.pending)&&!viewingPast);
- el('play').toggleAttribute('disabled',false);
+ el('step').toggleAttribute('disabled',busy||Boolean(state.pending)&&!viewingPast);
+ el('play').toggleAttribute('disabled',busy);
  el('step').innerHTML=viewingPast?'現在に戻る <span>→</span>':'時を進める <span>→</span>';
  if(state.pending){el('question').textContent=state.pending.question;el('context').textContent=state.pending.context;el('options').replaceChildren();state.pending.options.forEach((o,i)=>{const b=document.createElement('button');b.className='option';const strong=document.createElement('strong');strong.textContent=o.label;const small=document.createElement('span');small.textContent=o.description;b.append(strong,small);b.onclick=()=>resolvePending(i);el('options').append(b);});}
  const memory=ensureMemory(state);
@@ -133,45 +136,84 @@ function render(){
  for(const e of [...records].reverse()){const li=document.createElement('li');li.tabIndex=0;li.classList.toggle('active',viewingPast&&active.id===e.id);const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  ${e.tag}`;li.append(time,document.createTextNode(e.title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
  el('toggle-all').textContent=expanded?'最近の5件だけ見る −':`過去の記録をすべて見る ＋（${confirmedRecords.length}件）`;
 }
-function forward(){if(viewedYear!==null){viewedYear=null;render();return;}if(state.pending){render();scheduleChoice();return;}const start=state.history.length;let passes=0;while(passes<36&&!state.pending){advance(state,1);passes++;if(state.history.length>start)break;}render();scheduleChoice();}
+function forward(){if(busy)return;if(viewedYear!==null){viewedYear=null;render();return;}if(state.pending){render();scheduleChoice();return;}world=advanceWorldSession(world);state=world.state;render();scheduleChoice();}
 siteSelect.addEventListener('change',render);
 el('step').addEventListener('click',forward);
 speedInput.addEventListener('change',()=>{if(timer!==null)start();});
 autoChoiceInput.addEventListener('change',()=>{if(autoChoiceInput.checked)scheduleChoice();else clearChoiceTimer();});
 autoDelayInput.addEventListener('change',()=>{clearChoiceTimer();scheduleChoice();});
-el('play').addEventListener('click',()=>{if(viewedYear!==null){viewedYear=null;render();return;}if(timer!==null){stop();return;}start();});
+el('play').addEventListener('click',()=>{if(busy)return;if(viewedYear!==null){viewedYear=null;render();return;}if(timer!==null){stop();return;}start();});
 el('return-now').addEventListener('click',()=>{viewedYear=null;render();});
 scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===state.year?null:y;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
-function restart(seed:number){stop();state=createHousingCivilization(seed);viewedYear=null;expanded=false;input.value=String(seed);render();}
-el('restart').addEventListener('click',()=>restart(Number(input.value)||1));
-el('random').addEventListener('click',()=>restart(Math.floor(Math.random()*4294967295)+1));
-el('save').addEventListener('click',()=>{
- try{
-  // 先に候補全体を検証する。失敗した場合、既存の保存値を変更しない。
-  const serialized=serializeHousingSave(state);
-  localStorage.setItem(STORAGE,serialized);
-  el('feedback').textContent='この文明の歴史をブラウザに保存しました。';
- }catch{
-  el('feedback').textContent='保存できませんでした。ブラウザの設定をご確認ください。';
- }
+function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play'])(el(id) as HTMLButtonElement).disabled=value;}
+function adopt(candidate:WorldSession){verifyWorldCandidate(candidate);world=candidate;state=world.state;viewedYear=null;expanded=false;input.value=String(state.seed);render();}
+async function restart(seed:number){
+ if(busy)return;stop();setBusy(true);el('feedback').textContent='新しい土地を探しています。';
+ try{const {createNewWorld}=await import('./story/new-world.js');const candidate=createNewWorld(seed);adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
+ catch{el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
+ finally{setBusy(false);render();}
+}
+el('restart').addEventListener('click',()=>void restart(Number(input.value)||1));
+el('random').addEventListener('click',()=>void restart(Math.floor(Math.random()*4294967295)+1));
+function download(json:string){const blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`namonaki-${state.seed}-${state.year}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+el('save').addEventListener('click',async()=>{
+ if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を保存しています。';
+ try{const result=await storeWorldSave(localStorage,saveWorldSession(world));
+  if(result.status==='saved')el('feedback').textContent='この文明の歴史をブラウザに保存しました。';
+  else{el('feedback').textContent='ブラウザに保存できませんでした。現在の歴史と以前の保存は保持しています。JSONを書き出して保存できます。';}
+ }catch{el('feedback').textContent='保存できませんでした。現在の歴史と以前の保存はそのままです。';}
+ finally{setBusy(false);render();}
 });
-el('load').addEventListener('click',()=>{
- try{
-  const saved=findSavedHousing(key=>localStorage.getItem(key));
-  if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
-  // 候補だけを移行・検証し、成功するまで表示中の文明を変更しない。
-  const loaded=parseHousingSave(saved.raw);
-  ensureMemory(loaded);
-  snapshotAt(loaded,lastObservedYear(loaded));
-  stop();
-  state=loaded;
-  viewedYear=null;input.value=String(state.seed);expanded=false;
-  render();
-  el('feedback').textContent='保存された歴史を開きました。';
- }catch{
-  // 現行キーの破損を旧キーへ黙ってフォールバックしない。
-  el('feedback').textContent='この保存データを読み込めませんでした。';
- }
+el('load').addEventListener('click',async()=>{
+ if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を開いています。';
+ try{const saved=await findWorldSave(key=>localStorage.getItem(key));if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
+  const candidate=restoreWorldSession(saved);adopt(candidate);el('feedback').textContent='保存された歴史を開きました。';
+ }catch{el('feedback').textContent='この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
+ finally{setBusy(false);render();}
 });
-render();
+el('export').addEventListener('click',()=>{
+ if(busy)return;stop();setBusy(true);try{download(serializeWorldSave(saveWorldSession(world)));el('feedback').textContent='歴史のJSONを書き出しました。';}
+ catch{el('feedback').textContent='歴史を書き出せませんでした。現在の歴史はそのままです。';}finally{setBusy(false);render();}
+});
+const file=el('import-file') as HTMLInputElement;
+el('import').addEventListener('click',()=>{if(!busy)file.click();});
+file.addEventListener('change',async()=>{
+ const selected=file.files?.[0];if(!selected||busy)return;stop();setBusy(true);
+ try{if(selected.size>16*1024*1024)throw Error('File too large');const candidate=restoreWorldSession(await decodeWorldSave(await selected.text()));adopt(candidate);el('feedback').textContent='記録ファイルを開きました。';}
+ catch{el('feedback').textContent='この記録ファイルを開けませんでした。現在の歴史と保存値はそのままです。';}
+ finally{file.value='';setBusy(false);render();}
+});
+input.value=String(state.seed);render();
+}
+const bootControls=['step','play','save','load','export','import','restart','random'];
+let bootBusy=false;
+function startWorld(world:WorldSession){
+ verifyWorldCandidate(world);
+ for(const id of bootControls){(el(id) as HTMLButtonElement).disabled=false;el(id).onclick=null;}
+ (el('import-file') as HTMLInputElement).onchange=null;mount(world);
+}
+async function boot(){
+ if(bootBusy)return;bootBusy=true;
+ for(const id of bootControls)(el(id) as HTMLButtonElement).disabled=true;
+ el('feedback').textContent='文明の記録を準備しています。';
+ try{
+  const saved=await findWorldSave(key=>localStorage.getItem(key));
+  const world=saved?restoreWorldSession(saved):(await import('./story/new-world.js')).createNewWorld(42);
+  startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
+ }catch{
+  el('feedback').textContent='記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
+  const recovery=['load','restart','random','import'];for(const id of recovery)(el(id) as HTMLButtonElement).disabled=false;
+  el('load').onclick=()=>void boot();
+  const recover=async(make:()=>Promise<WorldSession>)=>{
+   if(bootBusy)return;bootBusy=true;for(const id of recovery)(el(id) as HTMLButtonElement).disabled=true;
+   try{startWorld(await make());el('feedback').textContent='文明の記録を開きました。';}
+   catch{el('feedback').textContent='文明を開けませんでした。保存値は保持しています。';for(const id of recovery)(el(id) as HTMLButtonElement).disabled=false;}
+   finally{bootBusy=false;}
+  };
+  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewWorld(seed));
+  el('restart').onclick=()=>void fresh(Number((el('seed') as HTMLInputElement).value)||1);el('random').onclick=()=>void fresh(Math.floor(Math.random()*4294967295)+1);
+  const file=el('import-file') as HTMLInputElement;el('import').onclick=()=>file.click();file.onchange=()=>{const f=file.files?.[0];if(!f)return;void recover(async()=>{if(f.size>16*1024*1024)throw Error('File too large');return restoreWorldSession(await decodeWorldSave(await f.text()));});file.value='';};
+ }finally{bootBusy=false;}
+}
+await boot();

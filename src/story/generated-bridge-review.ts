@@ -3,7 +3,7 @@ import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import {validateRiverReaches,type ValidatedRiverReaches} from '../terrain/river-reaches-review.js';
 import type {ReservationReviewMode} from '../terrain/facility-plan-review.js';
 import {createGeneratedPublicSpaceReview,generatedPublicSpaceExtension,validateGeneratedPublicSpaceLedger} from './generated-public-space-review.js';
-import {advanceGeneratedFacilityReview,chooseGeneratedFacilityReview,type GeneratedFacilityReview,type GeneratedAdvanceOptions} from './generated-facility-review.js';
+import {advanceGeneratedFacilityReview,chooseGeneratedFacilityReview,chooseAutomaticallyGeneratedFacilityReview,type GeneratedFacilityReview,type GeneratedAdvanceOptions} from './generated-facility-review.js';
 import {validateGeneratedBridgeLedger} from './generated-bridge-history-review.js';
 import {lastObservedYear} from './engine.js';
 export interface GeneratedBridgeReview {readonly format:'generated-bridge-review';readonly status:'review-only';readonly review:GeneratedFacilityReview}
@@ -20,4 +20,7 @@ export function advanceGeneratedBridgeReview(input:GeneratedBridgeReview,years:n
 }
 export function chooseGeneratedBridgeReview(input:GeneratedBridgeReview,index:number):GeneratedBridgeReview {
  check(input);const result={...input,review:chooseGeneratedFacilityReview(input.review,index,'manual',generatedPublicSpaceExtension)};check(result);return result;
+}
+export function chooseAutomaticallyGeneratedBridgeReview(input:GeneratedBridgeReview):GeneratedBridgeReview {
+ check(input);const result={...input,review:chooseAutomaticallyGeneratedFacilityReview(input.review,generatedPublicSpaceExtension)};check(result);return result;
 }

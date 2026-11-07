@@ -40,14 +40,17 @@ try{
  let feedback=null;
  if(storage.stored){
   await page.locator('#load').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
   feedback=await page.locator('#feedback').textContent();
   assert.match(feedback,/保存された歴史を開きました/);
   const after=await page.evaluate(key=>localStorage.getItem(key),storageKey);
   assert.equal(after,json,'the original save value must remain unchanged after loading');
   await page.locator('#save').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
   assert.match(await page.locator('#feedback').textContent(),/ブラウザに保存しました/);
   await page.reload();
   await page.locator('#load').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
   assert.match(await page.locator('#feedback').textContent(),/保存された歴史を開きました/);
  }
  console.log(JSON.stringify({

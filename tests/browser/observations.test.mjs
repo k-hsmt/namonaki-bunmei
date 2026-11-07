@@ -40,6 +40,7 @@ async function openSave(t, key, state) {
   await page.goto(origin);
   await page.evaluate(({ key, state }) => localStorage.setItem(key, JSON.stringify(state)), { key, state });
   await page.locator('#load').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
   assert.match(await page.locator('#feedback').textContent(), /保存された歴史を開きました/);
   return page;
 }
@@ -88,8 +89,10 @@ test('pending choice shows confirmed population through save, reload and resolut
   assert.equal(await canvas.evaluate(element => element.toDataURL()), image);
 
   await page.locator('#save').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
   await page.reload();
   await page.locator('#load').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
   await assertObservation(page, confirmedYear, state.population, pendingYear);
   assert.equal(await canvas.evaluate(element => element.toDataURL()), image);
 
@@ -108,9 +111,11 @@ test('migrated pending choice preserves the estimated scene at the migration bou
   const canvas = page.locator('#scene');
   const image = await canvas.evaluate(element => element.toDataURL());
   await page.locator('#save').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
   assert.equal(await page.evaluate(key => localStorage.getItem(key), legacyKey), JSON.stringify(state));
   await page.reload();
   await page.locator('#load').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
   await assertObservation(page, state.year, state.population, state.year);
   await page.locator('#options button').first().click();
   await assertObservation(page, state.year, state.population);
@@ -158,8 +163,10 @@ test('the same location and year show identical building pixels after switching 
   const hills = await picture();
   assert.notEqual(hills, river);
   await page.locator('#save').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
   await page.reload();
   await page.locator('#load').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
   await rewindTo500();
   await chooser.selectOption('1');
   assert.equal(await picture(), hills);
@@ -175,9 +182,11 @@ test('Chromium can save and reload a 10,000-year history', async t => {
   const page = await openSave(t,saveKey,state);
   await page.evaluate(key=>localStorage.removeItem(key),saveKey);
   await page.locator('#save').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
   assert.match(await page.locator('#feedback').textContent(), /ブラウザに保存しました/);
   await page.reload();
   await page.locator('#load').click();
+  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
   assert.match(await page.locator('#feedback').textContent(), /保存された歴史を開きました/);
   await assertObservation(page,10000,state.population);
   const rewind=page.locator('#rewind-year');
