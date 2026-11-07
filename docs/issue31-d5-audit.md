@@ -68,6 +68,7 @@ The separate long-run audit includes IO and must not run during measurement:
 ```sh
 PLAYWRIGHT_BROWSERS_PATH=/tmp/namonaki-browsers node scripts/audit-generated-longrun.mjs
 PLAYWRIGHT_BROWSERS_PATH=/tmp/namonaki-browsers node scripts/review-terrain-families.mjs
+node scripts/audit-generated-core-longrun.mjs
 ```
 
 All twelve Q5 worlds advance naturally to 10000. The audit checks original year
@@ -82,6 +83,15 @@ The separate family catalog contains all R10/H8/C8/M6, including all three
 mountain cameras. Prototype overrides are labeled and have no artificial
 construction history. The natural long-run pages include a separate canonical
 physics/plot/root overlay, with the same saved mirroring as the rendered scene.
+The final core audit checks the preserved fixed-terrain model, automatic choices
+and disaster dates at year 10000 for seeds 1/7/21/198. It permits the documented
+indirect land-history differences, not changes to the direct model.
+
+CI's `generated-world-acceptance` job publishes the `terrain31-d5-acceptance`
+artifact for 14 days. Download and extract it, then open the two `index.html`
+files in `terrain31-families` and `terrain31-d5`. The archive includes production
+saves and JSON evidence; raw diagnostic review objects remain local. This job
+does not claim the isolated performance gate or Human scenery acceptance.
 
 Outputs are under `artifacts/terrain31-performance`, `artifacts/terrain31-d5`
 and `artifacts/terrain31-families`;
