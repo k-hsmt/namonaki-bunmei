@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {chromium} from 'playwright';
+import {createNewWorld} from '../../dist/story/new-world.js';
+import {saveWorldSession} from '../../dist/story/world-session.js';
 import {decodeWorldSave} from '../../dist/story/world-storage.js';
 import {createCivilization,step,chooseAutomatically} from '../../dist/story/engine.js';
 const port=process.env.H2B_TEST_PORT??'5198',origin='http://127.0.0.1:'+port;
@@ -26,6 +28,7 @@ test('新規ゲームは生成v5とknownの住宅記録を保存し、再読込�
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
  const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));
  assert.equal(saved.version,5);assert.equal(saved.initialTerrain.mode,'generated');
+ assert.deepEqual(saved,saveWorldSession(createNewWorld(42)),'browser and Node produce the same complete seeded world');
  assert.deepEqual(saved.state.housing,{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
  const pixels=await page.locator('#scene').evaluate(e=>e.toDataURL());
  await page.reload();
