@@ -1,0 +1,39 @@
+{
+  "descriptor": {
+    "format": "river-reaches-review",
+    "schemaVersion": 1,
+    "status": "review-only",
+    "ruleId": "river-reaches-v1",
+    "source": {
+      "revision": "fixture-v1",
+      "seed": 42
+    },
+    "siteId": "river-bank",
+    "reaches": [
+      {
+        "parentShapeId": "river-bank-water-0",
+        "streamId": "main",
+        "fromY": 95,
+        "toY": 180
+      }
+    ],
+    "junctions": [
+      {
+        "y": 125,
+        "kind": "split",
+        "upstream": 1,
+        "downstream": 2
+      },
+      {
+        "y": 165,
+        "kind": "merge",
+        "upstream": 2,
+        "downstream": 1
+      }
+    ]
+  },
+  "streamIds": [
+    "main"
+  ],
+  "ownerBytesSha256": "8c92d3f3574eb931fda9fae8693ad649e9a1b700d78e1a01253b0a44c471fa51"
+}
