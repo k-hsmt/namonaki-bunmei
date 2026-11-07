@@ -72,7 +72,7 @@ for(const seed of seeds){
    const unbuilt=outer.review.plans[site].slots.filter(slot=>!outer.review.placements.some(p=>p.objectId===slot.id)&&!outer.review.bridgeReview.bridges.some(b=>b.geometry.bridgeId===slot.id)).map(slot=>({id:slot.id,kind:slot.kind}));
    return {site,variants:outer.review.terrain.sites[site].variants,phases,years,unbuilt};
   });
-  const row={seed,year:10000,stateSha256:stateHash,saves,districts,holdPeriods:periods,
+  const row={seed,year:10000,seaSide:outer.review.terrain.geography.seaSide,stateSha256:stateHash,saves,districts,holdPeriods:periods,
    auditCounters:Object.fromEntries(Object.entries(metrics()).map(([key,value])=>[key,value-before[key]])),
    maximumHookInterval:timings.reduce((a,b)=>a.ms>b.ms?a:b,{year:0,ms:0}),pastObservationChecks:early.size};
   await writeFile(`${out}/seed${seed}_review.json`,JSON.stringify(outer));report.cases.push(row);
@@ -80,14 +80,18 @@ for(const seed of seeds){
  }catch(error){report.failures.push({seed,error:String(error),stack:error.stack});console.log(JSON.stringify({seed,error:String(error)}));}
  await writeFile(out+'/report.json',JSON.stringify(report,null,2)+'\n');
 }
+report.coverage=Object.fromEntries(['river','hills','coast','mountains'].map(kind=>[kind,[...new Set(report.cases.flatMap(c=>c.districts.map(d=>d.variants[kind])).filter(Boolean))].sort()]));
+report.seaSides=[...new Set(report.cases.map(c=>c.seaSide))].sort();
 assert.equal(report.failures.length,0,'longrun failures; see report.json');
+for(const [kind,n] of Object.entries({river:10,hills:8,coast:8,mountains:6}))assert.equal(report.coverage[kind].length,n,kind+' family missing from natural worlds');
+assert.deepEqual(report.seaSides,['east','west']);
 const legacy=createHousingCivilization(42);while(legacy.year<10000){step(legacy);if(legacy.pending)chooseAutomatically(legacy);}
 const legacyJson=JSON.stringify(legacy);report.legacyCoexistence={seed:42,year:10000,bytes:Buffer.byteLength(legacyJson),stateSha256:hash(legacy)};
 const server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:'5311'},stdio:['ignore','pipe','inherit']});let browser;
 try{
  await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});
- browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});const page=await browser.newPage(),blocked=[];
- await page.route('**/*',route=>{
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});const context=await browser.newContext(),page=await context.newPage(),blocked=[];
+ await context.route('**/*',route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.includes('prototype')||path.includes('/capture-terrain')){blocked.push(path);return route.abort();}
   if(path==='/d5-review')return route.fulfill({contentType:'text/html',body:'<!doctype html><title>D5 natural scenery</title>'});return route.continue();
@@ -95,7 +99,7 @@ try{
  await page.evaluate(json=>localStorage.setItem('namonaki-story-v4',json),legacyJson);
  for(const row of report.cases){
   const json=await readFile(`${out}/seed${row.seed}_year10000_save.json`,'utf8');
-  const images=await page.evaluate(async ({json,districts,expectedHash})=>{
+  const render=async ({json,districts,expectedHash})=>{
    const {decodeWorldSave,storeWorldSave,findWorldSave}=await import('/story/world-storage.js');
    const {WORLD_SAVE_KEY,restoreGeneratedWorld}=await import('/story/world-save.js');
    const {observeGeneratedSceneReview}=await import('/scene/generated-scene-review.js');
@@ -125,9 +129,13 @@ try{
     frames.push({index,year,raw,large:enlarged.toDataURL(),overlay:overlay.toDataURL()});
    }
    if(await digest(outer.review.state)!==expectedHash)throw Error('Rendering mutated state');localStorage.removeItem(WORLD_SAVE_KEY);return frames;
-  },{json,districts:row.districts,expectedHash:row.stateSha256});
+  };
+  const args={json,districts:row.districts,expectedHash:row.stateSha256},images=await page.evaluate(render,args);
+  const second=await context.newPage();await second.goto('http://127.0.0.1:5311/d5-review');
+  const copies=await second.evaluate(render,args);await second.close();
+  assert.deepEqual(copies,images,'separate-tab production reopening changed PNGs');
   for(const im of images)for(const kind of ['raw','large','overlay'])await writeFile(`${out}/seed${row.seed}_${sites[im.index]}_year${im.year}_${kind}.png`,Buffer.from(im[kind].split(',')[1],'base64'));
-  row.browserStorageRoundtrip=true;row.repeatPngChecks=images.length;
+  row.browserStorageRoundtrip=true;row.repeatPngChecks=images.length;row.separateTabPngChecks=images.length;
   console.log(JSON.stringify({seed:row.seed,status:'browser-storage/scenery-checked',frames:images.length}));
  }
  assert.deepEqual(blocked,[]);report.generatorImports=blocked;

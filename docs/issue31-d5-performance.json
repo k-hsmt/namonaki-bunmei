@@ -1,7 +1,7 @@
 {
   "node": "v24.22.1",
   "platform": "linux",
-  "sourceSHA": "b4839d07e4eb5df554129033ff9692d5c9101c92",
+  "sourceSHA": "27bafae66ffba6a1b0f785ca7dd159fa3b5bf442",
   "baselineSHA": "4fac200cbf7bcb3f5546b3f97819b52f52dae7ce",
   "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "choices": "automatic",
@@ -31,20 +31,20 @@
       },
       "currentGenerated": {
         "measuredMs": [
-          2675.2422540000007,
-          2566.0978480000012,
-          2482.6033319999988,
-          2441.2101440000006,
-          2375.4727359999997
+          2528.4712800000007,
+          2242.4771,
+          2385.5436310000005,
+          2562.5402250000006,
+          2313.041890999997
         ],
-        "medianMs": 2482.6033319999988,
+        "medianMs": 2385.5436310000005,
         "stateSha256": "0c7f85676b3387f10130c14a39d639955e1667a4ff4a1185866946d2b9bc942c",
         "traces": [
           {
-            "walkGraphs": 2092,
-            "parentTraversals": 1530,
+            "walkGraphs": 1413,
+            "parentTraversals": 851,
             "distanceFields": 1076,
-            "visitedVertices": 56637427,
+            "visitedVertices": 41295402,
             "requests": 69,
             "physicalBuilds": 17,
             "physicalCacheHits": 52,
@@ -61,10 +61,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 2092,
-            "parentTraversals": 1530,
+            "walkGraphs": 1413,
+            "parentTraversals": 851,
             "distanceFields": 1076,
-            "visitedVertices": 56637427,
+            "visitedVertices": 41295402,
             "requests": 69,
             "physicalBuilds": 17,
             "physicalCacheHits": 52,
@@ -81,10 +81,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 2092,
-            "parentTraversals": 1530,
+            "walkGraphs": 1413,
+            "parentTraversals": 851,
             "distanceFields": 1076,
-            "visitedVertices": 56637427,
+            "visitedVertices": 41295402,
             "requests": 69,
             "physicalBuilds": 17,
             "physicalCacheHits": 52,
@@ -101,10 +101,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 2092,
-            "parentTraversals": 1530,
+            "walkGraphs": 1413,
+            "parentTraversals": 851,
             "distanceFields": 1076,
-            "visitedVertices": 56637427,
+            "visitedVertices": 41295402,
             "requests": 69,
             "physicalBuilds": 17,
             "physicalCacheHits": 52,
@@ -121,10 +121,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 2092,
-            "parentTraversals": 1530,
+            "walkGraphs": 1413,
+            "parentTraversals": 851,
             "distanceFields": 1076,
-            "visitedVertices": 56637427,
+            "visitedVertices": 41295402,
             "requests": 69,
             "physicalBuilds": 17,
             "physicalCacheHits": 52,
@@ -154,8 +154,8 @@
         "stateSha256": "756d4c96901bd04c432350c0a01b2eefcd83636b86bb9d059f5c9cdbe3caca03"
       },
       "absoluteBudgetMs": 5000,
-      "mainRatio": 0.6539517810157527,
-      "legacyRatio": 2.4826033319999987,
+      "mainRatio": 0.6283849240331386,
+      "legacyRatio": 2.3855436310000004,
       "absolutePass": true,
       "mainRatioPass": true,
       "legacyRatioPass": false,
@@ -177,20 +177,20 @@
       },
       "currentGenerated": {
         "measuredMs": [
-          10220.449827000004,
-          9500.117439000001,
-          8886.404866000004,
-          9156.03792100001,
-          8560.800707000002
+          9547.816328,
+          8520.955291999999,
+          8152.925670000004,
+          8705.294746,
+          9074.412486000001
         ],
-        "medianMs": 9156.03792100001,
+        "medianMs": 8705.294746,
         "stateSha256": "ff1a01a1fb584a7c5ebb5b472df3c48ec8f556dc7f6faa52eadf7d1b29aea5c7",
         "traces": [
           {
-            "walkGraphs": 4140,
-            "parentTraversals": 3132,
+            "walkGraphs": 2760,
+            "parentTraversals": 1752,
             "distanceFields": 1968,
-            "visitedVertices": 87503315,
+            "visitedVertices": 63744503,
             "requests": 177,
             "physicalBuilds": 18,
             "physicalCacheHits": 159,
@@ -207,10 +207,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 4140,
-            "parentTraversals": 3132,
+            "walkGraphs": 2760,
+            "parentTraversals": 1752,
             "distanceFields": 1968,
-            "visitedVertices": 87503315,
+            "visitedVertices": 63744503,
             "requests": 177,
             "physicalBuilds": 18,
             "physicalCacheHits": 159,
@@ -227,10 +227,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 4140,
-            "parentTraversals": 3132,
+            "walkGraphs": 2760,
+            "parentTraversals": 1752,
             "distanceFields": 1968,
-            "visitedVertices": 87503315,
+            "visitedVertices": 63744503,
             "requests": 177,
             "physicalBuilds": 18,
             "physicalCacheHits": 159,
@@ -247,10 +247,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 4140,
-            "parentTraversals": 3132,
+            "walkGraphs": 2760,
+            "parentTraversals": 1752,
             "distanceFields": 1968,
-            "visitedVertices": 87503315,
+            "visitedVertices": 63744503,
             "requests": 177,
             "physicalBuilds": 18,
             "physicalCacheHits": 159,
@@ -267,10 +267,10 @@
             "bridgeHoldReuses": 0
           },
           {
-            "walkGraphs": 4140,
-            "parentTraversals": 3132,
+            "walkGraphs": 2760,
+            "parentTraversals": 1752,
             "distanceFields": 1968,
-            "visitedVertices": 87503315,
+            "visitedVertices": 63744503,
             "requests": 177,
             "physicalBuilds": 18,
             "physicalCacheHits": 159,
@@ -300,8 +300,8 @@
         "stateSha256": "195bf4853e47f5910f8992d752beaf55604cfb25af38596386e0d54131ed20ed"
       },
       "absoluteBudgetMs": 25000,
-      "mainRatio": 0.2873912804779687,
-      "legacyRatio": 0.4448744736976273,
+      "mainRatio": 0.2732432767947544,
+      "legacyRatio": 0.4229737198474263,
       "absolutePass": true,
       "mainRatioPass": true,
       "legacyRatioPass": true,

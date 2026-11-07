@@ -92,6 +92,25 @@ baseline SHA, every measured sample, exact state hashes and diagnostic counters.
 Its `pass` fields are authoritative; the report does not turn an unmet ratio into
 an accepted budget. Further source changes require fresh current measurements.
 
+## Measured result, 2026-11-07
+
+Seed 1, Node v24.22.1, automatic choices; measured source `27bafae`, main baseline
+`4fac200`, same runner. All complete state hashes match the original references.
+
+| Years | Main generated median | Improved median | Legacy median | Absolute gate | Legacy ratio gate, denominator floor 1000ms |
+| --- | ---: | ---: | ---: | --- | --- |
+| 2000 | 3796ms | 2386ms | 418ms | pass, <=5000ms | **unmet**, 2.386 > 2 |
+| 10000 | 31859ms | 8705ms | 20581ms | pass, <=25000ms | pass, 0.423 <= 2 |
+
+The improved simulation is approximately 37% faster at 2000 and 73% faster at
+10000 than main's generated mode. The 2000-year original relative gate remains
+unmet by about 386ms after applying its denominator floor. This is not a D5
+performance pass. No threshold was changed. Retaining the ratio and continuing
+graph/cache optimization, or explicitly accepting the absolute budgets with this
+recorded cost, are alternatives for Human after reviewing the complete evidence.
+Other worlds' long-run audits are correctness/IO checks, not substitutes for five
+isolated performance measurements.
+
 ## Acceptance boundary
 
 The scripts themselves do not establish D5 acceptance. Record actual measurement
