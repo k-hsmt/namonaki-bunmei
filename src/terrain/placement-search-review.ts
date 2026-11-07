@@ -8,6 +8,8 @@ import {groundWalkWindows,groundDistances,groundDistancesFromAny,reviewPhysicalP
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;
  readonly nucleus:RecordPoint;readonly neighborEntrances:readonly RecordPoint[];
+ /** Civic distance to the nearest confirmed housing entrance, independent of hall distance. */
+ readonly housingEntrances?:readonly RecordPoint[];
 }
 const N=57600,W=320;
 const index=(p:RecordPoint)=>p[1]*W+p[0];
@@ -19,10 +21,13 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  if(ctx.historyStatus!=='known')return stop('unknown-history');
  if(!Number.isSafeInteger(ctx.year)||ctx.year<0||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year>ctx.confirmedYear)return stop('unconfirmed-year');
  if(!Number.isSafeInteger(req.width)||!Number.isSafeInteger(req.depth)||req.width<2||req.width>320||req.depth<1||req.depth>84)return stop('outside-ground');
- // Civic/public-space still need their own anchor and social rules.
- if(!['house','field','housing','hall','market','workshop','granary'].includes(req.purpose))return stop('unsupported-review-purpose');
+ // Public space still needs its constrained anchor neighborhood.
+ if(!['house','field','housing','hall','market','workshop','granary','civic'].includes(req.purpose))return stop('unsupported-review-purpose');
+ if(req.purpose==='civic'&&!req.neighborEntrances.length)return stop('missing-anchor');
  const r=decodeRecordPhysics(ctx.terrain.sites[ctx.site].physics),occupied=ctx.occupancy.map(o=>o.plot),baseWindows=groundWalkWindows(r,occupied);
- const distancesFor=(windows:Uint8Array)=>[groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances)];
+ const housing=req.purpose==='civic'?req.housingEntrances??[]:[];
+ const distancesFor=(windows:Uint8Array)=>[groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances),
+  ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];
  const base=distancesFor(baseWindows);
  const water=new Int32Array(N);water.fill(N);const queue:number[]=[];
  // Sea proximity must not be interpreted as freshwater irrigation for fields.
@@ -35,10 +40,12 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   const i=index(entry),core=distances[0]![i];if(core===undefined||core<0)return Infinity;
   const closest=distances[1]![i],near=closest!==undefined&&closest>=0?closest:Infinity;
   if(req.neighborEntrances.length&&!Number.isFinite(near))return Infinity;
+  const homes=housing.length?distances[2]![i]:0;
+  if(homes===undefined||homes<0)return Infinity;
   // For fields the 2/px preference outside 12..64 is monotone together with
   // the 3*Dneighbor term: total derivative is 1,3,5. Lower-bound pruning is safe.
   const fieldNeighborPenalty=req.purpose==='field'&&Number.isFinite(near)?2*(Math.max(0,12-near)+Math.max(0,near-64)):0;
-  return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+fieldNeighborPenalty+penalty;
+  return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+3*homes+fieldNeighborPenalty+penalty;
  };
  const candidates:{plot:GroundPlot;entrance:RecordPoint;penalty:number;lower:number}[]=[];
  for(let y=96;y+req.depth<=180;y+=2)for(let x=2;x+req.width<=320;x+=2){
