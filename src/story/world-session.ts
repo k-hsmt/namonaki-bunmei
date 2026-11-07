@@ -36,3 +36,10 @@ export function drawWorldSession(canvas:HTMLCanvasElement,session:WorldSession,y
  if(session.mode==='generated'){const o=observeGeneratedSceneReview(session.review,year,siteIndex);drawGeneratedSceneReview(canvas,o);return o.snapshot;}
  const s=snapshotAt(session.state,year,siteIndex);drawScene(canvas,s,session.state.seed,session.state.housing);return s;
 }
+
+/** Explicit future-only opt-in. Existing foundations, records and terrain stay intact. */
+export function improveWorldGrowth(session:WorldSession):WorldSession {
+ if(session.mode!=='generated')throw Error('Fixed worlds do not support generated growth');
+ if(session.review.review.growthPattern==='organic-v3')return session;
+ return generatedSession({...session.review,review:{...session.review.review,growthPattern:'organic-v3'}});
+}

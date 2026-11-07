@@ -1,6 +1,6 @@
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave} from './story/world-storage.js';
-import {restoreWorldSession,saveWorldSession,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
+import {restoreWorldSession,saveWorldSession,improveWorldGrowth,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
 import {serializeWorldSave} from './story/world-save.js';
 import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
@@ -63,6 +63,7 @@ function format(v:number){return new Intl.NumberFormat('ja-JP').format(Math.roun
 function label(v:number,good:string,bad:string){return v>=55?good:v>=30?'揺らいでいる':bad;}
 function inspect(year:number,record?:RecordEntry){stop();viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
 function render(){
+ const growthButton=el('improve-growth') as HTMLButtonElement;growthButton.hidden=world.mode!=='generated'||world.review.review.growthPattern==='organic-v3';growthButton.disabled=busy;
  const confirmedYear=lastObservedYear(state);
  const viewingPast=viewedYear!==null;
  const y=viewingPast?viewedYear!:confirmedYear;
@@ -146,7 +147,7 @@ el('play').addEventListener('click',()=>{if(busy)return;if(viewedYear!==null){vi
 el('return-now').addEventListener('click',()=>{viewedYear=null;render();});
 scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===state.year?null:y;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
-function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play'])(el(id) as HTMLButtonElement).disabled=value;}
+function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play','improve-growth'])(el(id) as HTMLButtonElement).disabled=value;}
 function adopt(candidate:WorldSession){verifyWorldCandidate(candidate);world=candidate;state=world.state;viewedYear=null;expanded=false;input.value=String(state.seed);render();}
 async function restart(seed:number){
  if(busy)return;stop();setBusy(true);el('feedback').textContent='新しい土地を探しています。';
@@ -154,6 +155,9 @@ async function restart(seed:number){
  catch{el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
  finally{setBusy(false);render();}
 }
+el('improve-growth').addEventListener('click',()=>{
+ if(busy||world.mode!=='generated')return;stop();adopt(improveWorldGrowth(world));el('feedback').textContent='今後の建設では橋の対岸にも広がります。過去の建物は移動しません。「この歴史を保存」で変更を保存できます。';
+});
 el('restart').addEventListener('click',()=>void restart(Number(input.value)||1));
 el('random').addEventListener('click',()=>void restart(Math.floor(Math.random()*4294967295)+1));
 function download(json:string){const blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`namonaki-${state.seed}-${state.year}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
@@ -186,7 +190,7 @@ file.addEventListener('change',async()=>{
 });
 input.value=String(state.seed);render();
 }
-const bootControls=['step','play','save','load','export','import','restart','random'];
+const bootControls=['step','play','save','load','export','import','restart','random','improve-growth'];
 let bootBusy=false;
 function startWorld(world:WorldSession){
  verifyWorldCandidate(world);

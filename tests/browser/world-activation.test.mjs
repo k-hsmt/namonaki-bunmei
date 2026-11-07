@@ -38,3 +38,13 @@ test('a corrupt cold-start v5 stops fallback and a valid file recovers without a
  await p.locator('#import-file').setInputFiles({name:'world.json',mimeType:'application/json',buffer:Buffer.from(plain)});await feedback(p,'文明の記録を開きました');assert.equal(await p.locator('#step').isEnabled(),true);
  assert.match(await p.locator('#year').textContent(),/2,000/);assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')),'broken-v5');assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v4')),old);
 });
+test('saved organic v2 can opt into cross-river growth without moving the present or changing its saved history',async t=>{
+ const oldSession=createNewWorld(42,'terrain-placement-v2'),oldSave=saveWorldSession(oldSession),oldWire=serializeWorldSave(oldSave),context=await browser.newContext(),p=await context.newPage();t.after(()=>context.close());
+ const errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.addInitScript(wire=>localStorage.setItem('namonaki-story-v5',wire),oldWire);await p.goto(origin);await feedback(p,'保存された歴史を開きました');const before=await png(p);
+ await p.locator('#improve-growth').click();await feedback(p,'今後の建設');assert.equal(await png(p),before);assert.equal(await p.locator('#improve-growth').isVisible(),false);
+ assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')),oldWire,'opt-in does not silently overwrite the previous save');
+ await p.locator('#save').click();await feedback(p,'ブラウザに保存しました');const result=await decodeWorldSave(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')));assert.equal(result.progressionPolicy.id,'terrain-placement-v3');assert.deepEqual(result.state,oldSave.state);assert.deepEqual(result.landHistory,oldSave.landHistory);
+ // A fresh tab reads the explicit v3 save without the old-save boot fixture.
+ const fresh=await p.context().newPage();t.after(()=>fresh.close());await fresh.goto(origin);await feedback(fresh,'保存された歴史を開きました');assert.equal(await fresh.locator('#improve-growth').isVisible(),false);assert.equal(await png(fresh),before);assert.deepEqual(errors,[]);
+});

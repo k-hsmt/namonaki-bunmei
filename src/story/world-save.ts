@@ -6,16 +6,17 @@ import {wireObject} from './generated-state-review.js';
 import {groundReviewLimits} from '../terrain/ground-access-review.js';
 export const WORLD_SAVE_KEY='namonaki-story-v5';
 export const compactPlacementPolicy=Object.freeze({id:'terrain-placement-v1' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
-export const productionPlacementPolicy=Object.freeze({id:'terrain-placement-v2' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
+export const organicPlacementPolicy=Object.freeze({id:'terrain-placement-v2' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
+export const productionPlacementPolicy=Object.freeze({id:'terrain-placement-v3' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
 export type GeneratedWorldSave=Omit<GeneratedSaveDraftReview,'format'|'status'|'progressionPolicy'|'rendererId'>&{
- readonly format:'namonaki-world-save';readonly progressionPolicy:typeof productionPlacementPolicy|typeof compactPlacementPolicy;readonly rendererId:'generated-scene-v1';
+ readonly format:'namonaki-world-save';readonly progressionPolicy:typeof productionPlacementPolicy|typeof organicPlacementPolicy|typeof compactPlacementPolicy;readonly rendererId:'generated-scene-v1';
 };
 export type LegacyWorldSave=Omit<LegacySaveDraft,'format'|'status'>&{readonly format:'namonaki-world-save'};
 export type WorldSave=GeneratedWorldSave|LegacyWorldSave;
 export function generatedWorld(save:WorldSave):save is GeneratedWorldSave{return save.initialTerrain.mode==='generated';}
 function promoteGenerated(d:GeneratedSaveDraftReview):GeneratedWorldSave {
  const {format:_,status:__,progressionPolicy:___,rendererId:____,...payload}=d;
- return {...payload,format:'namonaki-world-save',progressionPolicy:d.progressionPolicy.id==='generated-land-review-v2'?productionPlacementPolicy:compactPlacementPolicy,rendererId:'generated-scene-v1'};
+ return {...payload,format:'namonaki-world-save',progressionPolicy:d.progressionPolicy.id==='generated-land-review-v3'?productionPlacementPolicy:d.progressionPolicy.id==='generated-land-review-v2'?organicPlacementPolicy:compactPlacementPolicy,rendererId:'generated-scene-v1'};
 }
 function promoteLegacy(d:LegacySaveDraft):LegacyWorldSave {const {format:_,status:__,...payload}=d;return {...payload,format:'namonaki-world-save'};}
 export function validateWorldSave(raw:unknown):WorldSave {
@@ -25,8 +26,8 @@ export function validateWorldSave(raw:unknown):WorldSave {
  if(t?.mode==='generated'){
   wireObject(d,['format','version','schemaVersion','initialTerrain','progressionPolicy','rendererId','landHistory','state']);
   const p=wireObject(d.progressionPolicy,['id','reservationMode','limits']);
-  if(!['terrain-placement-v1','terrain-placement-v2'].includes(p.id as string)||p.reservationMode!=='field-only'||d.rendererId!=='generated-scene-v1')throw Error('Unknown production policy or renderer');
-  const draft=validateGeneratedSaveDraft({...d,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...p,id:p.id==='terrain-placement-v2'?'generated-land-review-v2':'generated-land-review-v1'}});
+  if(!['terrain-placement-v1','terrain-placement-v2','terrain-placement-v3'].includes(p.id as string)||p.reservationMode!=='field-only'||d.rendererId!=='generated-scene-v1')throw Error('Unknown production policy or renderer');
+  const draft=validateGeneratedSaveDraft({...d,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...p,id:p.id==='terrain-placement-v3'?'generated-land-review-v3':p.id==='terrain-placement-v2'?'generated-land-review-v2':'generated-land-review-v1'}});
   return promoteGenerated(draft);
  }
  if(t?.mode==='legacy-fixed'){
@@ -40,7 +41,7 @@ export function createGeneratedWorldSave(review:GeneratedBridgeReview):Generated
 }
 export function restoreGeneratedWorld(save:GeneratedWorldSave):GeneratedBridgeReview {
  const valid=validateWorldSave(save) as GeneratedWorldSave;
- return restoreGeneratedSaveDraft({...valid,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...valid.progressionPolicy,id:valid.progressionPolicy.id==='terrain-placement-v2'?'generated-land-review-v2':'generated-land-review-v1'}});
+ return restoreGeneratedSaveDraft({...valid,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...valid.progressionPolicy,id:valid.progressionPolicy.id==='terrain-placement-v3'?'generated-land-review-v3':valid.progressionPolicy.id==='terrain-placement-v2'?'generated-land-review-v2':'generated-land-review-v1'}});
 }
 export function migrateOldWorld(raw:unknown):LegacyWorldSave{return promoteLegacy(migrateLegacySave(raw));}
 export function parseWorldSave(json:string):WorldSave {
