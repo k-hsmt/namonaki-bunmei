@@ -349,3 +349,37 @@ jobs:
             artifacts/terrain31-organic/*
             artifacts/terrain31-cross-river/*
           if-no-files-found: error
+
+  vegetation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Verify vegetation histories, 10,000-year saves and unchanged civilization
+        run: node scripts/audit-vegetation.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Measure annual progression with and without vegetation
+        run: node scripts/benchmark-vegetation.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Compare natural succession and controlled clearing and fire recovery
+        run: node scripts/review-vegetation.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vegetation32-acceptance
+          retention-days: 14
+          path: artifacts/vegetation32/*
+          if-no-files-found: error
