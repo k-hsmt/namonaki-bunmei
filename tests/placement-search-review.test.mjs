@@ -59,3 +59,44 @@ test('large civic plots use hall and housing distances and match exhaustive scor
  for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key]);
  assert.equal(findPlacementReview(ctx,{...civic,neighborEntrances:[]}).reason,'missing-anchor');
 });
+for(const purpose of ['house','housing','field','civic'])test('organic distance band preserves exact pruning for '+purpose,()=>{
+ const {ctx,req}=fixture(1);
+ const organic={...req,objectId:'growth-4',purpose,growthPattern:'organic-v2',...(purpose==='field'?{width:26,depth:14}:{}),...(purpose==='civic'?{housingEntrances:[req.nucleus]}:{})};
+ const fast=findPlacementReview(ctx,organic),slow=findPlacementReview(ctx,organic,'exhaustive');
+ assert.equal(fast.status,'review-only');
+ for(const key of ['status','plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key],key);
+ const p=fast.plot,q=ctx.occupancy[0].plot,dx=Math.max(q.x-p.x-p.width,p.x-q.x-q.width,0),dy=Math.max(q.y-p.y-p.depth,p.y-q.y-q.depth,0);
+ assert.ok(dx>=(purpose==='field'?3:purpose==='civic'?8:6)||dy>=(purpose==='field'?3:10));
+});
+test('organic branching uses confirmed anchors deterministically and keeps exact search',()=>{
+ const {ctx,req}=fixture(1);
+ ctx.occupancy.push({id:'house2',plot:{x:34,y:102,width:18,depth:7},entrance:[42,109]},{id:'house3',plot:{x:60,y:102,width:18,depth:7},entrance:[68,109]});
+ const organic={...req,objectId:'housing-4',purpose:'housing',growthPattern:'organic-v2',neighborEntrances:ctx.occupancy.map(o=>o.entrance)};
+ const fast=findPlacementReview(ctx,organic),slow=findPlacementReview(ctx,organic,'exhaustive');
+ assert.equal(fast.status,'review-only');for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key]);
+ assert.deepEqual(findPlacementReview(ctx,{...organic,neighborEntrances:[...organic.neighborEntrances].reverse()}).plot,fast.plot);
+ assert.throws(()=>findPlacementReview(ctx,{...req,growthPattern:'future'}));
+});
+test('organic growth tries another confirmed anchor when the preferred edge has no space',async()=>{
+ const {organicAttraction}=await import('../dist/terrain/organic-placement-v2.js');
+ const {ctx,req}=fixture(1),r=emptyRecordRaster();for(let y=100;y<136;y++)r.surface.fill(1,y*320,y*320+240);ctx.terrain.sites['river-bank'].physics=encodeRecordPhysics(r);
+ const other={id:'other-house',plot:{x:188,y:102,width:18,depth:7},entrance:[196,109]};ctx.occupancy.push(other);
+ const organic={...req,objectId:'growth-2',growthPattern:'organic-v2',neighborEntrances:ctx.occupancy.map(o=>o.entrance)};
+ const preferred=organicAttraction(ctx,'house',organic.objectId,req.nucleus,organic.neighborEntrances).anchor;
+ ctx.reservations.push({id:'reserved-edge',plot:{x:preferred[0]<100?0:130,y:100,width:110,depth:36}});
+ const fast=findPlacementReview(ctx,organic),slow=findPlacementReview(ctx,organic,'exhaustive');assert.equal(fast.status,'review-only');
+ assert.ok(Math.abs(fast.entrance[0]-preferred[0])>80,'remaining land is beyond the first anchor walking radius');
+ for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key],key);
+});
+test('organic failed-site reuse requires frozen physics and current occupancy, reservations and crossings',()=>{
+ const {ctx,req}=fixture(1),organic={...req,growthPattern:'organic-v2'};
+ const freeze=o=>{if(o&&typeof o==='object'){Object.values(o).forEach(freeze);Object.freeze(o);}return o;};freeze(ctx.terrain);
+ ctx.reservations.push({id:'blocked',plot:{x:0,y:100,width:80,depth:36}});
+ assert.equal(findPlacementReview(ctx,organic).status,'hold');
+ const repeated=findPlacementReview({...ctx,year:11,confirmedYear:11},organic);assert.equal(repeated.status,'hold');assert.equal(repeated.metrics.enumerated,0);
+ assert.equal(findPlacementReview({...ctx,confirmedYear:9},organic).reason,'unconfirmed-year');
+ const changed={...ctx,reservations:[]},fast=findPlacementReview(changed,organic),slow=findPlacementReview(changed,organic,'exhaustive');assert.equal(fast.status,'review-only');assert.deepEqual(fast.plot,slow.plot);
+ assert.equal(findPlacementReview({...changed,occupancy:[...ctx.occupancy,{id:'blocked-now',plot:{x:0,y:100,width:80,depth:36},entrance:[38,136]}]},organic).status,'hold');
+ // A crossing change must trigger recomputation even when the result stays HOLD.
+ assert.ok(findPlacementReview({...ctx,crossings:[]},organic).metrics.enumerated>0);
+});

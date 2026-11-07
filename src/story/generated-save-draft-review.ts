@@ -15,12 +15,13 @@ import {groundReviewLimits,reviewPhysicalPlot,groundWalkWindows,groundDistances,
 import {fixedFacilityLotReservations,siteAt} from './settlement-history.js';
 import {reviewFacilityAnchor,type ReviewFacilityPlan,type ReservationReviewMode} from '../terrain/facility-plan-review.js';
 import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
+import type {GrowthPattern} from '../terrain/organic-placement-v2.js';
 const sites:readonly RecordSite[]=['river-bank','hill-side','coast-inlet'];
 export const generatedDraftMaxBytes=16*1024*1024;
 export interface GeneratedSaveDraftReview {
  readonly format:'namonaki-generated-save-draft';readonly version:5;readonly schemaVersion:1;readonly status:'review-only';
  readonly initialTerrain:{readonly schemaVersion:1;readonly mode:'generated';readonly record:ValidatedTerrainRecord;readonly hydrology:ValidatedRiverReaches;readonly plans:Readonly<Record<RecordSite,ReviewFacilityPlan>>};
- readonly progressionPolicy:{readonly id:'generated-land-review-v1';readonly reservationMode:ReservationReviewMode;readonly limits:typeof groundReviewLimits};
+ readonly progressionPolicy:{readonly id:'generated-land-review-v1'|'generated-land-review-v2';readonly reservationMode:ReservationReviewMode;readonly limits:typeof groundReviewLimits};
  readonly rendererId:'generated-scene-review-v1';readonly landHistory:GeneratedLandFoundationsReview;readonly state:Readonly<CivilizationState>;
 }
 declare const checkedDraft:unique symbol;
@@ -59,7 +60,7 @@ function validatePlans(raw:unknown,terrain:ValidatedTerrainRecord):Readonly<Reco
  }
  return plans as unknown as Readonly<Record<RecordSite,ReviewFacilityPlan>>;
 }
-function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,plans:GeneratedFacilityReview['plans'],mode:ReservationReviewMode,state:CivilizationState,land:unknown):GeneratedFacilityReview {
+function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,plans:GeneratedFacilityReview['plans'],mode:ReservationReviewMode,state:CivilizationState,land:unknown,growthPattern?:GrowthPattern):GeneratedFacilityReview {
  const h=wireObject(land,['schemaVersion','events']);if(h.schemaVersion!==1||!Array.isArray(h.events)||h.events.length>10000)throw Error('Invalid land history');
  const placements:ReviewFacilityPlacement[]=[],bridges:SavedReviewBridge[]=[];
  for(const value of h.events){
@@ -73,7 +74,7 @@ function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiver
    if(e.purpose!=='housing'&&e.purpose!=='public-space')placements.push({objectId:e.objectId,site:e.site as RecordSite,kind:e.purpose as GroundPurpose,plot:f,entrance,builtYear:e.year as number,sourceRecordId:e.sourceRecordId});
   }
  }
- const review:GeneratedFacilityReview={format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode:mode,state,placements,bridgeReview:{schemaVersion:1,hydrology,bridges},diagnostics:{holds:{},fullSearches:0}};
+ const review:GeneratedFacilityReview={format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode:mode,state,placements,bridgeReview:{schemaVersion:1,hydrology,bridges},diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{})};
  for(const [index,site] of sites.entries()){
   const buildings=siteAt(state.observation?.sites,index,lastObservedYear(state))!.buildings,placed=placements.filter(p=>p.site===site);
   if(buildings.length!==placed.length+(site==='river-bank'?bridges.length:0))throw Error('Facility birth ledger is incomplete');
@@ -95,20 +96,21 @@ export function validateGeneratedSaveDraft(raw:unknown):ValidatedGeneratedSaveDr
  const d=wireObject(structuredClone(raw),['format','version','schemaVersion','status','initialTerrain','progressionPolicy','rendererId','landHistory','state']);
  if(d.format!=='namonaki-generated-save-draft'||d.version!==5||d.schemaVersion!==1||d.status!=='review-only'||d.rendererId!=='generated-scene-review-v1')throw Error('Unknown generated draft contract');
  const t=wireObject(d.initialTerrain,['schemaVersion','mode','record','hydrology','plans']),policy=wireObject(d.progressionPolicy,['id','reservationMode','limits']);
- if(t.schemaVersion!==1||t.mode!=='generated'||policy.id!=='generated-land-review-v1'||!['wide','field-only','none'].includes(policy.reservationMode as string)||!sameWire(policy.limits,groundReviewLimits))throw Error('Unknown generated terrain or trial policy');
+ if(t.schemaVersion!==1||t.mode!=='generated'||!['generated-land-review-v1','generated-land-review-v2'].includes(policy.id as string)||!['wide','field-only','none'].includes(policy.reservationMode as string)||!sameWire(policy.limits,groundReviewLimits))throw Error('Unknown generated terrain or trial policy');
  const terrain=validateTerrainRecord(t.record),hydrology=validateRiverReaches(t.hydrology,terrain),plans=validatePlans(t.plans,terrain),state=validateGeneratedState(d.state,terrain.source.seed);
- reviewFromParts(terrain,hydrology,plans,policy.reservationMode as ReservationReviewMode,state,d.landHistory);
+ reviewFromParts(terrain,hydrology,plans,policy.reservationMode as ReservationReviewMode,state,d.landHistory,policy.id==='generated-land-review-v2'?'organic-v2':undefined);
  return freeze({...d,initialTerrain:{schemaVersion:1,mode:'generated',record:terrain,hydrology,plans},state}) as unknown as ValidatedGeneratedSaveDraft;
 }
 export function createGeneratedSaveDraft(input:GeneratedBridgeReview):ValidatedGeneratedSaveDraft {
  if(input.format!=='generated-bridge-review'||input.status!=='review-only'||!input.review.bridgeReview)throw Error('Missing generated draft source');assertJsonWire(input.review);const r=structuredClone(input.review);
+ if(r.growthPattern!==undefined&&r.growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
  const terrain=validateTerrainRecord(r.terrain),state=validateGeneratedState(r.state,terrain.source.seed),plans=validatePlans(r.plans,terrain),hydrology=validateRiverReaches(r.bridgeReview!.hydrology,terrain);
  const source={...r,terrain,state,plans,bridgeReview:{...r.bridgeReview!,hydrology}};validateGeneratedBridgeLedger(source);validateGeneratedPublicSpaceLedger(source,lastObservedYear(state));
  return validateGeneratedSaveDraft({format:'namonaki-generated-save-draft',version:5,schemaVersion:1,status:'review-only',initialTerrain:{schemaVersion:1,mode:'generated',record:r.terrain,hydrology:r.bridgeReview!.hydrology,plans:r.plans},
-  progressionPolicy:{id:'generated-land-review-v1',reservationMode:r.reservationMode,limits:groundReviewLimits},rendererId:'generated-scene-review-v1',landHistory:captureGeneratedLandFoundations(source),state});
+  progressionPolicy:{id:r.growthPattern?'generated-land-review-v2':'generated-land-review-v1',reservationMode:r.reservationMode,limits:groundReviewLimits},rendererId:'generated-scene-review-v1',landHistory:captureGeneratedLandFoundations(source),state});
 }
 export function restoreGeneratedSaveDraft(raw:unknown):GeneratedBridgeReview {
- const d=validateGeneratedSaveDraft(raw),t=d.initialTerrain;return {format:'generated-bridge-review',status:'review-only',review:reviewFromParts(t.record,t.hydrology,t.plans,d.progressionPolicy.reservationMode,structuredClone(d.state),d.landHistory)};
+ const d=validateGeneratedSaveDraft(raw),t=d.initialTerrain;return {format:'generated-bridge-review',status:'review-only',review:reviewFromParts(t.record,t.hydrology,t.plans,d.progressionPolicy.reservationMode,structuredClone(d.state),d.landHistory,d.progressionPolicy.id==='generated-land-review-v2'?'organic-v2':undefined)};
 }
 export function serializeGeneratedSaveDraft(raw:GeneratedSaveDraftReview):string{return JSON.stringify(validateGeneratedSaveDraft(raw));}
 export function parseGeneratedSaveDraft(json:string):ValidatedGeneratedSaveDraft {

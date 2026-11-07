@@ -2,6 +2,7 @@
 import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
+import type {GrowthPattern} from '../terrain/organic-placement-v2.js';
 import {decodeRecordPhysics} from '../terrain/terrain-record-raster-v1.js';
 import {groundContextWindows,groundDistances,reviewGroundAccess,southEntrance,type GroundPlot} from '../terrain/ground-access-review.js';
 import {selectReviewReservations,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
@@ -154,8 +155,8 @@ export const generatedPublicSpaceExtension:GeneratedLandReviewExtension={additio
  }
 }};
 export interface GeneratedPublicSpaceReview {readonly format:'generated-public-space-review';readonly status:'review-only';readonly review:GeneratedFacilityReview}
-export function createGeneratedPublicSpaceReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode):GeneratedPublicSpaceReview|{status:'hold';reason:string}{
- const parent=createGeneratedCivicReview(terrain,mode);return parent.status==='hold'?parent:{format:'generated-public-space-review',status:'review-only',review:parent.review};
+export function createGeneratedPublicSpaceReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedPublicSpaceReview|{status:'hold';reason:string}{
+ const parent=createGeneratedCivicReview(terrain,mode,growthPattern);return parent.status==='hold'?parent:{format:'generated-public-space-review',status:'review-only',review:parent.review};
 }
 export function advanceGeneratedPublicSpaceReview(input:GeneratedPublicSpaceReview,years:number,choices:'stop'|'automatic'='stop'):GeneratedPublicSpaceReview {
  if(input.format!=='generated-public-space-review'||input.status!=='review-only')throw Error('Invalid public-space review boundary');

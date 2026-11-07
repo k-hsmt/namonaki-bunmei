@@ -2,13 +2,14 @@
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import {validateRiverReaches,type ValidatedRiverReaches} from '../terrain/river-reaches-review.js';
 import type {ReservationReviewMode} from '../terrain/facility-plan-review.js';
+import type {GrowthPattern} from '../terrain/organic-placement-v2.js';
 import {createGeneratedPublicSpaceReview,generatedPublicSpaceExtension,validateGeneratedPublicSpaceLedger} from './generated-public-space-review.js';
 import {advanceGeneratedFacilityReview,chooseGeneratedFacilityReview,chooseAutomaticallyGeneratedFacilityReview,type GeneratedFacilityReview,type GeneratedAdvanceOptions} from './generated-facility-review.js';
 import {validateGeneratedBridgeLedger} from './generated-bridge-history-review.js';
 import {lastObservedYear} from './engine.js';
 export interface GeneratedBridgeReview {readonly format:'generated-bridge-review';readonly status:'review-only';readonly review:GeneratedFacilityReview}
-export function createGeneratedBridgeReview(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,mode:ReservationReviewMode):GeneratedBridgeReview|{status:'hold';reason:string}{
- const saved=validateRiverReaches(hydrology,terrain),parent=createGeneratedPublicSpaceReview(terrain,mode);
+export function createGeneratedBridgeReview(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,mode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedBridgeReview|{status:'hold';reason:string}{
+ const saved=validateRiverReaches(hydrology,terrain),parent=createGeneratedPublicSpaceReview(terrain,mode,growthPattern);
  return parent.status==='hold'?parent:{format:'generated-bridge-review',status:'review-only',review:{...parent.review,bridgeReview:{schemaVersion:1,hydrology:saved,bridges:[]}}};
 }
 function check(input:GeneratedBridgeReview){
