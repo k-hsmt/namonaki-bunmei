@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, 'feat/issue31-*']
 
 permissions:
   contents: read
@@ -150,6 +150,10 @@ jobs:
         run: node scripts/audit-generated-facilities.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit generated housing across three districts
+        run: node scripts/audit-generated-housing.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -158,4 +162,5 @@ jobs:
             artifacts/h3-longrun.jsonl
             artifacts/terrain31-legacy/longrun-report.json
             artifacts/terrain31-facilities/*
+            artifacts/terrain31-housing/*
           if-no-files-found: warn

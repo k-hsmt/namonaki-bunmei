@@ -19,6 +19,11 @@ export interface GeneratedFacilityReview {
  readonly placements:readonly ReviewFacilityPlacement[];
  readonly diagnostics:{readonly holds:Readonly<Record<string,number>>;readonly fullSearches:number};
 }
+/** Optional generated land stages; absent in the D3-A ordinary-only census. */
+export interface GeneratedLandReviewExtension {
+ additionalOccupancy:(review:GeneratedFacilityReview,state:CivilizationState,site:RecordSite)=>readonly TypedGroundOccupation[];
+ afterFacilities:(review:GeneratedFacilityReview,state:CivilizationState)=>void;
+}
 export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,reservationMode:ReservationReviewMode):GeneratedFacilityReview|{status:'hold';reason:string}{
  const plans={} as Record<RecordSite,ReviewFacilityPlan>;
  for(const site of sites){const result=planFacilitySitesReview(terrain,site);if(result.status==='hold')return result;plans[site]=result;}
@@ -36,14 +41,14 @@ function mutableCopy(input:GeneratedFacilityReview):GeneratedFacilityReview {
  if(input.format!=='generated-facility-review'||input.status!=='review-only'||input.placementPolicy!==null||input.state.version!==4||input.state.seed!==input.terrain.source.seed)throw Error('Invalid generated review boundary');
  const next=structuredClone(input);return {...next,terrain:validateTerrainRecord(next.terrain)};
 }
-function policyFor(review:GeneratedFacilityReview):ReviewLandProgression {
+function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):ReviewLandProgression {
  const placements=review.placements as ReviewFacilityPlacement[],holds=review.diagnostics.holds as Record<string,number>;
  const pending=new Map<string,{site:RecordSite;kind:GroundPurpose;plot:GroundPlot;entrance:RecordPoint}>();
  const hold=(site:RecordSite,kind:string,reason:string)=>{const key=site+':'+kind+':'+reason;holds[key]=(holds[key]??0)+1;return {status:'hold' as const};};
  return {mode:'generated-review-only',placeFacility(state,siteIndex,candidate){
   const site=sites[siteIndex];if(!site)throw Error('Invalid generated site');
   if(candidate.kind==='bridge')return hold(site,candidate.kind,'unsupported-bridge');
-  const plan=review.plans[site],actual:TypedGroundOccupation[]=placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance}));
+  const plan=review.plans[site],actual:TypedGroundOccupation[]=[...placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...(extension?.additionalOccupancy(review,state,site)??[])];
   const context={terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known' as const,primaryRoot:plan.primaryRoot,occupancy:actual,
    reservations:selectReviewReservations(plan,review.reservationMode,new Set(actual.map(p=>p.id)))};
   const preferred=plan.slots.find(s=>s.id===candidate.id)?.plot;
@@ -63,17 +68,17 @@ function policyFor(review:GeneratedFacilityReview):ReviewLandProgression {
    if(!building||building.builtYear!==state.year||!building.recordId)throw Error('Facility/placement transaction did not commit');
    if(placements.some(old=>old.objectId===id))throw Error('Duplicate facility placement');
    placements.push({objectId:id,...p,builtYear:state.year,sourceRecordId:building.recordId});
-  }pending.clear();
+  }pending.clear();extension?.afterFacilities(review,state);
  }};
 }
 /** Input remains untouched even if proposal or commit throws. years counts new years, not choices. */
-export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,years:number,choices:'stop'|'automatic'='stop'):GeneratedFacilityReview {
+export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,years:number,choices:'stop'|'automatic'='stop',extension?:GeneratedLandReviewExtension):GeneratedFacilityReview {
  if(!Number.isSafeInteger(years)||years<0||years>10000||!['stop','automatic'].includes(choices))throw Error('Invalid generated review advance');
- const next=mutableCopy(input),policy=policyFor(next),target=next.state.year+years;
+ const next=mutableCopy(input),policy=policyFor(next,extension),target=next.state.year+years;
  while(next.state.year<target){if(next.state.pending){if(choices==='stop')break;chooseAutomatically(next.state,policy);}else step(next.state,policy);}
  if(years>0&&next.state.pending&&choices==='automatic')chooseAutomatically(next.state,policy);
  return next;
 }
-export function chooseGeneratedFacilityReview(input:GeneratedFacilityReview,index:number,source:'manual'|'auto'='manual'):GeneratedFacilityReview {
- const next=mutableCopy(input);choose(next.state,index,source,policyFor(next));return next;
+export function chooseGeneratedFacilityReview(input:GeneratedFacilityReview,index:number,source:'manual'|'auto'='manual',extension?:GeneratedLandReviewExtension):GeneratedFacilityReview {
+ const next=mutableCopy(input);choose(next.state,index,source,policyFor(next,extension));return next;
 }
