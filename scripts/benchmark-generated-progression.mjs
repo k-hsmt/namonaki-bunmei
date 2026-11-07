@@ -29,6 +29,7 @@ const sha=root=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8
 const report={node:process.version,platform:process.platform,sourceSHA:sha('.'),baselineSHA:sha(baselineRoot),
  diffSha256:createHash('sha256').update(execFileSync('git',['diff'],{encoding:'utf8'})).digest('hex'),
  choices:'automatic',reservation:'field-only',seeds,years,warmups:1,measuredRuns:5,
+ initialization:'one template per API/case; mutable legacy state cloned outside timer; immutable generated facade clones internally',
  excludes:['world initialization','rendering','hashing','save/load'],cases:[]};
 const previous=process.env.BENCHMARK_BASELINE_REPORT?JSON.parse(await readFile(process.env.BENCHMARK_BASELINE_REPORT,'utf8')):null;
 if(previous){assert.equal(previous.baselineSHA,report.baselineSHA);assert.equal(previous.node,report.node);assert.equal(previous.platform,report.platform);report.reusedBaselineReport=process.env.BENCHMARK_BASELINE_REPORT;}
@@ -40,15 +41,16 @@ for(const seed of seeds)for(const year of years){
    const measured=previous.cases.find(c=>c.seed===seed&&c.year===year)?.[name];
    assert.equal(measured?.measuredMs.length,5,'missing complete baseline measurement');row[name]=measured;continue;
   }
-  const values=[],traces=[];let expectedHash;
+  const values=[],traces=[],template=legacy?api.createHousingCivilization(seed):api.createNewWorld(seed),initialWire=JSON.stringify(template);let expectedHash;
   for(let run=0;run<6;run++){
-   const initial=legacy?api.createHousingCivilization(seed):api.createNewWorld(seed);
+   const initial=legacy?structuredClone(template):template;
    const metrics=()=>Object.assign({},api.generatedGroundGraphMetrics?.(),api.generatedPlacementSearchMetrics?.(),api.generatedHousingReplayMetrics?.(),api.generatedBridgeProposalMetrics?.());
    const before=metrics();
    const start=performance.now();let state;
    if(legacy){state=initial;while(state.year<year){api.step(state);if(state.pending)api.chooseAutomatically(state);}}
    else state=api.advanceGeneratedBridgeReview(initial.review,year,'automatic').review.state;
    const elapsedMs=performance.now()-start;
+   assert.ok(JSON.stringify(template)===initialWire,'benchmark input template mutated');
    const trace=Object.fromEntries(Object.entries(metrics()).map(([key,value])=>[key,value-(before[key]??0)]));
    const stateSha256=createHash('sha256').update(JSON.stringify(state)).digest('hex');
    assert.equal(state.year,year);assert.ok(!state.pending);
