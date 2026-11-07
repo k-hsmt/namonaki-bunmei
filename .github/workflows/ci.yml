@@ -91,6 +91,10 @@ jobs:
         run: node scripts/review-ground-access.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Capture generated bridge history at native and four-times scale
+        run: node scripts/review-generated-bridges.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify 10,000-year save in Chromium localStorage
         shell: bash
         run: |
@@ -120,6 +124,7 @@ jobs:
             artifacts/terrain31-record/*
             artifacts/terrain31-legacy/*
             artifacts/terrain31-ground/*
+            artifacts/terrain31-bridge-visual/*
             artifacts/h4d3-concepts/*
           if-no-files-found: warn
 
@@ -198,6 +203,13 @@ jobs:
           AUDIT_HOUSING_SEED: ${{ matrix.seed }}
           AUDIT_HOUSING_MODE: ${{ matrix.reservation }}
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit bridge foundations, conditions and historical crossings
+        run: node scripts/audit-generated-housing.mjs
+        env:
+          AUDIT_BRIDGE: '1'
+          AUDIT_HOUSING_SEED: ${{ matrix.seed }}
+          AUDIT_HOUSING_MODE: ${{ matrix.reservation }}
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -206,4 +218,5 @@ jobs:
             artifacts/terrain31-housing/*
             artifacts/terrain31-civic/*
             artifacts/terrain31-public-space/*
+            artifacts/terrain31-bridge/*
           if-no-files-found: error

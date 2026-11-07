@@ -1,8 +1,9 @@
 /** D3-B assembly-ground stage. Explicit generated dispatch; no live save writer. */
+import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import {decodeRecordPhysics} from '../terrain/terrain-record-raster-v1.js';
-import {groundWalkWindows,groundDistances,reviewGroundAccess,southEntrance,type GroundPlot} from '../terrain/ground-access-review.js';
+import {groundContextWindows,groundDistances,reviewGroundAccess,southEntrance,type GroundPlot} from '../terrain/ground-access-review.js';
 import {selectReviewReservations,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
 import {terrainHash} from '../terrain/hill-prototype.js';
 import {publicSpacesAt,type PublicSpace,type PublicSpaceHistory,type PublicSpaceEvent} from './public-space-history.js';
@@ -28,12 +29,12 @@ function context(review:GeneratedFacilityReview,site:RecordSite,year:number,pref
  const occupancy:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===site&&p.builtYear<=year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),
   ...homes.blocks.map(b=>({id:b.blockId,kind:'housing' as const,plot:b.footprint,entrance:southEntrance(b.footprint)})),
   ...at(prefix,year).spaces.filter(p=>p.siteId===site).map(p=>({id:p.id,kind:'public-space' as const,plot:p.footprint,entrance:southEntrance(p.footprint)}))];
- return {terrain:review.terrain,site,year,confirmedYear:year,historyStatus:'known' as const,primaryRoot:review.plans[site].primaryRoot,occupancy,
-  reservations:selectReviewReservations(review.plans[site],review.reservationMode,new Set(occupancy.map(p=>p.id)))};
+ return withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year,confirmedYear:year,historyStatus:'known' as const,primaryRoot:review.plans[site].primaryRoot,occupancy,
+  reservations:selectReviewReservations(review.plans[site],review.reservationMode,new Set(occupancy.map(p=>p.id)))});
 }
 function nearestHomes(review:GeneratedFacilityReview,space:PublicSpace,year:number,prefix:PublicSpaceHistory){
  const ctx=context(review,space.siteId,year,prefix),homes=housingAt(review.state.housing,year,space.siteId).blocks.filter(b=>b.condition!=='ruined'&&b.use!=='vacant');
- const r=decodeRecordPhysics(review.terrain.sites[space.siteId].physics),windows=groundWalkWindows(r,[...ctx.occupancy.map(p=>p.plot),space.footprint]);
+ const r=decodeRecordPhysics(review.terrain.sites[space.siteId].physics),windows=groundContextWindows(r,ctx,[space.footprint]);
  const entry=southEntrance(space.footprint),distances=groundDistances(windows,entry);
  const ranked=homes.map(b=>{const p=southEntrance(b.footprint),d=distances[p[1]*320+p[0]];return {b,d:d===undefined||d<0?Infinity:d};})
   .sort((a,b)=>a.d-b.d||(a.b.blockId<b.b.blockId?-1:a.b.blockId>b.b.blockId?1:0));
@@ -136,7 +137,7 @@ export function validateGeneratedPublicSpaceLedger(review:GeneratedFacilityRevie
  }
 }
 const civic=createGeneratedCivicExtension(spaceOccupancy);
-const extension:GeneratedLandReviewExtension={additionalOccupancy:civic.additionalOccupancy,afterFacilities(review,state){
+export const generatedPublicSpaceExtension:GeneratedLandReviewExtension={additionalOccupancy:civic.additionalOccupancy,afterFacilities(review,state){
  civic.afterFacilities(review,state);
  for(let i=0;i<sites.length;i++){
   const result=proposeGeneratedPublicSpace(review,i,readOwnedGeneratedHousing);
@@ -155,9 +156,9 @@ export function createGeneratedPublicSpaceReview(terrain:ValidatedTerrainRecord,
 }
 export function advanceGeneratedPublicSpaceReview(input:GeneratedPublicSpaceReview,years:number,choices:'stop'|'automatic'='stop'):GeneratedPublicSpaceReview {
  if(input.format!=='generated-public-space-review'||input.status!=='review-only')throw Error('Invalid public-space review boundary');
- const review=advanceGeneratedFacilityReview(input.review,years,choices,extension);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));return {...input,review};
+ const review=advanceGeneratedFacilityReview(input.review,years,choices,generatedPublicSpaceExtension);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));return {...input,review};
 }
 export function chooseGeneratedPublicSpaceReview(input:GeneratedPublicSpaceReview,index:number):GeneratedPublicSpaceReview {
  if(input.format!=='generated-public-space-review'||input.status!=='review-only')throw Error('Invalid public-space review boundary');
- const review=chooseGeneratedFacilityReview(input.review,index,'manual',extension);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));return {...input,review};
+ const review=chooseGeneratedFacilityReview(input.review,index,'manual',generatedPublicSpaceExtension);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));return {...input,review};
 }

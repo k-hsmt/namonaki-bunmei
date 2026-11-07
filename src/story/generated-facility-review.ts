@@ -7,6 +7,7 @@ import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
 import {planFacilitySitesReview,selectReviewReservations,reviewNeighborEntrances,reviewFacilityAnchor,type ReviewFacilityPlan,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
 import {reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose} from '../terrain/ground-access-review.js';
+import {withGeneratedBridgeAccess,proposeGeneratedBridge,reviewBridgeAnchor,type BridgeHistoryReview,type SavedReviewBridge} from './generated-bridge-history-review.js';
 const sites:readonly RecordSite[]=['river-bank','hill-side','coast-inlet'];
 export interface ReviewFacilityPlacement {
  readonly objectId:string;readonly site:RecordSite;readonly kind:GroundPurpose;
@@ -17,6 +18,7 @@ export interface GeneratedFacilityReview {
  readonly terrain:ValidatedTerrainRecord;readonly plans:Readonly<Record<RecordSite,ReviewFacilityPlan>>;
  readonly reservationMode:ReservationReviewMode;readonly state:CivilizationState;
  readonly placements:readonly ReviewFacilityPlacement[];
+ readonly bridgeReview?:BridgeHistoryReview;
  readonly diagnostics:{readonly holds:Readonly<Record<string,number>>;readonly fullSearches:number};
 }
 /** Optional generated land stages; absent in the D3-A ordinary-only census. */
@@ -44,13 +46,18 @@ function mutableCopy(input:GeneratedFacilityReview):GeneratedFacilityReview {
 function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):ReviewLandProgression {
  const placements=review.placements as ReviewFacilityPlacement[],holds=review.diagnostics.holds as Record<string,number>;
  const pending=new Map<string,{site:RecordSite;kind:GroundPurpose;plot:GroundPlot;entrance:RecordPoint}>();
+ const pendingBridges:SavedReviewBridge['geometry'][]=[];
  const hold=(site:RecordSite,kind:string,reason:string)=>{const key=site+':'+kind+':'+reason;holds[key]=(holds[key]??0)+1;return {status:'hold' as const};};
  return {mode:'generated-review-only',placeFacility(state,siteIndex,candidate){
   const site=sites[siteIndex];if(!site)throw Error('Invalid generated site');
-  if(candidate.kind==='bridge')return hold(site,candidate.kind,'unsupported-bridge');
+  if(candidate.kind==='bridge'&&(!review.bridgeReview||site!=='river-bank'))return hold(site,candidate.kind,'unsupported-bridge');
   const plan=review.plans[site],actual:TypedGroundOccupation[]=[...placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...(extension?.additionalOccupancy(review,state,site)??[])];
-  const context={terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known' as const,primaryRoot:plan.primaryRoot,occupancy:actual,
-   reservations:selectReviewReservations(plan,review.reservationMode,new Set(actual.map(p=>p.id)))};
+  const context=withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known' as const,primaryRoot:plan.primaryRoot,occupancy:actual,
+   reservations:selectReviewReservations(plan,review.reservationMode,new Set(actual.map(p=>p.id)))});
+  if(candidate.kind==='bridge'){
+   const result=proposeGeneratedBridge(review,context,candidate.id);if(result.status==='hold')return hold(site,candidate.kind,result.reason);
+   pendingBridges.push(result.geometry);const [x,y]=reviewBridgeAnchor(result.geometry);return {status:'clear',x,y};
+  }
   const preferred=plan.slots.find(s=>s.id===candidate.id)?.plot;
   let plot:GroundPlot,entrance:RecordPoint;
   const checked=preferred?reviewGroundAccess(context,candidate.kind,candidate.id,preferred):null;
@@ -63,6 +70,11 @@ function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReview
   }
   pending.set(candidate.id,{site,kind:candidate.kind,plot,entrance});const [x,y]=reviewFacilityAnchor(candidate.kind,plot);return {status:'clear',x,y};
  },afterFacilities(state){
+  for(const geometry of pendingBridges){
+   const building=siteAt(state.observation?.sites,0,state.year)?.buildings.find(b=>b.id===geometry.bridgeId);
+   if(!building||building.builtYear!==state.year||!building.recordId||review.bridgeReview!.bridges.some(b=>b.geometry.bridgeId===geometry.bridgeId))throw Error('Bridge transaction did not commit');
+   (review.bridgeReview!.bridges as SavedReviewBridge[]).push({geometry,builtYear:state.year,sourceRecordId:building.recordId});
+  }pendingBridges.length=0;
   for(const [id,p] of pending){
    const index=sites.indexOf(p.site),building=siteAt(state.observation?.sites,index,state.year)?.buildings.find(b=>b.id===id);
    if(!building||building.builtYear!==state.year||!building.recordId)throw Error('Facility/placement transaction did not commit');

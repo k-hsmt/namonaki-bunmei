@@ -5,6 +5,7 @@ import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import {reviewNeighborEntrances,reviewFacilityAnchor,selectReviewReservations} from '../terrain/facility-plan-review.js';
 import type {ReservationReviewMode,TypedGroundOccupation} from '../terrain/facility-plan-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
+import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import {southEntrance} from '../terrain/ground-access-review.js';
 import {siteAt} from './settlement-history.js';
 import {validateCivicBuilding,validateCivicLedger,type CivicBuilding} from './civic-architecture.js';
@@ -33,8 +34,8 @@ export function proposeGeneratedCivic(review:GeneratedFacilityReview,index:numbe
  if((state.observation!.people[index]??0)<4500||(district?.coverage.at(-1)??0)<.94||(district?.shortageYears??1)>0||!state.economy||tradeYearsFor(state.economy,regions[index]!.id)<3)return hold('no-capacity');
  const style=hash01(state.seed,14,0)<.5?'great-hall':'courtyard-hall',id='civic-'+siteId+'-'+year+'-'+style;
  const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===siteId&&p.builtYear<=year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...generatedHousingExtension.additionalOccupancy(review,state,siteId),...extra];
- const plan=review.plans[siteId],result=findPlacementReview({terrain:review.terrain,site:siteId,year,confirmedYear:year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,
-  reservations:selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id)))},
+ const plan=review.plans[siteId],result=findPlacementReview(withGeneratedBridgeAccess(review,{terrain:review.terrain,site:siteId,year,confirmedYear:year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,
+  reservations:selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id)))}),
   {objectId:id,purpose:'civic',width:style==='great-hall'?44:56,depth:style==='great-hall'?22:30,nucleus:plan.nucleus,
    neighborEntrances:reviewNeighborEntrances('civic',occupied),housingEntrances:housing.blocks.map(b=>southEntrance(b.footprint))});
  if(result.status==='hold')return hold(result.reason);

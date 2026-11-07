@@ -2,6 +2,7 @@
 import {hash01} from '../engine/rng.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
+import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import {southEntrance} from '../terrain/ground-access-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
 import {reviewNeighborEntrances,selectReviewReservations,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
@@ -66,9 +67,10 @@ export function createGeneratedHousingExtension(extra?:GeneratedLandReviewExtens
   const {id,ordinal}=nextId(state,site),plan=review.plans[site];
   const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...additionalOccupancy(review,state,site),...(extra?.(review,state,site)??[])];
   const reservations=selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id))),neighborEntrances=reviewNeighborEntrances('housing',occupied);
-  const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,occupied,reservations,neighborEntrances]);
+  const context=withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations});
+  const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,context.occupancy,reservations,neighborEntrances,context.crossings]);
   let failed=failedPlots.get(review.terrain);if(!failed){failed=new Set();failedPlots.set(review.terrain,failed);}
-  const result=failed.has(key)?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview({terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations},
+  const result=failed.has(key)?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
    {objectId:id,purpose:'housing',width:18,depth:8,nucleus:plan.nucleus,neighborEntrances});
   if(result.status==='hold'&&result.reason==='no-safe-plot')failed.add(key);
   if(result.status==='hold'){const key=site+':housing:'+result.reason;holds[key]=(holds[key]??0)+1;continue;}

@@ -78,8 +78,8 @@ export function validateBridgeGeometry(raw:unknown,t:ValidatedTerrainRecord,h:Va
  const point=(p:unknown):RecordPoint=>{if(!Array.isArray(p)||p.length!==2||!p.every(Number.isSafeInteger))throw Error('Invalid bridge point');return p as unknown as RecordPoint;};
  if(!Array.isArray(g.bankSupports)||g.bankSupports.length!==2)throw Error('Invalid bridge supports');
  const deck=plot(g.deck),a=plot(g.bankSupports[0]),b=plot(g.bankSupports[1]),pa=point(g.bankA),pb=point(g.bankB);
- const match=staticData(t,h).templates.some(c=>c.streamId===g.streamId&&samePlot(c.deck,deck)&&samePlot(c.bankSupports[0],a)&&samePlot(c.bankSupports[1],b)&&c.bankA[0]===pa[0]&&c.bankA[1]===pa[1]&&c.bankB[0]===pb[0]&&c.bankB[1]===pb[1]);
- if(!match)throw Error('Bridge disagrees with saved water, banks, slope or junctions');return freeze(structuredClone(raw)) as ValidatedBridgeGeometry;
+ const match=staticData(t,h).templates.find(c=>c.streamId===g.streamId&&samePlot(c.deck,deck)&&samePlot(c.bankSupports[0],a)&&samePlot(c.bankSupports[1],b)&&c.bankA[0]===pa[0]&&c.bankA[1]===pa[1]&&c.bankB[0]===pb[0]&&c.bankB[1]===pb[1]);
+ if(!match)throw Error('Bridge disagrees with saved water, banks, slope or junctions');return freeze({...match,bridgeId:g.bridgeId}) as ValidatedBridgeGeometry;
 }
 function coveredLand(distance:Int32Array,r:RecordRaster){
  const cells=new Uint8Array(N);
