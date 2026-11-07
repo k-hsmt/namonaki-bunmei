@@ -15,7 +15,7 @@ export type PublicSpaceTransition='established'|'overgrown'|'reused';
 
 export interface PublicSpace {
  readonly id:string;
- readonly siteId:'river-bank';
+ readonly siteId:'river-bank'|'hill-side'|'coast-inlet';
  readonly kind:PublicSpaceKind;
  readonly footprint:HousingPlot;
  readonly establishedYear:number;
@@ -74,13 +74,13 @@ const validBox=(x:unknown):x is HousingPlot=>{
   Number(x.width)<=64&&Number(x.depth)<=32&&
   Number(x.x)+Number(x.width)<=320&&Number(x.y)+Number(x.depth)<=180;
 };
-export function validatePublicSpace(x:unknown):x is PublicSpace{
+export function validatePublicSpace(x:unknown,mode:'legacy-fixed'|'generated-review-only'='legacy-fixed'):x is PublicSpace{
  if(!object(x)||!validBox(x.footprint))return false;
  const value=x;
  return Object.keys(value).every(k=>['id','siteId','kind','footprint','establishedYear',
   'anchorBuildingId','foundationRecordId','condition'].includes(k))&&
-  typeof value.id==='string'&&value.id.startsWith('public-river-bank-')&&
-  value.siteId==='river-bank'&&
+  typeof value.id==='string'&&value.id.startsWith('public-'+String(value.siteId)+'-')&&
+  (mode==='legacy-fixed'?value.siteId==='river-bank':mode==='generated-review-only'&&['river-bank','hill-side','coast-inlet'].includes(String(value.siteId)))&&
   (value.kind==='assembly-ground'||value.kind==='market-yard')&&
   nat(value.establishedYear)&&
   typeof value.anchorBuildingId==='string'&&value.anchorBuildingId.length>0&&
@@ -94,7 +94,8 @@ const immutable=(a:PublicSpace,b:PublicSpace)=>
  JSON.stringify(a.footprint)===JSON.stringify(b.footprint);
 
 /** 当年の正本だけを読む。必ずイベント順・形状・状態遷移を検証する。 */
-export function publicSpacesAt(history:PublicSpaceHistory|undefined,year:number):PublicSpaceView{
+export function publicSpacesAt(history:PublicSpaceHistory|undefined,year:number,mode:'legacy-fixed'|'generated-review-only'='legacy-fixed'):PublicSpaceView{
+ if(!['legacy-fixed','generated-review-only'].includes(mode))err('不明な地形モード');
  if(!nat(year))err('観測年が不正');
  if(!history)return {status:'unknown',spaces:[]};
  if(history.schemaVersion!==1||!nat(history.introducedYear)||
@@ -108,13 +109,13 @@ export function publicSpacesAt(history:PublicSpaceHistory|undefined,year:number)
    e.year<lastYear||(e.year===lastYear&&e.seq<=lastSeq))err('イベントの順序が不正');
   lastYear=e.year;lastSeq=e.seq;
   if(e.year>year)break;
-  if(!['established','overgrown','reused'].includes(e.kind)||!validatePublicSpace(e.after)||
+  if(!['established','overgrown','reused'].includes(e.kind)||!validatePublicSpace(e.after,mode)||
    e.spaceId!==e.after.id||!e.causeRecordId)err('イベント属性が不正');
   const old=spaces.get(e.spaceId);
   if(e.kind==='established'){
    if(old||e.after.establishedYear!==e.year||e.after.condition!=='used'||
     e.after.foundationRecordId!==e.causeRecordId)err('不正な成立または重複');
-   if([...spaces.values()].some(s=>overlaps(s.footprint,e.after.footprint)))err('公共空地どうしが重複');
+   if([...spaces.values()].some(s=>s.siteId===e.after.siteId&&overlaps(s.footprint,e.after.footprint)))err('公共空地どうしが重複');
   }else{
    if(!old)throw Error('公共空地履歴: 未成立の更新');
    if(!immutable(old,e.after))throw Error('公共空地履歴: 不変属性の変更');
