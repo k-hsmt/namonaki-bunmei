@@ -25,6 +25,10 @@ test('draft reload resumes the exact state and preserves a pending unconfirmed y
 });
 test('unknown contracts, corrupt land/access/source/initial plans and future or inconsistent states fail closed',()=>{
  const brokenSource=structuredClone(source);brokenSource.review.bridgeReview.bridges[0].geometry.bankA=[NaN,170];assert.throws(()=>createGeneratedSaveDraft(brokenSource));
+ const renamed=structuredClone(draft),old=renamed.state.housing.events[0].blockId;
+ for(const e of renamed.state.housing.events)if(e.blockId===old){e.blockId='unknown-residential';e.after.blockId='unknown-residential';}
+ for(const r of renamed.state.history)if(r.buildingId===old)r.buildingId='unknown-residential';for(const e of renamed.landHistory.events)if(e.objectId===old)e.objectId='unknown-residential';
+ assert.throws(()=>validateGeneratedSaveDraft(renamed),'a coherently renamed ID must not load and then break future ID allocation');
  for(const mutate of [d=>d.version=4,d=>d.rendererId='future',d=>d.initialTerrain.mode='legacy-fixed',d=>d.progressionPolicy.id='future',d=>d.progressionPolicy.limits.normalRelief=2,
   d=>d.initialTerrain.record.schemaVersion=2,d=>delete d.initialTerrain.hydrology,d=>d.initialTerrain.plans['river-bank'].primaryRoot=[150,130],
   d=>d.landHistory.events[0].placement.access[0][0]++,d=>d.landHistory.events[0].placement.plot.x++,d=>d.landHistory.events[0].sourceRecordId='missing',d=>d.landHistory.events.pop(),

@@ -80,7 +80,7 @@ function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiver
   for(const p of placed){
    const b=buildings.find(b=>b.id===p.objectId),slot=plans[site].slots.find(s=>s.id===p.objectId),[x,y]=reviewFacilityAnchor(p.kind as Exclude<GroundPurpose,'public-space'>,p.plot);
    if(!b||b.kind!==(p.kind==='civic'?'hall':p.kind)||b.x!==x||b.y!==y||b.builtYear!==p.builtYear)throw Error('Facility placement disagrees with immutable history');
-   if(p.kind==='civic'){if(!b.civic||!sameWire(b.civic.footprint,p.plot))throw Error('Civic placement disagrees');}
+   if(p.kind==='civic'){if(!b.civic||p.builtYear<40||p.builtYear%40||p.objectId!=='civic-'+site+'-'+p.builtYear+'-'+b.civic.architectureStyle||!sameWire(b.civic.footprint,p.plot))throw Error('Civic placement disagrees');}
    else if(!slot||slot.kind!==p.kind||p.plot.width!==(p.kind==='field'?26:18)||p.plot.depth!==(p.kind==='field'?14:7))throw Error('Ordinary placement disagrees');
    if(p.objectId===site+'-0'&&(p.builtYear!==0||p.sourceRecordId!==state.history[0]?.id||!sameWire(p.plot,plans[site].slots[0]!.plot)))throw Error('Initial plan and birth disagree');
   }
