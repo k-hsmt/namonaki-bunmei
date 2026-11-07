@@ -28,7 +28,7 @@ test('新規ゲームは生成v5とknownの住宅記録を保存し、再読込�
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
  const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));
  assert.equal(saved.version,5);assert.equal(saved.initialTerrain.mode,'generated');
- assert.deepEqual(saved,saveWorldSession(createNewWorld(42)),'browser and Node produce the same complete seeded world');
+ assert.deepEqual(saved,saveWorldSession(createNewWorld(Number(await page.locator('#seed').inputValue()))),'browser and Node produce the same complete seeded world');
  assert.deepEqual(saved.state.housing,{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
  const pixels=await page.locator('#scene').evaluate(e=>e.toDataURL());
  await page.reload();
@@ -74,4 +74,18 @@ test('破損現行キーは旧キーを選ばず、表示中の文明と保存�
  assert.equal(await page.locator('#scene').evaluate(e=>e.toDataURL()),baseline);
  assert.equal(await page.evaluate(k=>localStorage.getItem(k),KEY),'{ broken');
  assert.equal(await page.evaluate(k=>localStorage.getItem(k),OLD),old);
+});
+
+test('fresh starts choose a new random seed, while explicit seeds and saved worlds remain reproducible',async t=>{
+ const page=await browser.newPage();t.after(()=>page.close());
+ await page.addInitScript(()=>{Math.random=()=>{const n=Number(sessionStorage.getItem('test-seed-draws')??0);sessionStorage.setItem('test-seed-draws',String(n+1));return [0,2,5][n%3]/4294967295;};});
+ const ready=()=>page.waitForFunction(()=>!document.getElementById('save').disabled);
+ await page.goto(origin);await ready();assert.equal(await page.locator('#seed').inputValue(),'1');
+ await page.reload();await ready();assert.equal(await page.locator('#seed').inputValue(),'3','an unsaved fresh start must draw a seed again');
+ await page.locator('#random').click();await ready();assert.equal(await page.locator('#seed').inputValue(),'6');
+ await page.locator('#seed').fill('42');await page.locator('#restart').click();await ready();assert.equal(await page.locator('#seed').inputValue(),'42','the explicitly labelled same-seed restart stays available');
+ await page.locator('#save').click();await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
+ const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));assert.deepEqual(saved,saveWorldSession(createNewWorld(42)));
+ await page.reload();await ready();assert.equal(await page.locator('#seed').inputValue(),'42','a saved history takes priority over random creation');
+ assert.deepEqual(await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY)),saved);
 });
