@@ -34,6 +34,7 @@ test('roots and plant marks avoid water, unstable ground and occupied plots acro
  const r=advanceGeneratedBridgeReview(initial,300,'automatic');
  for(let i=0;i<3;i++){
   const o=observeGeneratedSceneReview(r,300,i),p=projectVegetation(o),raster=decodeRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),ctx=generatedSceneWalkContext(o),live=new Set(o.snapshot.objects.filter(b=>b.kind!=='field'||b.condition!=='ruined').map(b=>b.id)),occupied=ctx.occupancy.filter(p=>!o.ground.facilities.some(f=>f.id===p.id&&!live.has(f.id)));
+  for(const {point:[x,y]} of p.trees)for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){const j=(y+dy)*320+x+dx;assert.equal(raster.surface[j],1);assert.equal(raster.bearing[j],0);assert.ok(raster.grade[j]<=1);assert.ok(occupied.every(q=>!vegetationOverlap({x:x+dx,y:y+dy,width:1,depth:1},q.plot)));}
   assert.ok(p.trees.length<=22&&p.shrubs.length<=32);for(const {point:[x,y]} of [...p.grass,...p.shrubs,...p.trees]){assert.equal(raster.surface[y*320+x],1);assert.equal(raster.bearing[y*320+x],0);assert.ok(occupied.every(q=>!vegetationOverlap({x,y,width:1,depth:1},q.plot)));}
  }
 });

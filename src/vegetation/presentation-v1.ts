@@ -9,6 +9,7 @@ export function projectVegetation(o:GeneratedSceneObservation){
  const occupied:GroundPlot[]=[...g.facilities.filter(p=>live.has(p.id)).map(p=>p.plot),...c.residentialBlocks.map(b=>b.footprint),...(s.publicSpaces??[]).filter(p=>p.condition==='used').map(p=>p.footprint),...g.bridges.flatMap(b=>[b.deck,...b.bankSupports])];
  const inside=(p:GroundPlot,x:number,y:number,pad=0)=>x>=p.x-pad&&x<p.x+p.width+pad&&y>=p.y-pad&&y<p.y+p.depth+pad;
  const clear=(x:number,y:number)=>x>=0&&x<320&&y>=96&&y<180&&r.surface[y*320+x]===1&&r.bearing[y*320+x]===0&&!occupied.some(p=>inside(p,x,y));
+ const rooted=(x:number,y:number)=>[0,1].every(dy=>[0,1].every(dx=>clear(x+dx,y+dy)&&r.grade[(y+dy)*320+x+dx]!<=1));
  const grass:{point:RecordPoint;color:string}[]=[],shrubs:{point:RecordPoint;rank:number}[]=[],trees:{point:RecordPoint;scale:number;rank:number}[]=[];
  for(const p of g.vegetation??[]){
   const hash=(n:number)=>terrainHash(['vegetation-display-v1',g.terrain.source.seed,g.site,p.index,n]);
@@ -17,7 +18,7 @@ export function projectVegetation(o:GeneratedSceneObservation){
    if(p.stage>0)grass.push({point:[x,y],color:p.stage===1?'#a4a77c':'#8e9c70'});
    else if(p.disturbedYear!==null&&s.year-p.disturbedYear<15)grass.push({point:[x,y],color:'#8e856d'});
    if(n===0&&p.stage===2&&h%3===0&&clear(x+2,y))shrubs.push({point:[x,y],rank:h});
-   if(n===0&&p.stage>=3&&h%5===0&&r.grade[y*320+x]!<=1&&!occupied.some(q=>x>=q.x-12&&x<q.x+q.width+12&&y>=q.y-6&&y<q.y+q.depth+24))trees.push({point:[x,y],scale:(.45+(y-96)/160)*(p.stage===4?1:.62),rank:h});
+   if(n===0&&p.stage>=3&&h%5===0&&rooted(x,y)&&!occupied.some(q=>x>=q.x-12&&x<q.x+q.width+12&&y>=q.y-6&&y<q.y+q.depth+24))trees.push({point:[x,y],scale:(.45+(y-96)/160)*(p.stage===4?1:.62),rank:h});
   }
  }
  shrubs.sort((a,b)=>a.rank-b.rank);trees.sort((a,b)=>a.rank-b.rank);const selected:typeof trees=[];
