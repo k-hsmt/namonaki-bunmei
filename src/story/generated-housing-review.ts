@@ -2,6 +2,7 @@
 import {hash01} from '../engine/rng.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
+import type {GrowthPattern} from '../terrain/organic-placement-v2.js';
 import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import {southEntrance} from '../terrain/ground-access-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
@@ -88,11 +89,11 @@ export function createGeneratedHousingExtension(extra?:GeneratedLandReviewExtens
   const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...additionalOccupancy(review,state,site),...(extra?.(review,state,site)??[])];
   const reservations=selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id))),neighborEntrances=reviewNeighborEntrances('housing',occupied);
   const context=withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations});
-  const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,context.occupancy,reservations,neighborEntrances,context.crossings]);
+  const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,context.occupancy,reservations,neighborEntrances,context.crossings,review.growthPattern]);
   let failed=failedPlots.get(review.terrain);if(!failed){failed=new Set();failedPlots.set(review.terrain,failed);}
   const reused=failed.has(key);if(reused)replayMetrics.plotHoldReuses++;
   const result=reused?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
-   {objectId:id,purpose:'housing',width:18,depth:8,nucleus:plan.nucleus,neighborEntrances});
+   {objectId:id,purpose:'housing',width:18,depth:8,nucleus:plan.nucleus,neighborEntrances,...(review.growthPattern?{growthPattern:review.growthPattern}:{})});
   if(result.status==='hold'&&result.reason==='no-safe-plot')failed.add(key);
   if(result.status==='hold'){const key=site+':housing:'+result.reason;holds[key]=(holds[key]??0)+1;continue;}
   const block:ResidentialBlock={blockId:id,siteId:site,footprint:result.plot,builtYear:state.year,
@@ -121,8 +122,8 @@ export function createGeneratedHousingExtension(extra?:GeneratedLandReviewExtens
  }};
 }
 export const generatedHousingExtension=createGeneratedHousingExtension();
-export function createGeneratedHousingReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode):GeneratedHousingReview|{status:'hold';reason:string}{
- const review=createGeneratedFacilityReview(terrain,mode);return review.status==='hold'?review:{format:'generated-housing-review',status:'review-only',review};
+export function createGeneratedHousingReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedHousingReview|{status:'hold';reason:string}{
+ const review=createGeneratedFacilityReview(terrain,mode,growthPattern);return review.status==='hold'?review:{format:'generated-housing-review',status:'review-only',review};
 }
 function check(input:GeneratedHousingReview){if(input.format!=='generated-housing-review'||input.status!=='review-only')throw Error('Invalid generated housing boundary');}
 export function advanceGeneratedHousingReview(input:GeneratedHousingReview,years:number,choices:'stop'|'automatic'='stop'):GeneratedHousingReview {

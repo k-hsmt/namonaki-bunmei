@@ -2,6 +2,7 @@
 import {fixedFacilityLotReservations} from '../story/settlement-history.js';
 import type {RecordPoint,RecordSite} from './terrain-record-types.js';
 import type {ValidatedTerrainRecord} from './terrain-record.js';
+import type {GrowthPattern} from './organic-placement-v2.js';
 import {proposeInitialAccess} from './initial-access-review.js';
 import {findPlacementReview,type SearchReviewRequest} from './placement-search-review.js';
 import {southEntrance,type GroundPurpose,type GroundOccupation,type GroundPlot} from './ground-access-review.js';
@@ -21,8 +22,8 @@ export function reviewNeighborEntrances(purpose:GroundPurpose,occupancy:readonly
   purpose==='civic'||purpose==='public-space'?['hall']:['house','housing'];
  return occupancy.filter(o=>kinds.includes(o.kind)).slice().sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0).map(o=>o.entrance);
 }
-export function planFacilitySitesReview(terrain:ValidatedTerrainRecord,site:RecordSite):ReviewFacilityPlan|{status:'hold';reason:string}{
- const initial=proposeInitialAccess(terrain,site);if(initial.status==='hold')return initial;
+export function planFacilitySitesReview(terrain:ValidatedTerrainRecord,site:RecordSite,growthPattern?:GrowthPattern):ReviewFacilityPlan|{status:'hold';reason:string}{
+ const initial=proposeInitialAccess(terrain,site,growthPattern);if(initial.status==='hold')return initial;
  const definitions=fixedFacilityLotReservations(sites.indexOf(site));
  if(definitions.length!==11)throw Error('Unexpected facility slot definitions');
  const slots:ReviewFacilitySlot[]=definitions.map((d,slot)=>({slot,id:d.id,kind:d.kind,plot:null,reason:d.kind==='bridge'?'unsupported-bridge':'not-searched'}));
@@ -34,7 +35,7 @@ export function planFacilitySitesReview(terrain:ValidatedTerrainRecord,site:Reco
  for(const slot of [1,3,2,4,5,6,8,9,10]){
   const definition=slots[slot]!,purpose=definition.kind as GroundPurpose;
   const request:SearchReviewRequest={objectId:definition.id,purpose,width:purpose==='field'?26:18,depth:purpose==='field'?14:7,
-   nucleus:initial.nucleus,neighborEntrances:reviewNeighborEntrances(purpose,actual)};
+   nucleus:initial.nucleus,neighborEntrances:reviewNeighborEntrances(purpose,actual),...(growthPattern?{growthPattern}:{})};
   const result=findPlacementReview({terrain,site,year:0,confirmedYear:0,historyStatus:'known',primaryRoot:initial.primaryRoot,occupancy:actual,
    reservations:slots.filter(s=>s.slot!==0&&s.plot!==null).map(s=>({id:s.id,plot:s.plot!}))},request);
   metrics.searches++;metrics.accessEvaluations+=result.metrics.accessEvaluations;metrics.scoreEvaluations+=result.metrics.scoreEvaluations;

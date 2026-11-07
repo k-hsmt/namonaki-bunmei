@@ -5,12 +5,14 @@ import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
 import {readOwnedRecordPhysics,frozenRecordPhysics} from './owned-record-physics.js';
 import {terrainHash,terrainCoordinateHasher} from './terrain-hash-v1.js';
+import {organicAttraction,organicDensityPenalty,organicPlotClear,organicGrowthLimits,type GrowthPattern} from './organic-placement-v2.js';
 import {groundContextWindows,groundDistances,groundDistancesFromAny,groundDistancesToGroups,reviewPhysicalPlot,reviewGroundAccess,createGroundAccessTransaction,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;
  readonly nucleus:RecordPoint;readonly neighborEntrances:readonly RecordPoint[];
  /** Civic distance to the nearest confirmed housing entrance, independent of hall distance. */
  readonly housingEntrances?:readonly RecordPoint[];
+ readonly growthPattern?:GrowthPattern;
 }
 const N=57600,W=320;
 const index=(p:RecordPoint)=>p[1]*W+p[0];
@@ -58,32 +60,43 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  // Public space still needs its constrained anchor neighborhood.
  if(!['house','field','housing','hall','market','workshop','granary','civic'].includes(req.purpose))return stop('unsupported-review-purpose');
  if(req.purpose==='civic'&&!req.neighborEntrances.length)return stop('missing-anchor');
+ if(req.growthPattern!==undefined&&req.growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
+ const organic=req.growthPattern==='organic-v2'?organicAttraction(ctx,req.purpose,req.objectId,req.nucleus,req.neighborEntrances):null;
+ const neighbors=organic?[organic.anchor]:req.neighborEntrances;
  const r=readOwnedRecordPhysics(ctx.terrain.sites[ctx.site].physics);
  const physical=physicalCandidates(ctx,req,r,mode==='bounded');metrics.enumerated=physical.enumerated;metrics.physicalClear=physical.physicalClear;
  const occupied=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==req.objectId)];
- const available=physical.plots.filter(c=>!occupied.some(o=>overlap(o.plot,c.plot)));
+ const actualPlots=organic?ctx.occupancy.map(o=>o.plot):[];
+ const available=physical.plots.filter(c=>!occupied.some(o=>overlap(o.plot,c.plot))&&(!organic||organicPlotClear(c.plot,actualPlots,req.purpose)));
  // No access graph can make a physically impossible or occupied plot valid.
  if(!available.length){searchMetrics.availabilityRejects++;return stop('no-safe-plot');}
  const baseWindows=groundContextWindows(r,ctx);
  const housing=req.purpose==='civic'?req.housingEntrances??[]:[];
  const distancesFor=(windows:Uint8Array)=>{
   metrics.distanceFieldBuilds+=2+(housing.length?1:0);
-  return [groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances),
+  return [groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,neighbors),
    ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];
  };
  const base=distancesFor(baseWindows);
- const rankValues=(core:number|undefined,closest:number|undefined,homes:number|undefined,penalty:number):number=>{
+ const rankValues=(core:number|undefined,closest:number|undefined,homes:number|undefined,penalty:number,lower=false):number=>{
   if(core===undefined||core<0)return Infinity;
   const near=closest!==undefined&&closest>=0?closest:Infinity;
-  if(req.neighborEntrances.length&&!Number.isFinite(near))return Infinity;
+  if(neighbors.length&&!Number.isFinite(near))return Infinity;
   if(homes===undefined||homes<0)return Infinity;
+  if(organic){
+   if(near>organicGrowthLimits.maxWalk)return Infinity;
+   // Candidate occupation can increase distance. Below the preferred band the
+   // admissible lower bound is zero, rather than the nonmonotone close penalty.
+   const local=3*(Math.max(0,near-organic.maximum)+(lower?0:Math.max(0,organic.minimum-near)));
+   return Math.min(core,organicGrowthLimits.coreCap)+local+homes+penalty;
+  }
   // For fields the 2/px preference outside 12..64 is monotone together with
   // the 3*Dneighbor term: total derivative is 1,3,5. Lower-bound pruning is safe.
   const fieldNeighborPenalty=req.purpose==='field'&&Number.isFinite(near)?2*(Math.max(0,12-near)+Math.max(0,near-64)):0;
   return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+3*homes+fieldNeighborPenalty+penalty;
  };
- const rank=(distances:readonly Int32Array[],entry:RecordPoint,penalty:number)=>{
-  const i=index(entry);return rankValues(distances[0]![i],distances[1]![i],housing.length?distances[2]![i]:0,penalty);
+ const rank=(distances:readonly Int32Array[],entry:RecordPoint,penalty:number,lower=false)=>{
+  const i=index(entry);return rankValues(distances[0]![i],distances[1]![i],housing.length?distances[2]![i]:0,penalty,lower);
  };
  const candidates:{plot:GroundPlot;entrance:RecordPoint;penalty:number;lower:number}[]=[];
  const hashPrefix=['placement-search-review-v2',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId];
@@ -91,8 +104,8 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  for(const {plot,slopeCells,waterPenalty} of available){
   const {x,y}=plot;
   const entrance=southEntrance(plot),penalty=waterPenalty+slopeCells+Math.max(0,y-150)*2+
-   coordinateHash(x,y)%4;
-  const lower=rank(base,entrance,penalty);if(Number.isFinite(lower))candidates.push({plot,entrance,penalty,lower});
+   coordinateHash(x,y)%4+(organic?organicDensityPenalty(plot,actualPlots):0);
+  const lower=rank(base,entrance,penalty,true);if(Number.isFinite(lower))candidates.push({plot,entrance,penalty,lower});
  }
  candidates.sort((a,b)=>a.lower-b.lower||a.plot.y-b.plot.y||a.plot.x-b.plot.x);
  const transaction=mode==='bounded'?createGroundAccessTransaction(ctx):null;
@@ -107,7 +120,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   const windows=transaction?.windows??groundContextWindows(r,ctx,[c.plot]);let score:number;
   if(mode==='exhaustive')score=rank(distancesFor(windows),c.entrance,c.penalty);
   else {
-   metrics.targetedDistanceQueries++;const distances=groundDistancesToGroups(windows,c.entrance,[[req.nucleus],req.neighborEntrances,housing]);
+   metrics.targetedDistanceQueries++;const distances=groundDistancesToGroups(windows,c.entrance,[[req.nucleus],neighbors,housing]);
    score=rankValues(distances[0],distances[1],housing.length?distances[2]:0,c.penalty);
   }
   if(!Number.isFinite(score))continue;

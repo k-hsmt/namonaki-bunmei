@@ -305,3 +305,37 @@ jobs:
             artifacts/terrain31-d5/*.png
             artifacts/terrain31-d5/*_save.json
           if-no-files-found: error
+
+  organic-growth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Verify organic growth, saved continuation and compact fixtures
+        run: node scripts/audit-organic-growth.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Measure organic annual progression against compact policy
+        run: node scripts/benchmark-organic-growth.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Compare natural compact and organic scenery
+        run: node scripts/review-organic-growth.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain31-organic-growth
+          retention-days: 14
+          path: artifacts/terrain31-organic/*
+          if-no-files-found: error

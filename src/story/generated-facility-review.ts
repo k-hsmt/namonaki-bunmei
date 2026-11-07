@@ -4,6 +4,7 @@ import {step,choose,chooseAutomatically,type CivilizationState,type ReviewLandPr
 import {siteAt} from './settlement-history.js';
 import {readOwnedTerrainRecord,type ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
+import type {GrowthPattern} from '../terrain/organic-placement-v2.js';
 import {planFacilitySitesReview,selectReviewReservations,reviewNeighborEntrances,reviewFacilityAnchor,type ReviewFacilityPlan,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
 import {reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose} from '../terrain/ground-access-review.js';
@@ -17,6 +18,7 @@ export interface GeneratedFacilityReview {
  readonly format:'generated-facility-review';readonly status:'review-only';readonly placementPolicy:null;
  readonly terrain:ValidatedTerrainRecord;readonly plans:Readonly<Record<RecordSite,ReviewFacilityPlan>>;
  readonly reservationMode:ReservationReviewMode;readonly state:CivilizationState;
+ readonly growthPattern?:GrowthPattern;
  readonly placements:readonly ReviewFacilityPlacement[];
  readonly bridgeReview?:BridgeHistoryReview;
  readonly diagnostics:{readonly holds:Readonly<Record<string,number>>;readonly fullSearches:number};
@@ -28,9 +30,10 @@ export interface GeneratedLandReviewExtension {
 }
 /** A UI batch may stop after its first new record while validating only once. */
 export interface GeneratedAdvanceOptions {readonly stopAtNewRecord?:boolean}
-export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,reservationMode:ReservationReviewMode):GeneratedFacilityReview|{status:'hold';reason:string}{
+export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,reservationMode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedFacilityReview|{status:'hold';reason:string}{
+ if(growthPattern!==undefined&&growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
  const plans={} as Record<RecordSite,ReviewFacilityPlan>;
- for(const site of sites){const result=planFacilitySitesReview(terrain,site);if(result.status==='hold')return result;plans[site]=result;}
+ for(const site of sites){const result=planFacilitySitesReview(terrain,site,growthPattern);if(result.status==='hold')return result;plans[site]=result;}
  // Validate mode before creating any civilization state.
  selectReviewReservations(plans['river-bank'],reservationMode);
  const state=createHousingCivilization(terrain.source.seed),placements:ReviewFacilityPlacement[]=[];
@@ -39,10 +42,11 @@ export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,res
   for(const b of history.view.buildings){b.x=x;b.y=y;placements.push({objectId:b.id,site,kind:'house',plot,entrance:southEntrance(plot),builtYear:0,sourceRecordId:state.history[0]!.id});}
   for(const change of history.buildingChanges){change.building.x=x;change.building.y=y;}
  }
- return {format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode,state,placements,diagnostics:{holds:{},fullSearches:0}};
+ return {format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode,state,placements,diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{})};
 }
 function mutableCopy(input:GeneratedFacilityReview):GeneratedFacilityReview {
  if(input.format!=='generated-facility-review'||input.status!=='review-only'||input.placementPolicy!==null||input.state.version!==4||input.state.seed!==input.terrain.source.seed)throw Error('Invalid generated review boundary');
+ if(input.growthPattern!==undefined&&input.growthPattern!=='organic-v2')throw Error('Unknown growth pattern');
  const terrain=readOwnedTerrainRecord(input.terrain),next=structuredClone({...input,terrain:null});return {...next,terrain};
 }
 function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):ReviewLandProgression {
@@ -62,12 +66,12 @@ function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReview
   }
   const preferred=plan.slots.find(s=>s.id===candidate.id)?.plot;
   let plot:GroundPlot,entrance:RecordPoint;
-  const checked=preferred?reviewGroundAccess(context,candidate.kind,candidate.id,preferred):null;
+  const checked=preferred&&!review.growthPattern?reviewGroundAccess(context,candidate.kind,candidate.id,preferred):null;
   if(preferred&&checked?.status==='clear'){plot=preferred;entrance=checked.entrance;}
   else {
    (review.diagnostics as {fullSearches:number}).fullSearches++;
    const result=findPlacementReview(context,{objectId:candidate.id,purpose:candidate.kind,width:candidate.kind==='field'?26:18,depth:candidate.kind==='field'?14:7,
-    nucleus:plan.nucleus,neighborEntrances:reviewNeighborEntrances(candidate.kind,actual)});
+    nucleus:plan.nucleus,neighborEntrances:reviewNeighborEntrances(candidate.kind,actual),...(review.growthPattern?{growthPattern:review.growthPattern}:{})});
    if(result.status==='hold')return hold(site,candidate.kind,result.reason);plot=result.plot;entrance=result.entrance;
   }
   pending.set(candidate.id,{site,kind:candidate.kind,plot,entrance});const [x,y]=reviewFacilityAnchor(candidate.kind,plot);return {status:'clear',x,y};

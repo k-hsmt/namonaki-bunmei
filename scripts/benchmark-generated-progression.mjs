@@ -41,7 +41,7 @@ for(const seed of seeds)for(const year of years){
    const measured=previous.cases.find(c=>c.seed===seed&&c.year===year)?.[name];
    assert.equal(measured?.measuredMs.length,5,'missing complete baseline measurement');row[name]=measured;continue;
   }
-  const values=[],traces=[],template=legacy?api.createHousingCivilization(seed):api.createNewWorld(seed),initialWire=JSON.stringify(template);let expectedHash;
+  const values=[],traces=[],template=legacy?api.createHousingCivilization(seed):api.createNewWorld(seed,'terrain-placement-v1'),initialWire=JSON.stringify(template);let expectedHash;
   for(let run=0;run<6;run++){
    const initial=legacy?structuredClone(template):template;
    const metrics=()=>Object.assign({},api.generatedGroundGraphMetrics?.(),api.generatedPlacementSearchMetrics?.(),api.generatedHousingReplayMetrics?.(),api.generatedBridgeProposalMetrics?.());

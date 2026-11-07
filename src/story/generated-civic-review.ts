@@ -2,6 +2,7 @@
 import {hash01} from '../engine/rng.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
 import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
+import type {GrowthPattern} from '../terrain/organic-placement-v2.js';
 import {reviewNeighborEntrances,reviewFacilityAnchor,selectReviewReservations} from '../terrain/facility-plan-review.js';
 import type {ReservationReviewMode,TypedGroundOccupation} from '../terrain/facility-plan-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
@@ -37,7 +38,7 @@ export function proposeGeneratedCivic(review:GeneratedFacilityReview,index:numbe
  const plan=review.plans[siteId],result=findPlacementReview(withGeneratedBridgeAccess(review,{terrain:review.terrain,site:siteId,year,confirmedYear:year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,
   reservations:selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id)))}),
   {objectId:id,purpose:'civic',width:style==='great-hall'?44:56,depth:style==='great-hall'?22:30,nucleus:plan.nucleus,
-   neighborEntrances:reviewNeighborEntrances('civic',occupied),housingEntrances:housing.blocks.map(b=>southEntrance(b.footprint))});
+   neighborEntrances:reviewNeighborEntrances('civic',occupied),housingEntrances:housing.blocks.map(b=>southEntrance(b.footprint)),...(review.growthPattern?{growthPattern:review.growthPattern}:{})});
  if(result.status==='hold')return hold(result.reason);
  const recordId=year+'-'+state.history.length,[x,y]=reviewFacilityAnchor('civic',result.plot);
  const candidate:CivicBuilding={id,kind:'hall',x,y,builtYear:year,condition:'intact',recordId,civic:{architectureStyle:style,footprint:result.plot,constructionRecordId:recordId}};
@@ -66,8 +67,8 @@ export function createGeneratedCivicExtension(extra?:GeneratedLandReviewExtensio
 }
 const extension=createGeneratedCivicExtension();
 export interface GeneratedCivicReview {readonly format:'generated-civic-review';readonly status:'review-only';readonly review:GeneratedFacilityReview}
-export function createGeneratedCivicReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode):GeneratedCivicReview|{status:'hold';reason:string}{
- const parent=createGeneratedHousingReview(terrain,mode);return parent.status==='hold'?parent:{format:'generated-civic-review',status:'review-only',review:parent.review};
+export function createGeneratedCivicReview(terrain:ValidatedTerrainRecord,mode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedCivicReview|{status:'hold';reason:string}{
+ const parent=createGeneratedHousingReview(terrain,mode,growthPattern);return parent.status==='hold'?parent:{format:'generated-civic-review',status:'review-only',review:parent.review};
 }
 export function advanceGeneratedCivicReview(input:GeneratedCivicReview,years:number,choices:'stop'|'automatic'='stop'):GeneratedCivicReview {
  if(input.format!=='generated-civic-review'||input.status!=='review-only')throw Error('Invalid generated civic boundary');

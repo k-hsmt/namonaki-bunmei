@@ -59,3 +59,21 @@ test('large civic plots use hall and housing distances and match exhaustive scor
  for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key]);
  assert.equal(findPlacementReview(ctx,{...civic,neighborEntrances:[]}).reason,'missing-anchor');
 });
+for(const purpose of ['house','housing','field','civic'])test('organic distance band preserves exact pruning for '+purpose,()=>{
+ const {ctx,req}=fixture(1);
+ const organic={...req,objectId:'growth-4',purpose,growthPattern:'organic-v2',...(purpose==='field'?{width:26,depth:14}:{}),...(purpose==='civic'?{housingEntrances:[req.nucleus]}:{})};
+ const fast=findPlacementReview(ctx,organic),slow=findPlacementReview(ctx,organic,'exhaustive');
+ assert.equal(fast.status,'review-only');
+ for(const key of ['status','plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key],key);
+ const p=fast.plot,q=ctx.occupancy[0].plot,dx=Math.max(q.x-p.x-p.width,p.x-q.x-q.width,0),dy=Math.max(q.y-p.y-p.depth,p.y-q.y-q.depth,0);
+ assert.ok(dx>=(purpose==='field'?3:purpose==='civic'?8:6)||dy>=(purpose==='field'?3:10));
+});
+test('organic branching uses confirmed anchors deterministically and keeps exact search',()=>{
+ const {ctx,req}=fixture(1);
+ ctx.occupancy.push({id:'house2',plot:{x:34,y:102,width:18,depth:7},entrance:[42,109]},{id:'house3',plot:{x:60,y:102,width:18,depth:7},entrance:[68,109]});
+ const organic={...req,objectId:'housing-4',purpose:'housing',growthPattern:'organic-v2',neighborEntrances:ctx.occupancy.map(o=>o.entrance)};
+ const fast=findPlacementReview(ctx,organic),slow=findPlacementReview(ctx,organic,'exhaustive');
+ assert.equal(fast.status,'review-only');for(const key of ['plot','entrance','score','access'])assert.deepEqual(fast[key],slow[key]);
+ assert.deepEqual(findPlacementReview(ctx,{...organic,neighborEntrances:[...organic.neighborEntrances].reverse()}).plot,fast.plot);
+ assert.throws(()=>findPlacementReview(ctx,{...req,growthPattern:'future'}));
+});

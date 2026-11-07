@@ -33,7 +33,7 @@ const report={sourceSHA,dirty,rendererId:'generated-scene-v1',mode:'generated',p
  'Single-family catalog is maintained separately in terrain31-families; human review remains required']};
 for(const seed of seeds){
  try{
-  let outer=createNewWorld(seed).review;
+  let outer=createNewWorld(seed,'terrain-placement-v1').review;
   const metrics=()=>({...generatedGroundGraphMetrics(),...generatedPlacementSearchMetrics(),...generatedHousingReplayMetrics(),...generatedBridgeProposalMetrics()}),before=metrics();
   const early=new Map(),holds=new Map(),periods={},timings=[];let previous=performance.now();
   const extension={additionalOccupancy:generatedPublicSpaceExtension.additionalOccupancy,afterFacilities(r,s){

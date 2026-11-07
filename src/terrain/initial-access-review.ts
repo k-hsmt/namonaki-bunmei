@@ -3,6 +3,7 @@ import type {ValidatedTerrainRecord} from './terrain-record.js';
 import type {RecordPoint,RecordSite} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
 import {terrainHash} from './terrain-hash-v1.js';
+import {organicPlotClear,type GrowthPattern} from './organic-placement-v2.js';
 import {groundWalkWindows,groundDistances,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot} from './ground-access-review.js';
 const W=320,N=57600;
 const point=(i:number):RecordPoint=>[i%W,Math.floor(i/W)];
@@ -13,7 +14,7 @@ export interface InitialAccessProposal {
  readonly accessRoots:readonly RecordPoint[];readonly house:GroundPlot;readonly field:GroundPlot;
  readonly trials:{readonly house:number;readonly field:number};
 }
-export function proposeInitialAccess(terrain:ValidatedTerrainRecord,site:RecordSite):InitialAccessProposal|{status:'hold';reason:'no-safe-plot';trials:{house:number;field:number}} {
+export function proposeInitialAccess(terrain:ValidatedTerrainRecord,site:RecordSite,growthPattern?:GrowthPattern):InitialAccessProposal|{status:'hold';reason:'no-safe-plot';trials:{house:number;field:number}} {
  const raster=decodeRecordPhysics(terrain.sites[site].physics),windows=groundWalkWindows(raster,[]);
  const seen=new Uint8Array(N),components:{area:number;first:number;roots:number[];members:Set<number>}[]=[];
  for(let i=96*W;i<N;i++)if(windows[i]&&!seen[i]){
@@ -42,8 +43,9 @@ export function proposeInitialAccess(terrain:ValidatedTerrainRecord,site:RecordS
   const sorted=houses.filter(p=>component.members.has(index(southEntrance(p)))).map(p=>{
    let water=N;for(let y=p.y;y<p.y+p.depth;y++)for(let x=p.x;x<p.x+p.width;x++)water=Math.min(water,waterDistance[y*W+x]!);
    const preference=waterQueue.length?(water>=8&&water<=32?0:1):Math.abs(p.x+9-cx)+Math.abs(p.y+3-cy);
-   return {p,preference,tie:terrainHash(['initial-access-review-v1',terrain.source.seed,'house',site,'0',p.x,p.y])};
-  }).sort((a,b)=>a.preference-b.preference||a.tie-b.tie||a.p.y-b.p.y||a.p.x-b.p.x);
+   const room=growthPattern==='organic-v2'?Math.abs(p.y+3-132)*2+Math.max(0,36-p.x)*3+Math.max(0,p.x+18-284)*3:0;
+   return {p,preference,room,tie:terrainHash(['initial-access-review-v1',terrain.source.seed,'house',site,'0',p.x,p.y])};
+  }).sort((a,b)=>a.preference-b.preference||a.room-b.room||a.tie-b.tie||a.p.y-b.p.y||a.p.x-b.p.x);
   for(const {p:house} of sorted){
    trials.house++;const entrance=southEntrance(house),afterHouse=groundWalkWindows(raster,[house]);
    const d=groundDistances(afterHouse,entrance);
@@ -56,6 +58,7 @@ export function proposeInitialAccess(terrain:ValidatedTerrainRecord,site:RecordS
     const ea=southEntrance(a),eb=southEntrance(b);return d[index(ea)]!-d[index(eb)]!||a.y-b.y||a.x-b.x;
    });
    for(const field of fieldCandidates){
+    if(growthPattern&&!organicPlotClear(field,[house],'field'))continue;
     trials.field++;
     const result=reviewGroundAccess({...context,occupancy:[{id:'initial-house',plot:house,entrance}]},'field','initial-field',field);
     if(result.status==='clear')return {status:'review-only',site,nucleus:entrance,primaryRoot,
