@@ -14,6 +14,34 @@ export interface SearchReviewRequest {
 const N=57600,W=320;
 const index=(p:RecordPoint)=>p[1]*W+p[0];
 const overlap=(a:GroundPlot,b:GroundPlot)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.depth&&a.y+a.depth>b.y;
+interface StaticPlots {enumerated:number;physicalClear:number;plots:readonly {plot:GroundPlot;slopeCells:number;waterPenalty:number}[]}
+const staticPlots=new WeakMap<object,Map<string,StaticPlots>>();
+/** Physics is immutable across births, HOLDs and bridge condition changes.
+ * Occupancy, reservations, access, distances and scores remain dynamic.
+ */
+function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:ReturnType<typeof decodeRecordPhysics>,cache:boolean):StaticPlots {
+ const physics=ctx.terrain.sites[ctx.site].physics,key=JSON.stringify([req.purpose,req.width,req.depth]);
+ const frozen=cache&&Object.isFrozen(physics)&&Object.isFrozen(physics.rows)&&physics.rows.every(row=>Object.isFrozen(row)&&row.every(Object.isFrozen));
+ const found=frozen?staticPlots.get(physics)?.get(key):undefined;if(found)return found;
+ const water=new Int32Array(N);water.fill(N);const queue:number[]=[];
+ // Sea proximity must not be interpreted as freshwater irrigation for fields.
+ for(let i=96*W;i<N;i++)if(r.surface[i]===2||req.purpose!=='field'&&r.surface[i]===3){water[i]=0;queue.push(i);}
+ for(let head=0;head<queue.length;head++){
+  const i=queue[head]!,x=i%W,y=Math.floor(i/W);
+  for(const j of [y>96?i-W:-1,x<319?i+1:-1,y<179?i+W:-1,x>0?i-1:-1])if(j>=0&&water[j]!>water[i]!+1){water[j]=water[i]!+1;queue.push(j);}
+ }
+ const result:{enumerated:number;physicalClear:number;plots:{plot:GroundPlot;slopeCells:number;waterPenalty:number}[]}={enumerated:0,physicalClear:0,plots:[]};
+ for(let y=96;y+req.depth<=180;y+=2)for(let x=2;x+req.width<=320;x+=2){
+  result.enumerated++;const plot={x,y,width:req.width,depth:req.depth},physical=reviewPhysicalPlot(r,req.purpose,plot);
+  if(physical.status!=='clear')continue;result.physicalClear++;
+  let dwater=N;for(let py=y;py<y+req.depth;py++)for(let px=x;px<x+req.width;px++)dwater=Math.min(dwater,water[py*W+px]!);
+  if(req.purpose!=='field'&&dwater<2)continue;
+  const waterPenalty=req.purpose==='field'?(queue.length?2*(Math.max(0,8-dwater)+Math.max(0,dwater-40)):0):(dwater<8?(8-dwater)*4:0);
+  result.plots.push({plot,slopeCells:physical.slopeCells,waterPenalty});
+ }
+ if(frozen){let entries=staticPlots.get(physics);if(!entries){entries=new Map();staticPlots.set(physics,entries);}entries.set(key,result);}
+ return result;
+}
 /** Full enumeration mode is retained as an independent check on pruning decisions. */
 export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,mode:'bounded'|'exhaustive'='bounded'){
  const metrics={enumerated:0,physicalClear:0,accessEvaluations:0,scoreEvaluations:0};
@@ -29,13 +57,6 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
  const distancesFor=(windows:Uint8Array)=>[groundDistances(windows,req.nucleus),groundDistancesFromAny(windows,req.neighborEntrances),
   ...(housing.length?[groundDistancesFromAny(windows,housing)]:[])];
  const base=distancesFor(baseWindows);
- const water=new Int32Array(N);water.fill(N);const queue:number[]=[];
- // Sea proximity must not be interpreted as freshwater irrigation for fields.
- for(let i=96*W;i<N;i++)if(r.surface[i]===2||req.purpose!=='field'&&r.surface[i]===3){water[i]=0;queue.push(i);}
- for(let head=0;head<queue.length;head++){
-  const i=queue[head]!,x=i%W,y=Math.floor(i/W);
-  for(const j of [y>96?i-W:-1,x<319?i+1:-1,y<179?i+W:-1,x>0?i-1:-1])if(j>=0&&water[j]!>water[i]!+1){water[j]=water[i]!+1;queue.push(j);}
- }
  const rank=(distances:readonly Int32Array[],entry:RecordPoint,penalty:number):number=>{
   const i=index(entry),core=distances[0]![i];if(core===undefined||core<0)return Infinity;
   const closest=distances[1]![i],near=closest!==undefined&&closest>=0?closest:Infinity;
@@ -48,15 +69,11 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   return 4*core+(req.purpose==='housing'?6:3)*(Number.isFinite(near)?near:0)+3*homes+fieldNeighborPenalty+penalty;
  };
  const candidates:{plot:GroundPlot;entrance:RecordPoint;penalty:number;lower:number}[]=[];
- for(let y=96;y+req.depth<=180;y+=2)for(let x=2;x+req.width<=320;x+=2){
-  metrics.enumerated++;const plot={x,y,width:req.width,depth:req.depth};
-  const physical=reviewPhysicalPlot(r,req.purpose,plot);if(physical.status!=='clear')continue;
-  metrics.physicalClear++;
-  if([...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==req.objectId)].some(o=>overlap(o.plot,plot)))continue;
-  let dwater=N;for(let py=y;py<y+req.depth;py++)for(let px=x;px<x+req.width;px++)dwater=Math.min(dwater,water[py*W+px]!);
-  if(req.purpose!=='field'&&dwater<2)continue;
-  const waterPenalty=req.purpose==='field'?(queue.length?2*(Math.max(0,8-dwater)+Math.max(0,dwater-40)):0):(dwater<8?(8-dwater)*4:0);
-  const entrance=southEntrance(plot),penalty=waterPenalty+physical.slopeCells+Math.max(0,y-150)*2+
+ const physical=physicalCandidates(ctx,req,r,mode==='bounded');metrics.enumerated=physical.enumerated;metrics.physicalClear=physical.physicalClear;
+ const occupied=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==req.objectId)];
+ for(const {plot,slopeCells,waterPenalty} of physical.plots){
+  const {x,y}=plot;if(occupied.some(o=>overlap(o.plot,plot)))continue;
+  const entrance=southEntrance(plot),penalty=waterPenalty+slopeCells+Math.max(0,y-150)*2+
    terrainHash(['placement-search-review-v2',ctx.terrain.source.seed,req.purpose,ctx.site,req.objectId,x,y])%4;
   const lower=rank(base,entrance,penalty);if(Number.isFinite(lower))candidates.push({plot,entrance,penalty,lower});
  }
@@ -69,7 +86,7 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   metrics.scoreEvaluations++;
   const windows=groundContextWindows(r,ctx,[c.plot]),distances=distancesFor(windows),score=rank(distances,c.entrance,c.penalty);
   if(!Number.isFinite(score))continue;
-  if(!best||score<best.score||score===best.score&&(c.plot.y<best.plot.y||c.plot.y===best.plot.y&&c.plot.x<best.plot.x))best={plot:c.plot,entrance:c.entrance,access:review.access,score};
+  if(!best||score<best.score||score===best.score&&(c.plot.y<best.plot.y||c.plot.y===best.plot.y&&c.plot.x<best.plot.x))best={plot:{...c.plot},entrance:c.entrance,access:review.access,score};
  }
  return best?{status:'review-only' as const,...best,metrics}:stop('no-safe-plot');
 }

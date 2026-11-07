@@ -31,15 +31,19 @@ export function southEntrance(p:GroundPlot):RecordPoint{return [p.x+Math.floor((
 export function reviewPhysicalPlot(r:RecordRaster,purpose:GroundPurpose,plot:GroundPlot,limits:typeof groundReviewLimits=groundReviewLimits):
  {status:'clear';slopeCells:number}|{status:'hold';reason:GroundHold} {
  if(!validPlot(plot))return {status:'hold',reason:'outside-ground'};
- const indices:number[]=[];
- for(let y=plot.y;y<plot.y+plot.depth;y++)for(let x=plot.x;x<plot.x+plot.width;x++)indices.push(y*W+x);
- if(indices.some(i=>r.surface[i]===0))return {status:'hold',reason:'outside-ground'};
- if(indices.some(i=>r.surface[i]===2||r.surface[i]===3))return {status:'hold',reason:'water'};
- if(indices.some(i=>r.bearing[i]!==0))return {status:'hold',reason:'unstable'};
  const flat=['hall','market','civic','public-space'].includes(purpose);
- let low=255,high=0,slopeCells=0;
- for(const i of indices){low=Math.min(low,r.elevation[i]!);high=Math.max(high,r.elevation[i]!);slopeCells+=+(r.grade[i]===1);}
- if(indices.some(i=>r.grade[i]!>(flat?limits.flatGrade:limits.normalGrade))||high-low>(flat?limits.flatRelief:limits.normalRelief))return {status:'hold',reason:'steep'};
+ let low=255,high=0,slopeCells=0,outside=false,water=false,unstable=false,steep=false;
+ for(let y=plot.y;y<plot.y+plot.depth;y++)for(let x=plot.x;x<plot.x+plot.width;x++){
+  const i=y*W+x,s=r.surface[i],g=r.grade[i]!;
+  outside ||=s===0;water ||=s===2||s===3;unstable ||=r.bearing[i]!==0;
+  low=Math.min(low,r.elevation[i]!);high=Math.max(high,r.elevation[i]!);slopeCells+=+(g===1);
+  steep ||=g>(flat?limits.flatGrade:limits.normalGrade);
+ }
+ // Preserve the original reason precedence even when several cells fail.
+ if(outside)return {status:'hold',reason:'outside-ground'};
+ if(water)return {status:'hold',reason:'water'};
+ if(unstable)return {status:'hold',reason:'unstable'};
+ if(steep||high-low>(flat?limits.flatRelief:limits.normalRelief))return {status:'hold',reason:'steep'};
  return {status:'clear',slopeCells};
 }
 

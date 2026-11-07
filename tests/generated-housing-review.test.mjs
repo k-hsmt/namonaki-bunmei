@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {parseTerrainRecord} from '../dist/terrain/terrain-record.js';
-import {createGeneratedHousingReview,advanceGeneratedHousingReview,chooseGeneratedHousingReview} from '../dist/story/generated-housing-review.js';
+import {createGeneratedHousingReview,advanceGeneratedHousingReview,chooseGeneratedHousingReview,readOwnedGeneratedHousing,generatedHousingReplayMetrics} from '../dist/story/generated-housing-review.js';
 import {housingAt} from '../dist/story/housing-history.js';
 import {decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {reviewPhysicalPlot} from '../dist/terrain/ground-access-review.js';
@@ -13,6 +13,37 @@ import {step,chooseAutomatically,lastObservedYear} from '../dist/story/engine.js
 const terrain=parseTerrainRecord(readFileSync(new URL('./fixtures/terrain-record-v1-seed42.json',import.meta.url),'utf8'));
 const sites=['river-bank','hill-side','coast-inlet'];
 const start=()=>{const x=createGeneratedHousingReview(terrain,'field-only');assert.equal(x.status,'review-only');return x;};
+test('owned housing append replay matches the full reducer, including ordering, past views and invalid appends',()=>{
+ const block=(id,x)=>({blockId:id,siteId:'river-bank',footprint:{x,y:100,width:18,depth:8},builtYear:60,housingCount:2,condition:'sound',use:'occupied',styleId:'low',styleSeed:1});
+ const z=block('z',10),a=block('a',40);
+ const birth=(after,seq)=>({year:60,seq,kind:'built',blockId:after.blockId,after});
+ let history={introducedYear:0,legacyUntracked:false,events:[birth(z,0)]};
+ readOwnedGeneratedHousing(history,60);
+ const before=generatedHousingReplayMetrics();
+ history={...history,events:[...history.events,birth(a,1)]};
+ assert.deepEqual(readOwnedGeneratedHousing(history,60),housingAt(history,60));
+ const event={year:70,seq:0,kind:'damaged',blockId:'z',after:{...z,condition:'damaged'}};
+ const updated={...history,events:[...history.events,event]};
+ assert.deepEqual(readOwnedGeneratedHousing(updated,70),housingAt(updated,70));
+ assert.deepEqual(readOwnedGeneratedHousing(updated,65),housingAt(updated,65));
+ assert.deepEqual(readOwnedGeneratedHousing(updated,80,'river-bank'),housingAt(updated,80,'river-bank'));
+ assert.ok(generatedHousingReplayMetrics().changedBlock>=before.changedBlock+2);
+ const bads=[
+  {...event,year:80,after:{...event.after,footprint:{...z.footprint,x:40}}},
+  birth(block('overlap',10),2),
+  {...event,year:59},
+  {...event,year:80,kind:'expanded',after:{...event.after,housingCount:1}},
+ ];
+ for(const bad of bads){
+  const invalid={...history,events:[...history.events,bad]};
+  readOwnedGeneratedHousing(history,60);
+  assert.throws(()=>housingAt(invalid,100));
+  assert.throws(()=>readOwnedGeneratedHousing(invalid,100));
+ }
+ // Replacing a prefix event must fall back to validation of the entire history.
+ const rewritten={...history,events:[{...history.events[0],after:{...z,footprint:{...z.footprint,x:40}}},...history.events.slice(1),event]};
+ assert.throws(()=>readOwnedGeneratedHousing(rewritten,70));
+});
 test('cached replay and repeated land HOLD retain the pinned uncached complete state',()=>{
  const saved=parseTerrainRecord(gunzipSync(readFileSync(new URL('./fixtures/terrain-record-v1-seed1.json.gz',import.meta.url))).toString());
  const initial=createGeneratedHousingReview(saved,'field-only');assert.equal(initial.status,'review-only');

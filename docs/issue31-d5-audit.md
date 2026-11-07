@@ -1,0 +1,76 @@
+# Issue31 D5: progression cost and natural long runs
+
+Q5 (field-only reservation), Q6 (the revised physical limits), and Q8 (documented
+indirect history differences) are resolved. PR #61 is merged. This stage checks
+the resulting production policy; it does not reopen those decisions.
+
+## Exactness of the optimization
+
+Generated housing previously replayed all events whenever one lifecycle event
+was appended. The owned transaction now replays the changed block's real event
+history, checks global event order and cross-block overlap, and preserves the
+public reducer's block ordering. Replaced prefixes fall back to the full reducer.
+The uncached public/legacy reader is unchanged. Old prefix cache entries are
+removed so that growing event arrays are not retained for every historical year.
+
+Frozen physics also permits reusing the all-cell physical candidate checks and
+water-distance penalties for a purpose and footprint size. Mutable records use
+the uncached path. Occupancy, reservations, bridge crossings, graph distances,
+candidate scores and final hypothetical access checks are recalculated. Returned
+plots do not expose cached geometry. No candidate cutoff or scoring change is
+introduced.
+
+The full-state reference fixture contains all twelve original field-only Q5
+states at year 2000 (source `55cd3c5`) and the original seed 1 storage probe at
+year 10000 (its original report recorded `local-unidentified`). The benchmark
+also verifies the seed 1 references against unmodified main `4fac200`, including
+every state field. Population/RNG-only comparisons would be insufficient here.
+
+## Reproduction
+
+Build an unmodified main checkout and the current checkout with the same Node
+version. Run the benchmark by itself, without tests or rendering in parallel:
+
+```sh
+npm run build
+BASELINE_ROOT=/path/to/unmodified-main node scripts/benchmark-generated-progression.mjs
+```
+
+It performs one warmup and five measured runs for 2000 and 10000 years, and
+records every time, the median and full-state SHA-256. World initialization,
+hashing, drawing and persistence are excluded. Both current main's generated
+engine and its retained fixed-terrain legacy engine are reported. The original
+design's legacy ratio, with a 1000ms denominator floor, is retained as a separate
+mandatory gate; a fast comparison against already-generated main does not erase
+it. Absolute budgets remain 5000ms and 25000ms. Unmet gates are reported as false.
+
+`BENCHMARK_SEEDS=1,21,7,198` selects additional seeds.
+`BENCHMARK_OUT` selects an output directory. `BENCHMARK_BASELINE_REPORT` may
+reuse a prior complete baseline measured on this runner; its SHA, Node version,
+platform and five measured samples are checked. Only baseline samples are reused,
+and the provenance is recorded. Do not use this option for a different runner.
+
+The separate long-run audit includes IO and must not run during measurement:
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=/tmp/namonaki-browsers node scripts/audit-generated-longrun.mjs
+```
+
+All twelve Q5 worlds advance naturally to 10000. The audit checks original year
+2000 hashes, production save/restore at 0/100/1000/10000 and continuation from
+those saves, historical observations at 0/1/99/100/101/1000/2000/10000, browser
+localStorage reopening, repeated PNGs, and no generator import during reading.
+It produces native and nearest-neighbor 4x scenes for 0/100/1000/10000 plus each
+actually reached settlement/village/town/city/decline phase. Unreached phases,
+unbuilt slots, failures and HOLD periods remain in the report.
+
+Outputs are under `artifacts/terrain31-performance` and `artifacts/terrain31-d5`;
+bulk world saves and images are diagnostic artifacts, not source fixtures.
+
+## Acceptance boundary
+
+The scripts themselves do not establish D5 acceptance. Record actual measurement
+results and failures before marking gates complete. The complete single-family
+R10/H8/C8/M6 catalog, diagnostic overlays, search/graph counters, old-engine
+long-run regressions, final browser checks and Human scenery decisions remain
+separate requirements in design §10.2–10.4. Human merges PRs and closes #31.

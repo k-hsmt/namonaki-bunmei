@@ -30,6 +30,18 @@ test('remote sea does not add an irrigation penalty or attract fields',()=>{
  const result=findPlacementReview(changed,field);
  assert.equal(result.status,'review-only');assert.deepEqual(result.plot,baseline.plot);assert.equal(result.score,baseline.score);
 });
+test('frozen physics candidates are reusable while occupancy and returned plots stay independent',()=>{
+ const {ctx,req}=fixture(2);
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+ freeze(ctx.terrain.sites['river-bank'].physics);
+ const first=findPlacementReview(ctx,req),original=structuredClone(first.plot);assert.equal(first.status,'review-only');
+ first.plot.x=300;
+ assert.deepEqual(findPlacementReview(ctx,req).plot,original,'return value must not expose cached geometry');
+ const changed={...ctx,reservations:[{id:'reserved',plot:original}]};
+ const cached=findPlacementReview(changed,req),uncached=findPlacementReview(changed,req,'exhaustive');
+ for(const key of ['status','plot','entrance','score','access'])assert.deepEqual(cached[key],uncached[key],key);
+ assert.notDeepEqual(cached.plot,original);
+});
 test('HOLD and unsupported semantic purposes do not run a placement search',()=>{
  const {ctx,req}=fixture(1);
  assert.equal(findPlacementReview({...ctx,historyStatus:'partial'},req).reason,'unknown-history');
