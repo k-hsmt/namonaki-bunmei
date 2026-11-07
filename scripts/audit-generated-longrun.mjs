@@ -17,6 +17,8 @@ import {generatedGroundGraphMetrics} from '../dist/terrain/ground-access-review.
 import {generatedPlacementSearchMetrics} from '../dist/terrain/placement-search-review.js';
 import {generatedHousingReplayMetrics} from '../dist/story/generated-housing-review.js';
 import {generatedBridgeProposalMetrics} from '../dist/story/generated-bridge-history-review.js';
+import {createHousingCivilization} from '../dist/story/housing-persistence.js';
+import {step,chooseAutomatically} from '../dist/story/engine.js';
 const out='artifacts/terrain31-d5',seeds=[1,3,6,29,85,131,7,198,10,12,21,24];
 const sites=['river-bank','hill-side','coast-inlet'],checkpoints=[0,1,99,100,101,1000,2000,10000];
 const sourceSHA=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
@@ -79,6 +81,8 @@ for(const seed of seeds){
  await writeFile(out+'/report.json',JSON.stringify(report,null,2)+'\n');
 }
 assert.equal(report.failures.length,0,'longrun failures; see report.json');
+const legacy=createHousingCivilization(42);while(legacy.year<10000){step(legacy);if(legacy.pending)chooseAutomatically(legacy);}
+const legacyJson=JSON.stringify(legacy);report.legacyCoexistence={seed:42,year:10000,bytes:Buffer.byteLength(legacyJson),stateSha256:hash(legacy)};
 const server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:'5311'},stdio:['ignore','pipe','inherit']});let browser;
 try{
  await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});
@@ -88,6 +92,7 @@ try{
   if(path.includes('prototype')||path.includes('/capture-terrain')){blocked.push(path);return route.abort();}
   if(path==='/d5-review')return route.fulfill({contentType:'text/html',body:'<!doctype html><title>D5 natural scenery</title>'});return route.continue();
  });await page.goto('http://127.0.0.1:5311/d5-review');
+ await page.evaluate(json=>localStorage.setItem('namonaki-story-v4',json),legacyJson);
  for(const row of report.cases){
   const json=await readFile(`${out}/seed${row.seed}_year10000_save.json`,'utf8');
   const images=await page.evaluate(async ({json,districts,expectedHash})=>{
@@ -99,7 +104,9 @@ try{
    const {housingAt}=await import('/story/housing-history.js');
    const digest=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(value))))).map(b=>b.toString(16).padStart(2,'0')).join('');
    const save=await decodeWorldSave(json);if(await digest(save.state)!==expectedHash)throw Error('Browser decode changed full state');
+   const old=localStorage.getItem('namonaki-story-v4');if(!old)throw Error('Missing legacy coexistence baseline');
    if((await storeWorldSave(localStorage,save)).status!=='saved')throw Error('10000-year production save exceeded quota');
+   if(localStorage.getItem('namonaki-story-v4')!==old)throw Error('Saving changed the original legacy key');
    const reopened=await findWorldSave(k=>localStorage.getItem(k));if(await digest(reopened.state)!==expectedHash)throw Error('localStorage reopen changed state');
    const outer=restoreGeneratedWorld(reopened),frames=[];
    for(let index=0;index<3;index++)for(const year of districts[index].years){

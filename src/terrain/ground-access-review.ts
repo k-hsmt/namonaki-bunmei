@@ -2,7 +2,7 @@
 import type {RecordPoint, RecordSite} from './terrain-record-types.js';
 import type {ValidatedTerrainRecord} from './terrain-record.js';
 import type {RecordRaster} from './terrain-record-raster-v1.js';
-import {readOwnedRecordPhysics} from './owned-record-physics.js';
+import {readOwnedRecordPhysics,frozenRecordPhysics} from './owned-record-physics.js';
 import type {WalkableBridgeCrossing} from './bridge-access-types.js';
 
 export interface GroundPlot {readonly x:number;readonly y:number;readonly width:number;readonly depth:number}
@@ -110,6 +110,20 @@ function index(p:RecordPoint):number{return p[1]*W+p[0];}
  * Bridges are not accepted until D3-C validates saved supports/deck/state.
  */
 export function reviewGroundAccess(ctx:GroundReviewContext,purpose:GroundPurpose,objectId:string,plot:GroundPlot):GroundReview {
+ return reviewGroundAccessPrepared(ctx,purpose,objectId,plot);
+}
+/** One synchronous search owns a fixed occupancy snapshot. Only the unchanged
+ * before-graph is reused; each candidate still gets its own after-graph.
+ */
+export function createGroundAccessReviewer(ctx:GroundReviewContext):(purpose:GroundPurpose,objectId:string,plot:GroundPlot)=>GroundReview {
+ const site=ctx.terrain.sites[ctx.site];
+ if(!Object.isFrozen(ctx.terrain)||!Object.isFrozen(ctx.terrain.sites)||!Object.isFrozen(site)||!frozenRecordPhysics(site.physics))return (purpose,id,plot)=>reviewGroundAccess(ctx,purpose,id,plot);
+ const owned:GroundReviewContext={...structuredClone({...ctx,terrain:null}),terrain:ctx.terrain};
+ let parents:Int32Array|undefined;
+ const before=()=>parents??=(groundReachParents(groundContextWindows(readOwnedRecordPhysics(site.physics),owned),owned.primaryRoot));
+ return (purpose,id,plot)=>reviewGroundAccessPrepared(owned,purpose,id,plot,before);
+}
+function reviewGroundAccessPrepared(ctx:GroundReviewContext,purpose:GroundPurpose,objectId:string,plot:GroundPlot,beforeGraph?:()=>Int32Array):GroundReview {
  if(ctx.historyStatus!=='known')return hold('unknown-history');
  if(!Number.isSafeInteger(ctx.year)||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year<0||ctx.year>ctx.confirmedYear)return hold('unconfirmed-year');
  if(!validPlot(plot))return hold('outside-ground');
@@ -124,7 +138,7 @@ export function reviewGroundAccess(ctx:GroundReviewContext,purpose:GroundPurpose
  const conflicts=[...ctx.occupancy,...ctx.reservations.filter(o=>o.id!==objectId)].filter(o=>overlap(plot,o.plot)).map(o=>o.id);
  if(conflicts.length)return hold('occupied',[...new Set(conflicts)].sort());
  const entrance=southEntrance(plot);
- const before=groundReachParents(groundContextWindows(r,ctx),ctx.primaryRoot),after=groundReachParents(groundContextWindows(r,ctx,[plot]),ctx.primaryRoot);
+ const before=beforeGraph?beforeGraph():groundReachParents(groundContextWindows(r,ctx),ctx.primaryRoot),after=groundReachParents(groundContextWindows(r,ctx,[plot]),ctx.primaryRoot);
  if(!validPoint(entrance)||after[index(entrance)]===-1)return hold('no-access');
  for(const o of ctx.occupancy)if(before[index(o.entrance)]!==-1&&after[index(o.entrance)]===-1)return hold('no-access',[o.id]);
  const access:RecordPoint[]=[];let i=index(entrance);

@@ -24,6 +24,10 @@ A CPU profile identified graph traversals and repeated RLE decoding as remaining
 costs. Land queries now share a private raster only for deeply frozen physics;
 the public decoder still returns fresh arrays. Graph traversal retains the exact
 N/E/S/W order while avoiding a temporary neighbor array for every visited vertex.
+Within one search, a private occupancy snapshot shares the unchanged before-graph
+across candidates. Each hypothetical after-graph and every previously connected
+entrance is still checked. Mutable terrain uses the original uncached path;
+the exhaustive comparison also bypasses the transaction cache.
 When all physical candidates are impossible or occupied, search now returns HOLD
 before constructing any access distance field. The benchmark records actual
 candidate builds/reuse, exclusions, hypothetical checks, graph builds, visited
@@ -82,6 +86,11 @@ physics/plot/root overlay, with the same saved mirroring as the rendered scene.
 Outputs are under `artifacts/terrain31-performance`, `artifacts/terrain31-d5`
 and `artifacts/terrain31-families`;
 bulk world saves and images are diagnostic artifacts, not source fixtures.
+
+The checked-in `issue31-d5-performance.json` records the measured source SHA,
+baseline SHA, every measured sample, exact state hashes and diagnostic counters.
+Its `pass` fields are authoritative; the report does not turn an unmet ratio into
+an accepted budget. Further source changes require fresh current measurements.
 
 ## Acceptance boundary
 

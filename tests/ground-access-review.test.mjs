@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {emptyRecordRaster,encodeRecordPhysics,decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {validateTerrainRecord} from '../dist/terrain/terrain-record.js';
-import {reviewGroundAccess,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny} from '../dist/terrain/ground-access-review.js';
+import {reviewGroundAccess,createGroundAccessReviewer,generatedGroundGraphMetrics,southEntrance,reviewPhysicalPlot,groundReviewLimits,groundWalkWindows,groundDistances,groundDistancesFromAny} from '../dist/terrain/ground-access-review.js';
 const plot=(x,y,width=18,depth=7)=>({x,y,width,depth});
 function setup(){
  const raster=emptyRecordRaster();raster.surface.fill(1,96*320);
@@ -34,6 +34,19 @@ test('owned frozen raster is isolated from public decoding and mutable wires rem
  assert.equal(reviewGroundAccess(ctx,'house','new',plot(20,110)).status,'clear');
  mutable.rows[110]=[[320,2,0,0,0]];
  assert.equal(reviewGroundAccess(ctx,'house','new',plot(20,110)).reason,'water');
+});
+test('search-owned before graph is reused while every hypothetical plot and entrance remains checked',()=>{
+ const {raster,ctx}=setup();ctx.terrain={sites:{'river-bank':{physics:encodeRecordPhysics(raster)}}};
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};freeze(ctx.terrain);
+ ctx.occupancy=[{id:'old',plot:plot(20,110),entrance:[28,117]}];
+ const owned=createGroundAccessReviewer(ctx),snapshot=structuredClone(ctx),before=generatedGroundGraphMetrics();
+ const candidates=[plot(38,110),plot(44,120),plot(0,100,2,79)];
+ const actual=candidates.map(p=>owned('house','new',p)),after=generatedGroundGraphMetrics();
+ assert.equal(after.parentTraversals-before.parentTraversals,1+candidates.length);
+ for(let i=0;i<candidates.length;i++)assert.deepEqual(actual[i],reviewGroundAccess(snapshot,'house','new',candidates[i]));
+ ctx.primaryRoot=[300,100];ctx.occupancy.push({id:'later',plot:plot(44,120),entrance:[52,127]});
+ assert.deepEqual(owned('house','new',candidates[1]),actual[1],'transaction must own its occupancy snapshot');
+ assert.equal(reviewGroundAccess(ctx,'house','new',candidates[1]).reason,'occupied');
 });
 test('interior cells, water, unstable bearing, slope and elevation are inspected',()=>{
  for(const [channel,value,reason] of [['surface',2,'water'],['surface',3,'water'],['surface',0,'outside-ground'],['bearing',1,'unstable'],['bearing',2,'unstable'],['grade',2,'steep'],['elevation',3,'steep']]){

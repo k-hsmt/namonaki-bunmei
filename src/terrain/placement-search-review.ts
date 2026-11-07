@@ -5,7 +5,7 @@ import type {RecordPoint} from './terrain-record-types.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
 import {readOwnedRecordPhysics,frozenRecordPhysics} from './owned-record-physics.js';
 import {terrainHash} from './terrain-hash-v1.js';
-import {groundContextWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
+import {groundContextWindows,groundDistances,groundDistancesFromAny,reviewPhysicalPlot,reviewGroundAccess,createGroundAccessReviewer,southEntrance,type GroundPlot,type GroundPurpose,type GroundReviewContext} from './ground-access-review.js';
 export interface SearchReviewRequest {
  readonly objectId:string;readonly purpose:GroundPurpose;readonly width:number;readonly depth:number;
  readonly nucleus:RecordPoint;readonly neighborEntrances:readonly RecordPoint[];
@@ -91,12 +91,13 @@ export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequ
   const lower=rank(base,entrance,penalty);if(Number.isFinite(lower))candidates.push({plot,entrance,penalty,lower});
  }
  candidates.sort((a,b)=>a.lower-b.lower||a.plot.y-b.plot.y||a.plot.x-b.plot.x);
+ const reviewCandidate=mode==='bounded'?createGroundAccessReviewer(ctx):(purpose:GroundPurpose,id:string,plot:GroundPlot)=>reviewGroundAccess(ctx,purpose,id,plot);
  let best:{plot:GroundPlot;entrance:RecordPoint;access:readonly RecordPoint[];score:number}|null=null;
  for(const c of candidates){
   if(mode==='bounded'&&best&&c.lower>best.score)break;
   metrics.accessEvaluations++;
   searchMetrics.accessEvaluations++;
-  const review=reviewGroundAccess(ctx,req.purpose,req.objectId,c.plot);if(review.status!=='clear')continue;
+  const review=reviewCandidate(req.purpose,req.objectId,c.plot);if(review.status!=='clear')continue;
   metrics.scoreEvaluations++;
   searchMetrics.scoreEvaluations++;
   const windows=groundContextWindows(r,ctx,[c.plot]),distances=distancesFor(windows),score=rank(distances,c.entrance,c.penalty);

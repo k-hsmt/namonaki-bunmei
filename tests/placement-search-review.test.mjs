@@ -33,7 +33,7 @@ test('remote sea does not add an irrigation penalty or attract fields',()=>{
 test('frozen physics candidates are reusable while occupancy and returned plots stay independent',()=>{
  const {ctx,req}=fixture(2);
  const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
- freeze(ctx.terrain.sites['river-bank'].physics);
+ freeze(ctx.terrain);
  const first=findPlacementReview(ctx,req),original=structuredClone(first.plot);assert.equal(first.status,'review-only');
  first.plot.x=300;
  assert.deepEqual(findPlacementReview(ctx,req).plot,original,'return value must not expose cached geometry');
