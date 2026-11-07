@@ -191,6 +191,13 @@ jobs:
           AUDIT_HOUSING_SEED: ${{ matrix.seed }}
           AUDIT_HOUSING_MODE: ${{ matrix.reservation }}
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit public-space foundation and lifecycle with all land uses
+        run: node scripts/audit-generated-housing.mjs
+        env:
+          AUDIT_PUBLIC_SPACE: '1'
+          AUDIT_HOUSING_SEED: ${{ matrix.seed }}
+          AUDIT_HOUSING_MODE: ${{ matrix.reservation }}
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -198,4 +205,5 @@ jobs:
           path: |
             artifacts/terrain31-housing/*
             artifacts/terrain31-civic/*
+            artifacts/terrain31-public-space/*
           if-no-files-found: error
