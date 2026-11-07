@@ -2,7 +2,7 @@
 import {createHousingCivilization} from './housing-persistence.js';
 import {step,choose,chooseAutomatically,type CivilizationState,type ReviewLandProgression} from './engine.js';
 import {siteAt} from './settlement-history.js';
-import {validateTerrainRecord,type ValidatedTerrainRecord} from '../terrain/terrain-record.js';
+import {readOwnedTerrainRecord,type ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
 import {planFacilitySitesReview,selectReviewReservations,reviewNeighborEntrances,reviewFacilityAnchor,type ReviewFacilityPlan,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
@@ -43,7 +43,7 @@ export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,res
 }
 function mutableCopy(input:GeneratedFacilityReview):GeneratedFacilityReview {
  if(input.format!=='generated-facility-review'||input.status!=='review-only'||input.placementPolicy!==null||input.state.version!==4||input.state.seed!==input.terrain.source.seed)throw Error('Invalid generated review boundary');
- const next=structuredClone(input);return {...next,terrain:validateTerrainRecord(next.terrain)};
+ const terrain=readOwnedTerrainRecord(input.terrain),next=structuredClone({...input,terrain:null});return {...next,terrain};
 }
 function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):ReviewLandProgression {
  const placements=review.placements as ReviewFacilityPlacement[],holds=review.diagnostics.holds as Record<string,number>;

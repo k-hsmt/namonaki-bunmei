@@ -4,6 +4,14 @@ import {decodeRecordPhysics,rasterizeRecordShapes,sampleRecordPhysics} from './t
 export const terrainRecordMaxBytes=1024*1024;
 declare const validated:unique symbol;
 export type ValidatedTerrainRecord=TerrainRecord&{readonly [validated]:true};
+const ownedRecords=new WeakSet<object>();
+/** Internal immutable identity reuse; unknown wires still cross the full boundary.
+ * The public validator below continues to return a detached frozen result.
+ */
+export function readOwnedTerrainRecord(raw:unknown):ValidatedTerrainRecord {
+ if(raw&&typeof raw==='object'&&ownedRecords.has(raw))return raw as ValidatedTerrainRecord;
+ return validateTerrainRecord(raw);
+}
 export class TerrainRecordError extends Error {
  constructor(public readonly code:string,public readonly path:string){super(code+' at '+path);this.name='TerrainRecordError';}
 }
@@ -148,7 +156,7 @@ export function validateTerrainRecord(raw:unknown):ValidatedTerrainRecord {
  }
  for(const p of record.geography.ports)if(!record.geography.streams.some(e=>e.id===p.streamId&&(p.flow==='out'?e.from===p.site:e.to===p.site)))fail('ORPHAN_PORT','geography');
  const json=JSON.stringify(raw);if(new TextEncoder().encode(json).length>terrainRecordMaxBytes)fail('SIZE_LIMIT','record');
- return freeze(JSON.parse(json)) as ValidatedTerrainRecord;
+ const result=freeze(JSON.parse(json)) as ValidatedTerrainRecord;ownedRecords.add(result);return result;
 }
 export function parseTerrainRecord(json:string):ValidatedTerrainRecord {
  if(typeof json!=='string'||new TextEncoder().encode(json).length>terrainRecordMaxBytes)fail('SIZE_LIMIT','record');

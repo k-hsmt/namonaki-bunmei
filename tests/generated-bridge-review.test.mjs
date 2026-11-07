@@ -3,8 +3,8 @@ import {generateWorldPrototype} from '../dist/terrain/world-prototype.js';
 import {captureTerrainRecord} from '../dist/terrain/capture-terrain-record.js';
 import {captureRiverReaches} from '../dist/terrain/river-reaches-review.js';
 import {createGeneratedBridgeReview,advanceGeneratedBridgeReview} from '../dist/story/generated-bridge-review.js';
-import {validateGeneratedBridgeLedger,withGeneratedBridgeAccess} from '../dist/story/generated-bridge-history-review.js';
-import {groundContextWindows,groundDistances} from '../dist/terrain/ground-access-review.js';
+import {validateGeneratedBridgeLedger,withGeneratedBridgeAccess,proposeGeneratedBridge,generatedBridgeProposalMetrics} from '../dist/story/generated-bridge-history-review.js';
+import {groundContextWindows,groundDistances,generatedGroundGraphMetrics} from '../dist/terrain/ground-access-review.js';
 import {decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 import {siteAt} from '../dist/story/settlement-history.js';
 import {createHousingCivilization} from '../dist/story/housing-persistence.js';
@@ -62,4 +62,18 @@ test('a record-boundary batch matches single-year UI advancement and preserves p
  assert.throws(()=>advanceGeneratedBridgeReview(completed,1,'stop',{stopAtNewRecord:'yes'}));
  const pending=advanceGeneratedBridgeReview(initial,1000,'stop');assert.ok(pending.review.state.pending);
  assert.deepEqual(advanceGeneratedBridgeReview(pending,36,'stop',{stopAtNewRecord:true}),pending);
+});
+test('unchanged next-year bridge HOLD rebuilds no graph and occupancy changes invalidate reuse',()=>{
+ const terrain=captureTerrainRecord(generateWorldPrototype(21).world,'bridge-hold-reuse-test');
+ const initial=createGeneratedBridgeReview(terrain,captureRiverReaches(terrain),'field-only'),review=initial.review,plan=review.plans['river-bank'];
+ const ctx={terrain,site:'river-bank',year:0,confirmedYear:0,historyStatus:'known',primaryRoot:plan.primaryRoot,
+  occupancy:review.placements.filter(p=>p.site==='river-bank').map(p=>({id:p.objectId,plot:p.plot,entrance:p.entrance})),reservations:[]};
+ const original=JSON.stringify(initial),first=proposeGeneratedBridge(review,ctx,'river-bank-7');assert.equal(first.reason,'no-safe-bridge');
+ const before=generatedGroundGraphMetrics(),reused=generatedBridgeProposalMetrics().bridgeHoldReuses;
+ const next={...ctx,year:1,confirmedYear:1};assert.equal(proposeGeneratedBridge(review,next,'river-bank-7').reason,'no-safe-bridge');
+ assert.deepEqual(generatedGroundGraphMetrics(),before);assert.equal(generatedBridgeProposalMetrics().bridgeHoldReuses,reused+1);
+ const changed={...next,occupancy:[...next.occupancy,{id:'changed',plot:{x:0,y:100,width:2,depth:2},entrance:[0,102]}]};
+ assert.equal(proposeGeneratedBridge(review,changed,'river-bank-7').reason,'no-safe-bridge');
+ assert.equal(generatedBridgeProposalMetrics().bridgeHoldReuses,reused+1,'changed occupancy must recalculate');
+ assert.equal(JSON.stringify(initial),original,'HOLD must preserve state, IDs, RNG and history');
 });

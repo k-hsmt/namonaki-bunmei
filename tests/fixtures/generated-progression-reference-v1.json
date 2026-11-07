@@ -1,0 +1,71 @@
+{
+  "description": "Complete states from pre-incremental Q5 trials and the 10000-year storage probe. Field-only, automatic choices. No state fields omitted.",
+  "mode": "field-only",
+  "cases": [
+    {
+      "seed": 1,
+      "year": 2000,
+      "stateSha256": "0c7f85676b3387f10130c14a39d639955e1667a4ff4a1185866946d2b9bc942c"
+    },
+    {
+      "seed": 3,
+      "year": 2000,
+      "stateSha256": "f8ebb477d3afb86e63bd83b0b10f34573137c2ec7ac93dab1887a352f20a7aeb"
+    },
+    {
+      "seed": 6,
+      "year": 2000,
+      "stateSha256": "0a825c46978baee0f73e03bb4128e8c39bb931f1a75f303f92d77699dd2bd325"
+    },
+    {
+      "seed": 29,
+      "year": 2000,
+      "stateSha256": "d988f09dde3350471854be8d48b39b65dff0aa9c0c26232af8a98dde348e5764"
+    },
+    {
+      "seed": 85,
+      "year": 2000,
+      "stateSha256": "3d15c6da4a920a2f3c84787f2a5b5798304cb6e25a29750f23c789813a56646a"
+    },
+    {
+      "seed": 131,
+      "year": 2000,
+      "stateSha256": "8633c965d062fc3366c0843230faf387131e11c1d99dd9a5f24f187ab6ecbbd5"
+    },
+    {
+      "seed": 7,
+      "year": 2000,
+      "stateSha256": "b69771dc762a6dd86536c337a7870165bafdaefbe60b149284b757636215e244"
+    },
+    {
+      "seed": 198,
+      "year": 2000,
+      "stateSha256": "720c72c02abe6aced5dd05556c6bcadf6e8019fc016d24b710ad4783121fee28"
+    },
+    {
+      "seed": 10,
+      "year": 2000,
+      "stateSha256": "8815167f3660ae0d62abae110e3d91685b1a0c0c3557c5303121767a6eb5e826"
+    },
+    {
+      "seed": 12,
+      "year": 2000,
+      "stateSha256": "664c01b99540c470aa2c064c1889c70b142f67969e9e75dd97ac3e2de7f6b4c6"
+    },
+    {
+      "seed": 21,
+      "year": 2000,
+      "stateSha256": "5275503c7f1550b7f162e55d8f980f55b33c64d0d893a51364ce089bc3bf464e"
+    },
+    {
+      "seed": 24,
+      "year": 2000,
+      "stateSha256": "3b0295857b69d48542c078e0ed0ab7dba5dba5aa44071b47778d3f9f1a83fd36"
+    },
+    {
+      "seed": 1,
+      "year": 10000,
+      "stateSha256": "ff1a01a1fb584a7c5ebb5b472df3c48ec8f556dc7f6faa52eadf7d1b29aea5c7"
+    }
+  ]
+}

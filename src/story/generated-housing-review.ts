@@ -6,7 +6,7 @@ import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import {southEntrance} from '../terrain/ground-access-review.js';
 import {findPlacementReview} from '../terrain/placement-search-review.js';
 import {reviewNeighborEntrances,selectReviewReservations,type ReservationReviewMode,type TypedGroundOccupation} from '../terrain/facility-plan-review.js';
-import {housingAt,type ResidentialBlock,type ResidentialBlockEvent} from './housing-history.js';
+import {housingAt,type HousingHistory,type ResidentialBlock,type ResidentialBlockEvent} from './housing-history.js';
 import {proposeHousingLifecycle,appendHousingLifecycle} from './housing-lifecycle.js';
 import type {CivilizationState,RecordEntry} from './engine.js';
 import {siteNames} from './society.js';
@@ -16,6 +16,25 @@ const prefixes:Readonly<Record<RecordSite,string>>={'river-bank':'river-resident
 // Only this synchronous, append-only review stage uses these caches. Old readers
 // remain uncached and still detect callers mutating a legacy history in place.
 const views=new WeakMap<object,{year:number;view:ReturnType<typeof housingAt>}>();
+const lastYears=new WeakMap<object,Map<string,number>>();
+// A checked append validates the changed block's real event history and checks
+// overlap against the other blocks. Old prefix entries are removed so the cache
+// does not retain every historical copy of the growing event array.
+const prefixesByLastEvent=new WeakMap<object,{history:HousingHistory;view:ReturnType<typeof housingAt>}>();
+const replayMetrics={wholeHistory:0,changedBlock:0,cacheHits:0,plotHoldReuses:0};
+export function generatedHousingReplayMetrics(){return {...replayMetrics};}
+function appendedView(history:HousingHistory,year:number):ReturnType<typeof housingAt>|null {
+ const last=history.events.at(-1),previous=history.events.at(-2);if(!last||!previous||last.year>year)return null;
+ const prior=prefixesByLastEvent.get(previous);
+ if(!prior||prior.history.events.length+1!==history.events.length||prior.history.introducedYear!==history.introducedYear||prior.history.legacyUntracked!==history.legacyUntracked||last.year<previous.year||last.year===previous.year&&last.seq<=previous.seq||!prior.history.events.every((e,i)=>history.events[i]===e))return null;
+ const reduced=housingAt({...history,events:history.events.filter(e=>e.blockId===last.blockId)},year),block=reduced.blocks[0];
+ if(!block||reduced.blocks.length!==1)return null;
+ const f=block.footprint;
+ if(prior.view.blocks.some(b=>b.blockId!==block.blockId&&b.siteId===block.siteId&&f.x<b.footprint.x+b.footprint.width&&f.x+f.width>b.footprint.x&&f.y<b.footprint.y+b.footprint.depth&&f.y+f.depth>b.footprint.y))return null;
+ const found=prior.view.blocks.some(b=>b.blockId===block.blockId),blocks=found?prior.view.blocks.map(b=>b.blockId===block.blockId?block:b):[...prior.view.blocks,block].sort((a,b)=>a.blockId.localeCompare(b.blockId));
+ const previousYears=lastYears.get(prior.history);if(previousYears){const years=new Map(previousYears);years.set(last.blockId,last.year);lastYears.set(history,years);}
+ prefixesByLastEvent.delete(previous);replayMetrics.changedBlock++;return {status:reduced.status,blocks};
+}
 const readHousing:typeof housingAt=(history,year,site)=>{
  if(!history)return housingAt(history,year,site);
  let cached=views.get(history);
@@ -23,14 +42,15 @@ const readHousing:typeof housingAt=(history,year,site)=>{
  // year cannot change its reduced view. Past observations still replay normally.
  const complete=cached&&(history.events.at(-1)?.year??history.introducedYear)<=cached.year;
  if(!cached||cached.year!==year&&!(complete&&year>=cached.year)){
-  cached={year,view:housingAt(history,year)};views.set(history,cached);
- }
+  const appended=appendedView(history,year);if(!appended)replayMetrics.wholeHistory++;
+  cached={year,view:appended??housingAt(history,year)};views.set(history,cached);
+  const last=history.events.at(-1);if(last&&last.year<=year)prefixesByLastEvent.set(last,{history,view:cached.view});
+ }else replayMetrics.cacheHits++;
  return {status:cached.view.status,blocks:cached.view.blocks.filter(b=>!site||b.siteId===site)};
 };
 /** Only for immutable, privately owned histories inside a generated transaction. */
 export const readOwnedGeneratedHousing=readHousing;
 const failedPlots=new WeakMap<object,Set<string>>();
-const lastYears=new WeakMap<object,Map<string,number>>();
 function latestYears(state:CivilizationState){
  const history=state.housing!;let years=lastYears.get(history);
  if(!years){years=new Map();for(const event of history.events)years.set(event.blockId,event.year);lastYears.set(history,years);}
@@ -70,7 +90,8 @@ export function createGeneratedHousingExtension(extra?:GeneratedLandReviewExtens
   const context=withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations});
   const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,context.occupancy,reservations,neighborEntrances,context.crossings]);
   let failed=failedPlots.get(review.terrain);if(!failed){failed=new Set();failedPlots.set(review.terrain,failed);}
-  const result=failed.has(key)?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
+  const reused=failed.has(key);if(reused)replayMetrics.plotHoldReuses++;
+  const result=reused?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
    {objectId:id,purpose:'housing',width:18,depth:8,nucleus:plan.nucleus,neighborEntrances});
   if(result.status==='hold'&&result.reason==='no-safe-plot')failed.add(key);
   if(result.status==='hold'){const key=site+':housing:'+result.reason;holds[key]=(holds[key]??0)+1;continue;}

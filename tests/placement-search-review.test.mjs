@@ -30,13 +30,25 @@ test('remote sea does not add an irrigation penalty or attract fields',()=>{
  const result=findPlacementReview(changed,field);
  assert.equal(result.status,'review-only');assert.deepEqual(result.plot,baseline.plot);assert.equal(result.score,baseline.score);
 });
+test('frozen physics candidates are reusable while occupancy and returned plots stay independent',()=>{
+ const {ctx,req}=fixture(2);
+ const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+ freeze(ctx.terrain);
+ const first=findPlacementReview(ctx,req),original=structuredClone(first.plot);assert.equal(first.status,'review-only');
+ first.plot.x=300;
+ assert.deepEqual(findPlacementReview(ctx,req).plot,original,'return value must not expose cached geometry');
+ const changed={...ctx,reservations:[{id:'reserved',plot:original}]};
+ const cached=findPlacementReview(changed,req),uncached=findPlacementReview(changed,req,'exhaustive');
+ for(const key of ['status','plot','entrance','score','access'])assert.deepEqual(cached[key],uncached[key],key);
+ assert.notDeepEqual(cached.plot,original);
+});
 test('HOLD and unsupported semantic purposes do not run a placement search',()=>{
  const {ctx,req}=fixture(1);
  assert.equal(findPlacementReview({...ctx,historyStatus:'partial'},req).reason,'unknown-history');
  assert.equal(findPlacementReview({...ctx,year:11},req).reason,'unconfirmed-year');
  assert.equal(findPlacementReview(ctx,{...req,purpose:'public-space'}).reason,'unsupported-review-purpose');
  const blocked={...ctx,reservations:[{id:'all',plot:{x:0,y:100,width:80,depth:36}}]};
- const result=findPlacementReview(blocked,req);assert.equal(result.reason,'no-safe-plot');assert.equal(result.metrics.accessEvaluations,0);
+ const result=findPlacementReview(blocked,req);assert.equal(result.reason,'no-safe-plot');assert.equal(result.metrics.accessEvaluations,0);assert.equal(result.metrics.distanceFieldBuilds,0);
 });
 test('large civic plots use hall and housing distances and match exhaustive scoring',()=>{
  const {ctx,req}=fixture(1),hall={id:'hall',plot:{x:30,y:100,width:18,depth:7},entrance:[38,107]};
