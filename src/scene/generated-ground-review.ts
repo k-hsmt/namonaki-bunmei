@@ -9,7 +9,9 @@ import type {ResidentialBlock} from '../story/housing-history.js';
 import type {SiteSnapshot} from './model.js';
 import {housingAt,type HousingHistory} from '../story/housing-history.js';
 import {projectSceneComposition,type SceneComposition} from './composition.js';
+import type {VegetationPatchView} from '../vegetation/history-v1.js';
 export interface GeneratedSceneGround {
+ readonly vegetation?:readonly VegetationPatchView[];
  readonly terrain:ValidatedTerrainRecord;readonly site:RecordSite;
  readonly primaryRoot:RecordPoint;
  readonly facilities:readonly {readonly id:string;readonly purpose:GroundPurpose;readonly plot:GroundPlot}[];

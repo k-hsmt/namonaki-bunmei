@@ -1,4 +1,5 @@
 /** D4-A saved terrain + confirmed structures. Legacy scenery remains separate. */
+import {projectVegetation} from '../vegetation/presentation-v1.js';
 import {drawTerrainRecord} from '../terrain/draw-terrain-record-v1.js';
 import type {GroundPlot} from '../terrain/ground-access-review.js';
 import type {GeneratedSceneObservation} from './generated-scene-review.js';
@@ -22,7 +23,12 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
   if(presentation.flood&&r.surface[i]===2){c.fillStyle='#6296a0';c.fillRect(x,y,1,1);}
   else if(presentation.drought&&r.surface[i]===1&&(x*7+y*13)%43===0){c.fillStyle='#b2a278';c.fillRect(x,y,1,1);}
  }
- for(const {point:[x,y],scale:k} of presentation.trees){
+ const vegetation=ground.vegetation?projectVegetation(observation):null;
+ if(vegetation){
+  for(const {point:[x,y],color} of vegetation.grass){c.fillStyle=color;c.fillRect(x,y,1,1);}
+  for(const {point:[x,y]} of vegetation.shrubs){c.fillStyle='#718866';c.fillRect(x,y-2,3,2);c.fillStyle='#84956c';c.fillRect(x+1,y-3,2,2);}
+ }
+ for(const {point:[x,y],scale:k} of vegetation?.trees??presentation.trees){
   const h=Math.round(9*k),w=Math.round(7*k);c.fillStyle='#625745';c.fillRect(x,y-h,2,h+2);
   c.fillStyle='#607b57';c.fillRect(x-w,y-h-8,2*w+2,7);c.fillStyle='#77916a';c.fillRect(x-w-2,y-h-5,w+2,6);
   c.fillStyle='#4d7055';c.fillRect(x+2,y-h-5,w+1,5);
@@ -38,6 +44,7 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
   withinFootprint(c,f,()=>{
    if(o.civic){drawCivicArchitecture(c,o);return;}
    if(o.kind==='field'){
+    if(vegetation&&o.condition==='ruined')return;
     c.fillStyle=o.condition==='ruined'?'#8b9077':'#ad996e';c.fillRect(f.x,f.y,f.width,f.depth);
     c.fillStyle=presentation.drought?'#ab9c64':o.condition==='intact'?'#607748':'#8a8764';for(let x=f.x+2;x<f.x+f.width-1;x+=5)c.fillRect(x,f.y+1,2,f.depth-2);return;
    }
