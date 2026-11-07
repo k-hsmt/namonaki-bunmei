@@ -8,6 +8,9 @@
 import {housingAt,type HousingHistory,type ResidentialBlock,type ResidentialBlockEvent,type HousingEventKind} from './housing-history.js';
 
 export interface HousingLifecycleInput {
+ /** Optional per-transaction reader for immutable generated review histories. */
+ readonly readHousing?:typeof housingAt;
+ readonly lastEventYear?:(blockId:string,builtYear:number)=>number;
  readonly history:HousingHistory;
  readonly year:number;
  readonly siteId:'river-bank'|'hill-side'|'coast-inlet';
@@ -38,10 +41,10 @@ export function proposeHousingLifecycle(input:HousingLifecycleInput):HousingLife
     !Number.isSafeInteger(population)||population<0||
     !Number.isSafeInteger(shortageYears)||shortageYears<0)throw Error('住宅状態判定の入力が不正');
  if(year<history.introducedYear)return null;
- const view=housingAt(history,year,siteId);
+ const view=(input.readHousing??housingAt)(history,year,siteId);
  // 旧住宅は推定しない。明示的なbuiltイベントから作られた街区だけを更新する。
  for(const block of view.blocks){
-  const last=latestEventYear(history,block.blockId,block.builtYear);
+  const last=input.lastEventYear?input.lastEventYear(block.blockId,block.builtYear):latestEventYear(history,block.blockId,block.builtYear);
   if(last>=year)continue;
   const elapsed=age(year,last);
   const totalAge=age(year,block.builtYear);
@@ -87,6 +90,7 @@ export function proposeHousingLifecycle(input:HousingLifecycleInput):HousingLife
 export function appendHousingLifecycle<H extends HousingHistory>(
  history:H,year:number,proposal:HousingLifecycleProposal,
  causeRecordId:string,
+ readHousing:typeof housingAt=housingAt,
 ):H{
  if(history.events.some(e=>e.year===year&&e.blockId===proposal.blockId))
   throw Error('同一年の住宅街区状態変更が重複');
@@ -98,6 +102,6 @@ export function appendHousingLifecycle<H extends HousingHistory>(
   causeRecordId,
  };
  const next={...history,events:[...history.events,event]} as H;
- housingAt(next,year); // 年次・変更許可属性・廃墟原子性を確定前に検証
+ readHousing(next,year); // 年次・変更許可属性・廃墟原子性を確定前に検証
  return next;
 }

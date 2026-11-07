@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {gunzipSync} from 'node:zlib';
+import {createHash} from 'node:crypto';
 import {parseTerrainRecord} from '../dist/terrain/terrain-record.js';
 import {createGeneratedHousingReview,advanceGeneratedHousingReview,chooseGeneratedHousingReview} from '../dist/story/generated-housing-review.js';
 import {housingAt} from '../dist/story/housing-history.js';
@@ -11,6 +13,15 @@ import {step,chooseAutomatically,lastObservedYear} from '../dist/story/engine.js
 const terrain=parseTerrainRecord(readFileSync(new URL('./fixtures/terrain-record-v1-seed42.json',import.meta.url),'utf8'));
 const sites=['river-bank','hill-side','coast-inlet'];
 const start=()=>{const x=createGeneratedHousingReview(terrain,'field-only');assert.equal(x.status,'review-only');return x;};
+test('cached replay and repeated land HOLD retain the pinned uncached complete state',()=>{
+ const saved=parseTerrainRecord(gunzipSync(readFileSync(new URL('./fixtures/terrain-record-v1-seed1.json.gz',import.meta.url))).toString());
+ const initial=createGeneratedHousingReview(saved,'field-only');assert.equal(initial.status,'review-only');
+ const result=advanceGeneratedHousingReview(initial,2000,'automatic');
+ assert.equal(createHash('sha256').update(JSON.stringify(result.review.state)).digest('hex'),'c48ee9dae9481a7a315636245b1d8954f2c4e3432f92891f71ca426254c11764');
+ assert.equal(result.review.diagnostics.holds['river-bank:housing:no-safe-plot'],3);
+ const split=advanceGeneratedHousingReview(advanceGeneratedHousingReview(initial,1900,'automatic'),100,'automatic');
+ assert.deepEqual(split,result);
+});
 test('three-district housing and later ordinary facilities keep disjoint immutable plots and recorded sources',()=>{
  const initial=start(),before=JSON.stringify(initial),later=advanceGeneratedHousingReview(initial,2000,'automatic'),{state,placements}=later.review;
  assert.equal(JSON.stringify(initial),before);assert.equal(state.year,2000);

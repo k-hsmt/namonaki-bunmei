@@ -150,10 +150,6 @@ jobs:
         run: node scripts/audit-generated-facilities.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Audit generated housing across three districts
-        run: node scripts/audit-generated-housing.mjs
-        env:
-          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -162,5 +158,35 @@ jobs:
             artifacts/h3-longrun.jsonl
             artifacts/terrain31-legacy/longrun-report.json
             artifacts/terrain31-facilities/*
-            artifacts/terrain31-housing/*
           if-no-files-found: warn
+
+  generated-housing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1, 21, 198]
+        reservation: [wide, field-only, none]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - name: Audit housing shard without reducing seeds, modes or years
+        run: node scripts/audit-generated-housing.mjs
+        env:
+          AUDIT_HOUSING_SEED: ${{ matrix.seed }}
+          AUDIT_HOUSING_MODE: ${{ matrix.reservation }}
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain31-housing-${{ matrix.seed }}-${{ matrix.reservation }}
+          path: artifacts/terrain31-housing/*
+          if-no-files-found: error
