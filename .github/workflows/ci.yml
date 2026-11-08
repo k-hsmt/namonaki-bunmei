@@ -384,12 +384,18 @@ jobs:
         run: node scripts/review-landscape-detail.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Compare climate vegetation, snowy mountains and the slower recorded cycle
+        run: node scripts/review-climate-seasons.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: environment34-landscape-detail
           retention-days: 14
-          path: artifacts/environment34-detail/*
+          path: |
+            artifacts/environment34-detail/*
+            artifacts/environment34-climate/*
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1,3 +1,5 @@
+import {relaxEnvironment} from '../environment/progression-v1.js';
+import type {CoupledVegetation} from '../environment/model-v1.js';
 /** One explicit mode controls progression, observation and persistence together. */
 import {advance,choose,chooseAutomatically,legacyNames,type CivilizationState} from './engine.js';
 import {advanceGeneratedBridgeReview,chooseGeneratedBridgeReview,chooseAutomaticallyGeneratedBridgeReview,type GeneratedBridgeReview} from './generated-bridge-review.js';
@@ -47,6 +49,13 @@ export function improveWorldGrowth(session:WorldSession):WorldSession {
 /** Explicit appearance upgrade; every recorded model value stays intact. */
 export function improveWorldEnvironment(session:WorldSession):WorldSession {
  if(session.mode!=='generated'||!session.review.environment)throw Error('No recorded environment');
- if(session.review.environmentAppearance==='landscape-v2')return session;
- return generatedSession({...session.review,environmentAppearance:'landscape-v2'});
+ if(session.review.environmentAppearance==='landscape-v3')return session;
+ return generatedSession({...session.review,environmentAppearance:'landscape-v3'});
+}
+
+/** Switch only future climate; observation, civilization and past ecology stay identical. */
+export function slowWorldClimate(session:WorldSession):WorldSession {
+ if(session.mode!=='generated'||!session.review.environment)throw Error('No recorded environment');
+ const environment=relaxEnvironment(session.review.environment,session.review.vegetation as CoupledVegetation,session.review.review);
+ return environment===session.review.environment?session:generatedSession({...session.review,environment});
 }

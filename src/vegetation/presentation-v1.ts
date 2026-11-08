@@ -1,3 +1,4 @@
+import {projectClimateVegetation,type Foliage} from '../environment/landscape-v3.js';
 import type {LeafPalette} from '../environment/landscape-v2.js';
 import {projectLandscapeVegetation} from '../environment/landscape-v2.js';
 /** Sparse plant marks and rooted trees; this layer never changes land occupation. */
@@ -6,9 +7,10 @@ import type {RecordPoint} from '../terrain/terrain-record-types.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {terrainHash} from '../terrain/terrain-hash-v1.js';
 import type {GroundPlot} from '../terrain/ground-access-review.js';
-export interface TreePaint {readonly point:RecordPoint;readonly scale:number;readonly rank?:number;readonly palette?:LeafPalette}
-export interface VegetationPresentation {grass:{point:RecordPoint;color:string;height?:number}[];shrubs:{point:RecordPoint;rank:number;palette?:LeafPalette}[];trees:TreePaint[]}
+export interface TreePaint {readonly point:RecordPoint;readonly scale:number;readonly rank?:number;readonly palette?:LeafPalette;readonly foliage?:Foliage}
+export interface VegetationPresentation {grass:{point:RecordPoint;color:string;height?:number}[];shrubs:{point:RecordPoint;rank:number;palette?:LeafPalette;foliage?:Foliage}[];trees:TreePaint[]}
 export function projectVegetation(o:GeneratedSceneObservation):VegetationPresentation{
+ if(o.ground.environmentAppearance==='landscape-v3')return projectClimateVegetation(o);
  if(o.ground.environmentAppearance==='landscape-v2')return projectLandscapeVegetation(o);
  const {ground:g,snapshot:s,composition:c}=o,r=readOwnedRecordPhysics(g.terrain.sites[g.site].physics),live=new Set(s.objects.filter(b=>b.kind!=='field'||b.condition!=='ruined').map(b=>b.id));
  const occupied:GroundPlot[]=[...g.facilities.filter(p=>live.has(p.id)).map(p=>p.plot),...c.residentialBlocks.map(b=>b.footprint),...(s.publicSpaces??[]).filter(p=>p.condition==='used').map(p=>p.footprint),...g.bridges.flatMap(b=>[b.deck,...b.bankSupports])];

@@ -11,7 +11,7 @@ export type PatchState=readonly [number,number,number,number];
 export interface EnvironmentState {readonly year:number;readonly humidity:number;readonly temperature:number;readonly patches:Readonly<Record<RecordSite,readonly (PatchState|null)[]>>}
 export interface ClimateTarget {readonly year:number;readonly humidity:number;readonly temperature:number}
 export interface LandUseEvent {readonly id:string;readonly year:number;readonly site:RecordSite;readonly objectId:string;readonly sourceRecordId:string;readonly plot:GroundPlot;readonly active:boolean;readonly farm:boolean}
-export interface EnvironmentHistory {readonly schemaVersion:1;readonly ruleId:'environment-coupled-v1';readonly introducedYear:0;readonly confirmedThrough:number;readonly seed:number;readonly targets:readonly ClimateTarget[];readonly uses:readonly LandUseEvent[];readonly checkpoints:readonly EnvironmentState[];readonly current:EnvironmentState}
+export interface EnvironmentHistory {readonly schemaVersion:1;readonly ruleId:'environment-coupled-v1'|'environment-coupled-v2';readonly climateStart?:number;readonly introducedYear:0;readonly confirmedThrough:number;readonly seed:number;readonly targets:readonly ClimateTarget[];readonly uses:readonly LandUseEvent[];readonly checkpoints:readonly EnvironmentState[];readonly current:EnvironmentState}
 export interface EnvironmentView {readonly humidity:number;readonly temperature:number;readonly moisture:readonly (number|null)[];readonly soil:readonly (number|null)[]}
 export const environmentLimits=Object.freeze({interval:100,soilMax:40,dryYears:40,growthMax:600});
 export function landUseEvents(r:GeneratedFacilityReview):readonly LandUseEvent[]{
@@ -60,8 +60,8 @@ export function environmentRunner(v:CoupledVegetation,r:GeneratedFacilityReview,
  for(const e of v.events){if(e.year<from.year||e.year===from.year&&from.year!==0)continue;const a=disturbances.get(e.year)??[];a.push({site:e.site,indices:covered(e.plot)});disturbances.set(e.year,a);}
  if(from.year===0)for(const {site,indices}of disturbances.get(0)??[])for(const i of indices){const p=patches[site][i];if(p){p[0]=0;p[1]=0;}}
  const buffers=Object.fromEntries(vegetationSites.map(site=>[site,waterBuffers(r,site)])) as Record<RecordSite,readonly number[]>;let year=from.year,humidity=from.humidity,temperature=from.temperature;
- return {snapshot():EnvironmentState{return {year,humidity,temperature,patches:Object.fromEntries(vegetationSites.map(site=>[site,patches[site].map(p=>p?[...p] as unknown as PatchState:null)])) as unknown as EnvironmentState['patches']};},step(target:ClimateTarget){
-  year++;humidity+=Math.sign(target.humidity-humidity);temperature+=Math.sign(target.temperature-temperature);
+ return {snapshot():EnvironmentState{return {year,humidity,temperature,patches:Object.fromEntries(vegetationSites.map(site=>[site,patches[site].map(p=>p?[...p] as unknown as PatchState:null)])) as unknown as EnvironmentState['patches']};},step(target:ClimateTarget,slow=false){
+  year++;if(!slow||year%2===0){humidity+=Math.sign(target.humidity-humidity);temperature+=Math.sign(target.temperature-temperature);}
   const changes=useYears.get(year),before=changes?Object.fromEntries(vegetationSites.map(s=>[s,farms[s].slice()])) as Record<RecordSite,Int16Array>:null;
   for(const {e,indices}of changes??[])apply(e,indices);
   for(const {site,indices}of disturbances.get(year)??[])for(const i of indices){const p=patches[site][i];if(p){p[0]=0;p[1]=0;}}

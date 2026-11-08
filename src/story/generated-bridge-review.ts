@@ -10,13 +10,13 @@ import {createGeneratedPublicSpaceReview,generatedPublicSpaceExtension,validateG
 import {advanceGeneratedFacilityReview,chooseGeneratedFacilityReview,chooseAutomaticallyGeneratedFacilityReview,type GeneratedFacilityReview,type GeneratedAdvanceOptions} from './generated-facility-review.js';
 import {validateGeneratedBridgeLedger} from './generated-bridge-history-review.js';
 import {lastObservedYear} from './engine.js';
-export interface GeneratedBridgeReview {readonly format:'generated-bridge-review';readonly status:'review-only';readonly review:GeneratedFacilityReview;readonly vegetation?:VegetationHistory|CoupledVegetation;readonly environment?:EnvironmentHistory;readonly environmentAppearance?:'landscape-v2'}
+export interface GeneratedBridgeReview {readonly format:'generated-bridge-review';readonly status:'review-only';readonly review:GeneratedFacilityReview;readonly vegetation?:VegetationHistory|CoupledVegetation;readonly environment?:EnvironmentHistory;readonly environmentAppearance?:'landscape-v2'|'landscape-v3'}
 export function createGeneratedBridgeReview(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,mode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedBridgeReview|{status:'hold';reason:string}{
  const saved=validateRiverReaches(hydrology,terrain),parent=createGeneratedPublicSpaceReview(terrain,mode,growthPattern);
  return parent.status==='hold'?parent:{format:'generated-bridge-review',status:'review-only',review:{...parent.review,bridgeReview:{schemaVersion:1,hydrology:saved,bridges:[]}}};
 }
 function check(input:GeneratedBridgeReview){
- if(input.environmentAppearance!==undefined&&(input.environmentAppearance!=='landscape-v2'||!input.environment))throw Error('Invalid environment appearance');
+ if(input.environmentAppearance!==undefined&&(!['landscape-v2','landscape-v3'].includes(input.environmentAppearance)||!input.environment))throw Error('Invalid environment appearance');
  if(input.format!=='generated-bridge-review'||input.status!=='review-only')throw Error('Invalid bridge review boundary');
  if(input.environment){if(input.vegetation?.schemaVersion!==2)throw Error('Missing coupled vegetation');validateEnvironment(input.environment,validateCoupledVegetation(input.vegetation,input.review),input.review);}else if(input.vegetation)validateVegetationHistory(input.vegetation,input.review);
  validateGeneratedBridgeLedger(input.review);validateGeneratedPublicSpaceLedger(input.review,lastObservedYear(input.review.state));
