@@ -11,7 +11,7 @@ export const compactPlacementPolicy=Object.freeze({id:'terrain-placement-v1' as 
 export const organicPlacementPolicy=Object.freeze({id:'terrain-placement-v2' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
 export const productionPlacementPolicy=Object.freeze({id:'terrain-placement-v3' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
 export type GeneratedWorldSave=Omit<GeneratedSaveDraftReview,'format'|'status'|'progressionPolicy'|'rendererId'>&{
- readonly format:'namonaki-world-save';readonly progressionPolicy:typeof productionPlacementPolicy|typeof organicPlacementPolicy|typeof compactPlacementPolicy;readonly rendererId:'generated-scene-v1'|'generated-scene-v2'|'generated-scene-v3';readonly vegetation?:VegetationHistory|CoupledVegetation;readonly environment?:EnvironmentHistory;
+ readonly format:'namonaki-world-save';readonly progressionPolicy:typeof productionPlacementPolicy|typeof organicPlacementPolicy|typeof compactPlacementPolicy;readonly rendererId:'generated-scene-v1'|'generated-scene-v2'|'generated-scene-v3'|'generated-scene-v4';readonly vegetation?:VegetationHistory|CoupledVegetation;readonly environment?:EnvironmentHistory;
 };
 export type LegacyWorldSave=Omit<LegacySaveDraft,'format'|'status'>&{readonly format:'namonaki-world-save'};
 export type WorldSave=GeneratedWorldSave|LegacyWorldSave;
@@ -36,13 +36,13 @@ export function validateWorldSave(raw:unknown):WorldSave {
  if(t?.mode==='generated'){
   wireObject(d,['format','version','schemaVersion','initialTerrain','progressionPolicy','rendererId','landHistory','state'],['vegetation','environment']);
   const p=wireObject(d.progressionPolicy,['id','reservationMode','limits']);
-  if(!['terrain-placement-v1','terrain-placement-v2','terrain-placement-v3'].includes(p.id as string)||p.reservationMode!=='field-only'||!['generated-scene-v1','generated-scene-v2','generated-scene-v3'].includes(d.rendererId as string))throw Error('Unknown production policy or renderer');
+  if(!['terrain-placement-v1','terrain-placement-v2','terrain-placement-v3'].includes(p.id as string)||p.reservationMode!=='field-only'||!['generated-scene-v1','generated-scene-v2','generated-scene-v3','generated-scene-v4'].includes(d.rendererId as string))throw Error('Unknown production policy or renderer');
   if(d.environment!==undefined)assertJsonWire(d);
   const {vegetation,environment,...payload}=d;
-  if((vegetation!==undefined)!==(d.rendererId!=='generated-scene-v1')||(environment!==undefined)!==(d.rendererId==='generated-scene-v3'))throw Error('Vegetation/environment renderer mismatch');
+  if((vegetation!==undefined)!==(d.rendererId!=='generated-scene-v1')||(environment!==undefined)!==(['generated-scene-v3','generated-scene-v4'].includes(d.rendererId as string)))throw Error('Vegetation/environment renderer mismatch');
   const draft=validateGeneratedSaveDraft({...payload,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...p,id:p.id==='terrain-placement-v3'?'generated-land-review-v3':p.id==='terrain-placement-v2'?'generated-land-review-v2':'generated-land-review-v1'}});
   const base=promoteGenerated(draft);if(vegetation===undefined)return base;
-  const review=restoreGeneratedSaveDraft(draft).review;if(environment!==undefined){const v=validateCoupledVegetation(vegetation,review);const e=validateEnvironment(environment,v,review);return ownEnvironmentSave({...base,rendererId:'generated-scene-v3',vegetation:v,environment:e},{format:'generated-bridge-review',status:'review-only',review,vegetation:v,environment:e});}
+  const review=restoreGeneratedSaveDraft(draft).review;if(environment!==undefined){const v=validateCoupledVegetation(vegetation,review);const e=validateEnvironment(environment,v,review);return ownEnvironmentSave({...base,rendererId:d.rendererId as 'generated-scene-v3'|'generated-scene-v4',vegetation:v,environment:e},{format:'generated-bridge-review',status:'review-only',review,vegetation:v,environment:e,...(d.rendererId==='generated-scene-v4'?{environmentAppearance:'landscape-v2' as const}:{})});}
   return {...base,rendererId:'generated-scene-v2',vegetation:validateVegetationHistory(vegetation,review)};
  }
  if(t?.mode==='legacy-fixed'){
@@ -52,7 +52,8 @@ export function validateWorldSave(raw:unknown):WorldSave {
  throw Error('Unknown world terrain mode');
 }
 export function createGeneratedWorldSave(review:GeneratedBridgeReview):GeneratedWorldSave {
- if(review.review.reservationMode!=='field-only')throw Error('Unapproved production reservation mode');const base=promoteGenerated(createGeneratedSaveDraft(review));if(review.environment){const v=validateCoupledVegetation(review.vegetation,review.review);const e=validateEnvironment(review.environment,v,review.review);return ownEnvironmentSave({...base,rendererId:'generated-scene-v3',vegetation:v,environment:e},{...review,vegetation:v,environment:e});}return review.vegetation?{...base,rendererId:'generated-scene-v2',vegetation:validateVegetationHistory(review.vegetation,review.review)}:base;
+ if(review.environmentAppearance!==undefined&&(review.environmentAppearance!=='landscape-v2'||!review.environment))throw Error('Invalid environment appearance');
+ if(review.review.reservationMode!=='field-only')throw Error('Unapproved production reservation mode');const base=promoteGenerated(createGeneratedSaveDraft(review));if(review.environment){const v=validateCoupledVegetation(review.vegetation,review.review);const e=validateEnvironment(review.environment,v,review.review);return ownEnvironmentSave({...base,rendererId:review.environmentAppearance==='landscape-v2'?'generated-scene-v4':'generated-scene-v3',vegetation:v,environment:e},{...review,vegetation:v,environment:e});}return review.vegetation?{...base,rendererId:'generated-scene-v2',vegetation:validateVegetationHistory(review.vegetation,review.review)}:base;
 }
 export function restoreGeneratedWorld(save:GeneratedWorldSave):GeneratedBridgeReview {
  const valid=validateWorldSave(save) as GeneratedWorldSave,cached=environmentSaves.get(valid);if(cached)return {...cached,review:{...cached.review,state:structuredClone(cached.review.state)}};
