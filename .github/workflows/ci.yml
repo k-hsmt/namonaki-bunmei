@@ -388,6 +388,17 @@ jobs:
         run: node scripts/review-climate-seasons.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit independent irrigation intake, occupation and pedestrian geometry
+        run: node scripts/review-irrigation-kernel.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-kernel
+          retention-days: 14
+          path: artifacts/environment34-irrigation-kernel/*
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
