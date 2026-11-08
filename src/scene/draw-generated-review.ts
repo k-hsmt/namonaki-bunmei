@@ -13,7 +13,7 @@ function withinFootprint(c:CanvasRenderingContext2D,p:GroundPlot,draw:()=>void){
  c.save();c.beginPath();c.rect(0,0,320,p.y);c.rect(p.x,p.y,p.width,p.depth);c.clip();draw();c.restore();
 }
 export function drawSceneTree(c:CanvasRenderingContext2D,x:number,y:number,k:number,sway=0,palette?:LeafPalette):void {
- if(palette){const h=Math.round(10*k),w=Math.max(2,Math.round(7*k)),leaves=Math.max(3,Math.round(8*k));c.fillStyle='#625745';c.fillRect(x,y-h,2,h+2);c.fillRect(x-1,y-h+2,1,2);x+=sway;c.fillStyle=palette[2];c.fillRect(x-w+1,y-h-leaves+2,w*2,leaves-1);c.fillStyle=palette[0];c.fillRect(x-w,y-h-leaves+1,w*2-1,leaves-1);c.fillStyle=palette[1];c.fillRect(x-w+1,y-h-leaves,w+1,Math.max(2,leaves-2));c.fillStyle=palette[0];c.fillRect(x-w-1,y-h-leaves+Math.floor(leaves/2),w+1,Math.ceil(leaves/2));return;}
+ if(palette){const h=Math.round(10*k),w=Math.max(2,Math.round(7*k)),leaves=Math.max(3,Math.round(8*k));c.fillStyle='#625745';c.fillRect(x,y-h,2,h+2);c.fillRect(x-1,y-h+1,1,2);x+=sway;c.fillStyle=palette[2];c.fillRect(x-w+1,y-h-leaves+2,w*2,leaves-1);c.fillStyle=palette[0];c.fillRect(x-w,y-h-leaves+1,w*2-1,leaves-1);c.fillStyle=palette[1];c.fillRect(x-w+1,y-h-leaves,w+1,Math.max(2,leaves-2));c.fillStyle=palette[0];c.fillRect(x-w-1,y-h-leaves+Math.floor(leaves/2),w+1,Math.ceil(leaves/2));return;}
 
   const h=Math.round(9*k),w=Math.round(7*k);c.fillStyle='#625745';c.fillRect(x,y-h,2,h+2);
   x+=sway;c.fillStyle='#607b57';c.fillRect(x-w,y-h-8,2*w+2,7);c.fillStyle='#77916a';c.fillRect(x-w-2,y-h-5,w+2,6);
