@@ -22,3 +22,6 @@
 .scene-place p:empty { display: none; }
 
 .scene-motion-control{display:inline-flex;align-items:center;gap:.25rem;white-space:nowrap;font-size:.72rem}.scene-motion-control input{accent-color:#607b57;margin:0}
+
+.music-control{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:12px 0;color:#777c75;font-size:12px;letter-spacing:.03em}
+.music-control .textbutton{min-height:44px;min-width:64px}.music-control input{width:88px;min-height:44px;accent-color:#597c68}.music-control :focus-visible{outline:2px solid #597c68;outline-offset:3px}.music-control [role=status]:empty{display:none}.music-control [role=status]{flex-basis:100%;text-align:right}@media(max-width:600px){.music-control{justify-content:center;gap:4px 8px}.music-control [role=status]{text-align:center}}
