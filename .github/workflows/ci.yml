@@ -490,3 +490,41 @@ jobs:
           retention-days: 14
           path: artifacts/vegetation32/*
           if-no-files-found: error
+
+  irrigation-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Measure annual and full irrigation advancement with one warm-up and five samples
+        run: node scripts/benchmark-irrigation.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit all five 10,000-year worlds and exact A2 reference values
+        run: node scripts/audit-irrigation-acceptance.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Compare native scenery, lifecycle windows and controlled failures
+        run: node scripts/review-irrigation-acceptance.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Measure first reads, warm observation and static preparation on desktop and CPU4x
+        run: node scripts/benchmark-irrigation-observation.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-acceptance
+          retention-days: 14
+          path: artifacts/environment34-irrigation-acceptance/*
+          if-no-files-found: error

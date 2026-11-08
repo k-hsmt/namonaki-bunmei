@@ -1,0 +1,36 @@
+{
+  "sourceSHA": "aad15d2941f8520a85fc8e637908a3cc6adf55b0",
+  "description": "Pre-A3 complete normalized trial values, natural automatic choices",
+  "cases": [
+    {
+      "seed": 1,
+      "year": 1000,
+      "sha256": "e42760772bc5d44756a739730ac6292db305e6784edd33d37e4956f6f5f325dd"
+    },
+    {
+      "seed": 21,
+      "year": 1000,
+      "sha256": "dbee363b41233e8fa2672475144a5b708b09efec6204b730ded2c080444ca48f"
+    },
+    {
+      "seed": 29,
+      "year": 1000,
+      "sha256": "1435b54ff13206e2713a78daf546bfcd3d0496f6a280927218459c259a9150ba"
+    },
+    {
+      "seed": 42,
+      "year": 1000,
+      "sha256": "d64540b144db0eb7a8a4d892df7a3b1c585aa0935d7846893e7f9bba2a2234a0"
+    },
+    {
+      "seed": 198,
+      "year": 1000,
+      "sha256": "55f5e99d2fc58a41bf8fb4a59f84134752fcc34294146de8f3561ea7b76515dc"
+    },
+    {
+      "seed": 42,
+      "year": 10000,
+      "sha256": "e85ddddb597b4a294d254c2d04ab74c1b7b5699cb32f732b06a1488a18ce6885"
+    }
+  ]
+}

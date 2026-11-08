@@ -6,9 +6,10 @@ import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 const W=320,N=57600;
 export const patchIndex=(x:number,y:number)=>Math.floor((y-96)/8)*40+Math.floor(x/8);
 export function channelPatches(system:ChannelSystem):number[]{return [...new Set(system.geometry.cells.map(([x,y])=>patchIndex(x,y)))].sort((a,b)=>a-b);}
-export function irrigationEffects(system:ChannelSystem|undefined,state:ChannelState|null,frame:Omit<IrrigationContext,'cause'>,disturbedPatches:readonly number[]=[]):IrrigationPatchEffects {
+export function irrigationEffects(system:ChannelSystem|undefined,state:ChannelState|null,frame:Omit<IrrigationContext,'cause'>|undefined,disturbedPatches:readonly number[]=[]):IrrigationPatchEffects {
  const moisture=Array<number>(440).fill(0),occupiedPatches=system&&state&&state.status!=='retired'?channelPatches(system):[];
  if(!system||state?.status!=='active')return {moisture,occupiedPatches,disturbedPatches};
+ if(!frame)throw Error('Active irrigation requires a confirmed frame');
  const r=readOwnedRecordPhysics(frame.ground.terrain.sites['river-bank'].physics),g=system.geometry,blocked=new Uint8Array(N),eligible=new Uint8Array(N),wet=new Uint8Array(N),denominator=new Uint8Array(440),numerator=new Uint8Array(440);
  for(const o of frame.ground.occupancy){if(o.id===g.field.id)continue;const p=o.plot;for(let y=p.y;y<p.y+p.depth;y++)blocked.fill(1,y*W+p.x,y*W+p.x+p.width);}
  const offer=(x:number,y:number)=>{if(x>=0&&x<W&&y>=96&&y<180){const i=y*W+x;if(!blocked[i]&&r.surface[i]===1&&r.bearing[i]===0&&r.elevation[i]===g.intake.head)eligible[i]=1;}};
