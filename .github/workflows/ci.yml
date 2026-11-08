@@ -372,6 +372,10 @@ jobs:
         run: node scripts/benchmark-environment.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Measure observation and native scenery across early and 10,000-year histories
+        run: node scripts/benchmark-environment-scenes.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Compare natural histories and explicitly controlled climate and land use
         run: node scripts/review-environment.mjs
         env:

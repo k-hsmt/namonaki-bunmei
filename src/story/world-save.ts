@@ -66,4 +66,4 @@ export function parseWorldSave(json:string):WorldSave {
  const raw:unknown=JSON.parse(json);if(raw&&typeof raw==='object'&&'version' in raw&&[2,3,4].includes(raw.version as number)&&!('format' in raw))return migrateOldWorld(raw);
  return validateWorldSave(raw);
 }
-export function serializeWorldSave(save:WorldSave):string{return JSON.stringify(validateWorldSave(save));}
+export function serializeWorldSave(save:WorldSave):string {const json=JSON.stringify(validateWorldSave(save));if(new TextEncoder().encode(json).length>generatedDraftMaxBytes)throw Error('World save exceeds 16MiB');return json;}
