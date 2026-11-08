@@ -1,3 +1,4 @@
+import {environmentAppearance} from '../environment/presentation-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {planWaterTracks,waterStrokeAt} from './water-motion.js';
 import type {GeneratedSceneObservation} from './generated-scene-review.js';
@@ -7,7 +8,7 @@ import {planSceneMotion,journeyAt,sceneActivityCount} from './motion-plan.js';
 /** Equivalent paint/activities within one immutable terrain; ages remain in history. */
 export function sceneMotionVisualKey(o:GeneratedSceneObservation):string {
  const {snapshot:s,composition:c,ground:g}=o;
- return JSON.stringify([g.site,g.terrain.source.seed,s.objects,s.publicSpaces,s.scars,c.residentialBlocks,g.facilities,g.bridges,
+ return JSON.stringify([environmentAppearance(g.environment),g.site,g.terrain.source.seed,s.objects,s.publicSpaces,s.scars,c.residentialBlocks,g.facilities,g.bridges,
   g.vegetation?.map(p=>[p.index,p.stage,p.stage===0&&p.disturbedYear!==null&&s.year-p.disturbedYear<15]),
   Math.floor(s.year/20),sceneActivityCount(c.population,c.scale),presentationPeopleCount(c.population,s.scars.includes('epidemic'))]);
 }

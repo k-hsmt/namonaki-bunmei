@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';import {mkdir,writeFile} from 'node:fs/p
 import {createNewWorld} from '../dist/story/new-world.js';import {advanceGeneratedBridgeReview} from '../dist/story/generated-bridge-review.js';import {vegetationAt} from '../dist/vegetation/history-v1.js';
 const out='artifacts/vegetation32',sourceSHA=process.env.REVIEW_SOURCE_SHA??execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),dirty=execFileSync('git',['diff','--name-only'],{encoding:'utf8'}).trim(),frames=[],report={sourceSHA,dirty,natural:[],controlled:[]};await mkdir(out,{recursive:true});
 for(const seed of [42,1,21]){
- const outer=advanceGeneratedBridgeReview(createNewWorld(seed).review,300,'automatic');await writeFile(`${out}/seed${seed}-review.json`,JSON.stringify(outer));
+ const outer=advanceGeneratedBridgeReview(createNewWorld(seed,'terrain-placement-v3',true).review,300,'automatic');await writeFile(`${out}/seed${seed}-review.json`,JSON.stringify(outer));
  for(const year of [0,30,100,200,300])for(let siteIndex=0;siteIndex<3;siteIndex++){
   const site=['river-bank','hill-side','coast-inlet'][siteIndex],patches=vegetationAt(outer.vegetation,year,site),counts=patches.reduce((a,p)=>(a[p.stage]++,a),[0,0,0,0,0]),id=`natural-${seed}-${site}-${year}`;report.natural.push({id,seed,site,year,counts});frames.push({id,label:`自然進行 seed ${seed} / ${site} / ${year}年`,outer,year,siteIndex});
  }

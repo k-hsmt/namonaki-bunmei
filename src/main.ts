@@ -1,3 +1,4 @@
+import {environmentLabel} from './environment/presentation-v1.js';
 import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave} from './story/world-storage.js';
@@ -80,6 +81,7 @@ function render(){
  const historicalStats=viewingPast||awaitingChoice||estimating;
  const siteIndex=Number(siteSelect.value);
  const scene=motion.show(world,y,siteIndex);
+ const environment=motion.environment;el('site-environment').hidden=!environment;el('site-environment').textContent=environment?environmentLabel(environment):'';
  const site=siteAt(state.observation?.sites,siteIndex,y);
  el('scene-place').hidden=!site;
  if(site&&scene.local){

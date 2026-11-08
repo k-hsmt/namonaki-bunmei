@@ -15,7 +15,8 @@ export function projectVegetation(o:GeneratedSceneObservation){
   const hash=(n:number)=>terrainHash(['vegetation-display-v1',g.terrain.source.seed,g.site,p.index,n]);
   for(let n=0;n<4;n++){
    const h=hash(n),x=p.plot.x+h%8,y=p.plot.y+Math.floor(h/8)%p.plot.depth;if(!clear(x,y))continue;
-   if(p.stage>0)grass.push({point:[x,y],color:p.stage===1?'#a4a77c':'#8e9c70'});
+   const m=g.environment?.moisture[p.index],cold=g.environment&&g.environment.temperature< -25;
+   if(p.stage>0){if(m===undefined||m===null||m>=-35||h%2)grass.push({point:[x,y],color:m!==undefined&&m!==null&&m< -15?'#b4ab7b':cold?'#a2ac94':p.stage===1?'#a4a77c':'#8e9c70'});}
    else if(p.disturbedYear!==null&&s.year-p.disturbedYear<15)grass.push({point:[x,y],color:'#8e856d'});
    if(n===0&&p.stage===2&&h%3===0&&clear(x+2,y))shrubs.push({point:[x,y],rank:h});
    if(n===0&&p.stage>=3&&h%5===0&&rooted(x,y)&&!occupied.some(q=>x>=q.x-12&&x<q.x+q.width+12&&y>=q.y-6&&y<q.y+q.depth+24))trees.push({point:[x,y],scale:(.45+(y-96)/160)*(p.stage===4?1:.62),rank:h});
