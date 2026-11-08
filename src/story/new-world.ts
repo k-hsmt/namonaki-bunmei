@@ -15,6 +15,6 @@ export function createNewWorld(seed:number,policy?:'terrain-placement-v1'|'terra
  const terrain=captureTerrainRecord(result.world,'world-terrain-v1'),review=createGeneratedBridgeReview(terrain,captureRiverReaches(terrain),'field-only',policy==='terrain-placement-v3'?'organic-v3':policy==='terrain-placement-v2'?'organic-v2':undefined);
  if(review.status!=='review-only')throw Error('No viable initial settlement');if(environment&&!vegetation)throw Error('Environment requires vegetation');
  const initial=vegetation?validateVegetationHistory(createInitialVegetation(review.review),review.review):undefined,v=initial&&environment?coupleVegetation(initial):initial;
- const session=generatedSession({...review,...(v?{vegetation:v}:{}),...(v?.schemaVersion===2?{environment:createEnvironment(v,review.review),environmentAppearance:'landscape-v2' as const}:{})});
+ const session=generatedSession({...review,...(v?{vegetation:v}:{}),...(v?.schemaVersion===2?{environment:createEnvironment(v,review.review,true),environmentAppearance:'landscape-v3' as const}:{})});
  for(let i=0;i<3;i++)observeWorldSession(session,0,i);return session;
 }

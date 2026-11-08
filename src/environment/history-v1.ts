@@ -19,14 +19,15 @@ const trusted=new WeakMap<object,{terrain:object;initial:object;events:object}>(
 export function trustEnvironment(e:EnvironmentHistory,v:CoupledVegetation,r:GeneratedFacilityReview):EnvironmentHistory {const result=freezeVegetation(e);trusted.set(result,{terrain:r.terrain,initial:v.initial,events:v.events});return result;}
 /** Check derived snapshots from recorded controls and spatial source ledgers, never re-roll. */
 export function validateEnvironment(raw:unknown,v:CoupledVegetation,r:GeneratedFacilityReview):EnvironmentHistory {
- const e=wireObject(raw,['schemaVersion','ruleId','introducedYear','confirmedThrough','seed','targets','uses','checkpoints','current']),end=lastObservedYear(r.state);
- if(e.schemaVersion!==1||e.ruleId!=='environment-coupled-v1'||e.introducedYear!==0||e.confirmedThrough!==end||e.seed!==r.state.seed||v.confirmedThrough!==end)throw Error('Unknown or unconfirmed environment');
+ const e=wireObject(raw,['schemaVersion','ruleId','introducedYear','confirmedThrough','seed','targets','uses','checkpoints','current'],['climateStart']),end=lastObservedYear(r.state);
+ if(e.schemaVersion!==1||!['environment-coupled-v1','environment-coupled-v2'].includes(e.ruleId as string)||e.introducedYear!==0||e.confirmedThrough!==end||e.seed!==r.state.seed||v.confirmedThrough!==end)throw Error('Unknown or unconfirmed environment');
+ if(e.ruleId==='environment-coupled-v2'?(!Number.isSafeInteger(e.climateStart)||Number(e.climateStart)<0||Number(e.climateStart)%100!==0||Number(e.climateStart)>(Math.floor(end/100)+1)*100):e.climateStart!==undefined)throw Error('Invalid climate policy boundary');
  const uses=landUseEvents(r);if(!sameWire(e.uses,uses))throw Error('Environment land-use sources disagree');
  const proof=trusted.get(raw as object);if(proof?.terrain===r.terrain&&proof.initial===v.initial&&proof.events===v.events)return raw as EnvironmentHistory;
  if(!Array.isArray(e.targets)||e.targets.length!==Math.floor(end/100)+1||!Array.isArray(e.checkpoints)||e.checkpoints.length!==Math.floor(end/100)+1)throw Error('Invalid environment intervals');
  for(const [i,target] of e.targets.entries()){const t=wireObject(target,['year','humidity','temperature']);if(t.year!==i*100||!Number.isSafeInteger(t.humidity)||Math.abs(Number(t.humidity))>60||!Number.isSafeInteger(t.temperature)||Math.abs(Number(t.temperature))>40)throw Error('Invalid climate target');}
  const typed=e as unknown as EnvironmentHistory,runner=environmentRunner(v,r,uses,initialEnvironment(v));if(!sameWire(e.checkpoints[0],runner.snapshot()))throw Error('Invalid initial environment checkpoint');
- for(let y=1;y<=end;y++){runner.step(typed.targets[Math.floor(y/100)]!);if(y%100===0&&!sameWire(e.checkpoints[y/100],runner.snapshot()))throw Error('Environment checkpoint differs from history');}
+ for(let y=1;y<=end;y++){runner.step(typed.targets[Math.floor(y/100)]!,typed.ruleId==='environment-coupled-v2'&&y>=typed.climateStart!);if(y%100===0&&!sameWire(e.checkpoints[y/100],runner.snapshot()))throw Error('Environment checkpoint differs from history');}
  if(!sameWire(e.current,runner.snapshot()))throw Error('Environment current differs from history');
  return trustEnvironment(structuredClone(typed),v,r);
 }
@@ -34,7 +35,7 @@ export function environmentStateAt(e:EnvironmentHistory,v:CoupledVegetation,r:Ge
  if(!Number.isSafeInteger(year)||year<0||year>e.confirmedThrough)throw Error('Unconfirmed environment observation');
  if(year===e.confirmedThrough)return e.current;
  const checkpoint=e.checkpoints[Math.floor(year/100)]!;if(checkpoint.year===year)return checkpoint;
- const runner=environmentRunner(v,r,e.uses,checkpoint);for(let y=checkpoint.year+1;y<=year;y++)runner.step(e.targets[Math.floor(y/100)]!);return freezeVegetation(runner.snapshot());
+ const runner=environmentRunner(v,r,e.uses,checkpoint);for(let y=checkpoint.year+1;y<=year;y++)runner.step(e.targets[Math.floor(y/100)]!,e.ruleId==='environment-coupled-v2'&&y>=e.climateStart!);return freezeVegetation(runner.snapshot());
 }
 export function environmentProjection(e:EnvironmentHistory,v:CoupledVegetation,r:GeneratedFacilityReview,year:number,site:RecordSite):{vegetation:readonly VegetationPatchView[];environment:EnvironmentView}{
  if(!vegetationSites.includes(site))throw Error('Invalid environment site');const state=environmentStateAt(e,v,r,year),buffer=waterBuffers(r,site),moisture:(number|null)[]=Array(440).fill(null),soil:(number|null)[]=Array(440).fill(null),vegetation:VegetationPatchView[]=[];

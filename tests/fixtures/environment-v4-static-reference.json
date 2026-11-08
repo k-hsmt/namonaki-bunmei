@@ -1,0 +1,52 @@
+{
+  "sourceSHA": "073fac524812cca6fc24b75ee7c65591e21b7a95",
+  "seed": 42,
+  "rendererId": "generated-scene-v4",
+  "cases": [
+    {
+      "year": 0,
+      "site": 0,
+      "sha256": "dfdb7890c79137e599e1e88bf01fb1d9cad35acc29722c05fd1fb7f81cf26372"
+    },
+    {
+      "year": 0,
+      "site": 1,
+      "sha256": "6b0f0c55242de46e6a5259106617041f755c9eaf22dfd07e9a09f654d2da0bc8"
+    },
+    {
+      "year": 0,
+      "site": 2,
+      "sha256": "47d7f6fe3d2c74f7e6b7a72e9b7c315711de47bd895a525be7328e29a01ba2cd"
+    },
+    {
+      "year": 300,
+      "site": 0,
+      "sha256": "be3056b76a7ca6538fa80b2173bd307186d293c42c3841a282b8361554ca8bcf"
+    },
+    {
+      "year": 300,
+      "site": 1,
+      "sha256": "7dd2b0be7a98c32721d9f87103f4785286afbef12f4871a427cd595091b4d7fd"
+    },
+    {
+      "year": 300,
+      "site": 2,
+      "sha256": "d3094627812b0124f3593766839885a2bd2816f31451da88c467d85b34ccc299"
+    },
+    {
+      "year": 1000,
+      "site": 0,
+      "sha256": "0668d316512ed4c3ca9fcdc15d3478a58b03a319cfb78b5f4151ad3eb046389a"
+    },
+    {
+      "year": 1000,
+      "site": 1,
+      "sha256": "b3678647cecdc536e81419a02871aff0c61b7cc23eda6b062daf8aaa3d682010"
+    },
+    {
+      "year": 1000,
+      "site": 2,
+      "sha256": "754d3aa7971ddf85731611acded765133c13a6cb2e22a93fb59a5ec7b67e0aa0"
+    }
+  ]
+}

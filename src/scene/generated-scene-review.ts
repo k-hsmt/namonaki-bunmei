@@ -11,7 +11,7 @@ import type {SceneComposition} from './composition.js';
 import {composeGeneratedScene,type GeneratedSceneGround} from './generated-ground-review.js';
 export interface GeneratedSceneObservation {readonly snapshot:SiteSnapshot;readonly composition:SceneComposition;readonly ground:GeneratedSceneGround}
 export function observeGeneratedSceneReview(input:GeneratedBridgeReview,year:number,siteIndex=0):GeneratedSceneObservation {
- if(input.environmentAppearance!==undefined&&(input.environmentAppearance!=='landscape-v2'||!input.environment))throw Error('Invalid environment appearance');
+ if(input.environmentAppearance!==undefined&&(!['landscape-v2','landscape-v3'].includes(input.environmentAppearance)||!input.environment))throw Error('Invalid environment appearance');
  if(input.format!=='generated-bridge-review'||input.status!=='review-only'||!Number.isSafeInteger(siteIndex)||siteIndex<0||siteIndex>2)throw Error('Invalid generated scene boundary');
  const review={...input.review,terrain:readOwnedTerrainRecord(input.review.terrain)};
  validateGeneratedBridgeLedger(review);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));

@@ -1,3 +1,4 @@
+import type {Foliage} from '../environment/landscape-v3.js';
 import type {LeafPalette} from '../environment/landscape-v2.js';
 import {paintEnvironmentGround} from '../environment/presentation-v1.js';
 /** D4-A saved terrain + confirmed structures. Legacy scenery remains separate. */
@@ -12,7 +13,19 @@ import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 function withinFootprint(c:CanvasRenderingContext2D,p:GroundPlot,draw:()=>void){
  c.save();c.beginPath();c.rect(0,0,320,p.y);c.rect(p.x,p.y,p.width,p.depth);c.clip();draw();c.restore();
 }
-export function drawSceneTree(c:CanvasRenderingContext2D,x:number,y:number,k:number,sway=0,palette?:LeafPalette):void {
+export function drawSceneTree(c:CanvasRenderingContext2D,x:number,y:number,k:number,sway=0,palette?:LeafPalette,foliage?:Foliage):void {
+ if(palette&&foliage&&foliage!=='full'){
+  const h=Math.max(3,Math.round(10*k)),w=Math.max(2,Math.round(7*k)),leaves=Math.max(3,Math.round(8*k)),top=y-h-leaves;
+  c.fillStyle='#625745';c.fillRect(x,y-h,2,h+2);c.fillRect(x,top+2,1,leaves);const crown=x+sway;
+  // Exposed branches stay above the verified two-pixel root.
+  for(const side of [-1,1])for(let i=1;i<=w;i++)c.fillRect(crown+side*i,top+2+Math.floor(i*.7),1,1);
+  c.fillRect(crown-1,top,1,3);
+  if(foliage==='bare'){c.fillStyle='#d9ded0';c.fillRect(crown-1,top,2,1);return;}
+  c.fillStyle=palette[2];c.fillRect(crown-w,top+2,Math.max(2,w-1),2);c.fillRect(crown+1,top+4,w,2);
+  c.fillStyle=palette[0];c.fillRect(crown-2,top,3,2);c.fillStyle=palette[1];c.fillRect(crown-w,top+1,Math.max(2,w-1),1);
+  if(foliage==='lush'){c.fillStyle=palette[2];c.fillRect(crown-w-1,top+2,w*2+2,leaves);c.fillStyle=palette[0];c.fillRect(crown-w,top,w*2,leaves);c.fillStyle=palette[1];c.fillRect(crown-w+1,top-1,w+1,Math.max(2,leaves-2));}
+  return;
+ }
  if(palette){const h=Math.round(10*k),w=Math.max(2,Math.round(7*k)),leaves=Math.max(3,Math.round(8*k));c.fillStyle='#625745';c.fillRect(x,y-h,2,h+2);c.fillRect(x-1,y-h+1,1,2);x+=sway;c.fillStyle=palette[2];c.fillRect(x-w+1,y-h-leaves+2,w*2,leaves-1);c.fillStyle=palette[0];c.fillRect(x-w,y-h-leaves+1,w*2-1,leaves-1);c.fillStyle=palette[1];c.fillRect(x-w+1,y-h-leaves,w+1,Math.max(2,leaves-2));c.fillStyle=palette[0];c.fillRect(x-w-1,y-h-leaves+Math.floor(leaves/2),w+1,Math.ceil(leaves/2));return;}
 
   const h=Math.round(9*k),w=Math.round(7*k);c.fillStyle='#625745';c.fillRect(x,y-h,2,h+2);
@@ -40,9 +53,9 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
  }
  if(vegetation&&layer!=='structures'){
   for(const mark of vegetation.grass){const [x,y]=mark.point;c.fillStyle=mark.color;if(mark.height!==undefined&&mark.height>1){c.fillRect(x,y-mark.height+1,1,mark.height);c.fillRect(x+1,y-1,1,2);}else c.fillRect(x,y,1,1);}
-  for(const mark of vegetation.shrubs){const [x,y]=mark.point;if(mark.palette!==undefined){c.fillStyle=mark.palette[2];c.fillRect(x,y-2,3,3);c.fillStyle=mark.palette[0];c.fillRect(x-1,y-3,4,2);c.fillStyle=mark.palette[1];c.fillRect(x,y-4,2,2);continue;}c.fillStyle='#718866';c.fillRect(x,y-2,3,2);c.fillStyle='#84956c';c.fillRect(x+1,y-3,2,2);}
+  for(const mark of vegetation.shrubs){const [x,y]=mark.point;if(mark.foliage==='bare'||mark.foliage==='sparse'){c.fillStyle='#8c8063';c.fillRect(x,y-3,1,4);c.fillRect(x+1,y-2,2,1);if(mark.foliage==='sparse'){c.fillStyle=mark.palette![0];c.fillRect(x+1,y-3,2,1);}continue;}if(mark.palette!==undefined){c.fillStyle=mark.palette[2];c.fillRect(x,y-2,3,3);c.fillStyle=mark.palette[0];c.fillRect(x-1,y-3,4,2);c.fillStyle=mark.palette[1];c.fillRect(x,y-4,2,2);continue;}c.fillStyle='#718866';c.fillRect(x,y-2,3,2);c.fillStyle='#84956c';c.fillRect(x+1,y-3,2,2);}
  }
- if(!layer)for(const t of (vegetation?.trees??presentation.trees) as readonly TreePaint[])drawSceneTree(c,t.point[0],t.point[1],t.scale,0,t.palette);
+ if(!layer)for(const t of (vegetation?.trees??presentation.trees) as readonly TreePaint[])drawSceneTree(c,t.point[0],t.point[1],t.scale,0,t.palette,t.foliage);
  if(layer!=='structures'){
  c.fillStyle=presentation.drought?'#aa9b77':'#b1a180';for(const [x,y] of presentation.wear)c.fillRect(x,y,1,1);
  drawConfirmedPublicSpaces(c,s.publicSpaces??[]);drawHousingPlotSurface(c,scene);
