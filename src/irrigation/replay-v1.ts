@@ -13,8 +13,8 @@ export function replayIrrigation(base:GeneratedWorldSave,introducedYear:number,c
  const runner=irrigationEnvironmentRunner(source.vegetation,source.world.review,source.environment.uses,start.environment,()=>effects);
  let current=start;
  for(let year=start.year+1;year<=source.environment.confirmedThrough;year++){
-  const next=lifecycle.step(year),key=[next.channel?.id,next.channel?.status,source.keyAt(year)].join('/');
-  if(key!==cachedKey){cached=irrigationEffects(next.system,next.channel,next.frame);cachedKey=key;}
+  const next=lifecycle.step(year),key=[next.channel?.id,next.channel?.status,next.channel?.status==='active'?source.keyAt(year):0].join('/');
+  if(key!==cachedKey){cached=irrigationEffects(next.system,next.channel,next.channel?.status==='active'?next.frame:undefined);cachedKey=key;}
   const disturbed=new Set(next.events.filter(e=>e.kind==='built'||e.kind==='backfilled').flatMap(e=>channelPatches(lifecycle.systems.find(s=>s.id===e.systemId)!)));
   effects={...cached,disturbedPatches:[...disturbed].sort((a,b)=>a-b)};
   runner.step(source.environment.targets[Math.floor(year/100)]!,source.environment.ruleId==='environment-coupled-v2'&&year>=source.environment.climateStart!);
@@ -30,6 +30,6 @@ export function irrigationEnvironmentAt(source:IrrigationSources,trial:Irrigatio
  const checkpoint=trial.checkpoints[Math.floor((year-trial.introducedYear)/100)]!;if(year===checkpoint.year)return checkpoint.environment;
  const systems=new Map(trial.systems.map(s=>[s.id,s])),eventsByYear=new Map<number,ChannelEvent[]>();for(const event of trial.events){const list=eventsByYear.get(event.year)??[];list.push(event);eventsByYear.set(event.year,list);}
  let effectKey='',cached:IrrigationPatchEffects={moisture:Array(440).fill(0),occupiedPatches:[],disturbedPatches:[]};
- const runner=irrigationEnvironmentRunner(source.vegetation,source.world.review,source.environment.uses,checkpoint.environment,y=>{const state=channelStateAt(trial.events,y),system=state?systems.get(state.id):undefined,key=[state?.id,state?.status,source.keyAt(y)].join('/'),disturbed=[...new Set((eventsByYear.get(y)??[]).filter(e=>e.kind==='built'||e.kind==='backfilled').flatMap(e=>channelPatches(systems.get(e.systemId)!)))];if(key!==effectKey){cached=irrigationEffects(system,state,source.at(y));effectKey=key;}return {...cached,disturbedPatches:disturbed};});
+ const runner=irrigationEnvironmentRunner(source.vegetation,source.world.review,source.environment.uses,checkpoint.environment,y=>{const state=channelStateAt(trial.events,y),system=state?systems.get(state.id):undefined,key=[state?.id,state?.status,state?.status==='active'?source.keyAt(y):0].join('/'),disturbed=[...new Set((eventsByYear.get(y)??[]).filter(e=>e.kind==='built'||e.kind==='backfilled').flatMap(e=>channelPatches(systems.get(e.systemId)!)))];if(key!==effectKey){cached=irrigationEffects(system,state,state?.status==='active'?source.at(y):undefined);effectKey=key;}return {...cached,disturbedPatches:disturbed};});
  for(let y=checkpoint.year+1;y<=year;y++)runner.step(source.environment.targets[Math.floor(y/100)]!,source.environment.ruleId==='environment-coupled-v2'&&y>=source.environment.climateStart!);return runner.snapshot();
 }

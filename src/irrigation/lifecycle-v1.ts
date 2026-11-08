@@ -13,9 +13,9 @@ export function channelLifecycle(source:IrrigationSources,seed:LifecycleSeed,con
   events.push({seq,id:eventId,year,systemId:id,kind,cause,before,after});channel=after;
  }
  return {systems,events,attempts,get channel(){return channel;},step(year:number){
-  const firstEvent=events.length,frame=source.at(year),sources=source.changed(year),system=()=>systems.find(s=>s.id===channel?.id),healthy=()=>Boolean(system()&&frame.fields.some(f=>f.id===system()!.geometry.field.id));
+  const firstEvent=events.length,sources=source.changed(year);let frame:ReturnType<IrrigationSources['at']>|undefined;const readFrame=()=>frame??(frame=source.at(year)),system=()=>systems.find(s=>s.id===channel?.id),healthy=()=>Boolean(system()&&readFrame().fields.some(f=>f.id===system()!.geometry.field.id));
   const landCause=(objectId:string|null=null):ChannelCause=>{if(!sources.length)throw Error('Missing changed-land source');return {kind:'land-use',recordIds:sources,objectId};};
-  if(channel&&channel.status!=='retired'&&sources.length){const fit=channelFitness(system()!.geometry,frame);if(!fit.clear)emit(year,'backfilled',landCause(fit.objectId),'retired');}
+  if(channel&&channel.status!=='retired'&&sources.length){const fit=channelFitness(system()!.geometry,readFrame());if(!fit.clear)emit(year,'backfilled',landCause(fit.objectId),'retired');}
   if(channel&&channel.status!=='retired'){
    const clock:ChannelCause={kind:'policy-clock',parentEventId:channel.lastMaintainedEventId,elapsed:year-channel.lastMaintainedYear};
    if(channel.status==='abandoned'){if(year-channel.abandonedYear!>=limits.backfillYears)emit(year,'backfilled',{kind:'policy-clock',parentEventId:channel.abandonedEventId!,elapsed:year-channel.abandonedYear!},'retired');}
@@ -28,15 +28,15 @@ export function channelLifecycle(source:IrrigationSources,seed:LifecycleSeed,con
   for(const request of requests){
    if(channel&&channel.status!=='retired'){
     if(channel.status==='abandoned'||channel.status==='damaged'&&!healthy()){attempts.push({year,...request,outcome:'hold',systemId:channel.id,reason:channel.status==='abandoned'?'awaiting-backfill':'no-active-field',metrics:null,diagnostics:[]});continue;}
-    if(!channelFitness(system()!.geometry,frame).clear)throw Error('Equipment failed revalidation without a land change');
+    if(!channelFitness(system()!.geometry,readFrame()).clear)throw Error('Equipment failed revalidation without a land change');
     const outcome=channel.status==='damaged'?'repaired':'maintained';emit(year,outcome,request.cause,channel.status==='idle'?'idle':'active',channel.id,true);attempts.push({year,...request,outcome,systemId:channel.id,reason:null,metrics:null,diagnostics:[]});continue;
    }
-   const decision=decide({...frame,cause:{recordId:request.recordId,year}});
+   const decision=decide({...readFrame(),cause:{recordId:request.recordId,year}});
    if(decision.status==='hold'){attempts.push({year,...request,outcome:'hold',systemId:null,reason:decision.reason,metrics:decision.metrics,diagnostics:decision.diagnostics});continue;}
    const id='channel-'+String(systems.length+1).padStart(6,'0');systems.push({id,geometry:decision.geometry});emit(year,'built',request.cause,'active',id,true);attempts.push({year,...request,outcome:'built',systemId:id,reason:null,metrics:decision.metrics,diagnostics:decision.diagnostics});
   }
-  if(channel?.status==='idle'&&healthy()){if(!channelFitness(system()!.geometry,frame).clear)throw Error('Restored field loses conveyance');emit(year,'resumed',landCause(system()!.geometry.field.id),'active');}
+  if(channel?.status==='idle'&&healthy()){if(!channelFitness(system()!.geometry,readFrame()).clear)throw Error('Restored field loses conveyance');emit(year,'resumed',landCause(system()!.geometry.field.id),'active');}
   if(events.length>limits.maxEntries||systems.length>limits.maxYears||attempts.length>limits.maxEntries)throw Error('Irrigation ledger exceeds bounds');
-  return {channel,system:system(),events:events.slice(firstEvent),frame};
+  return {channel,system:system(),events:events.slice(firstEvent),get frame(){return readFrame();}};
  }};
 }
