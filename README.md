@@ -71,18 +71,20 @@ v0.4以前の保存形式（`version:2`）は引き続き読めます。旧版�
 ### BGM「名もなき朝」
 
 完成済みのオリジナル音源 `assets/audio/namonaki_asa_v3.mp3` をそのまま使用します。
-画面上部の「音楽」で再生・停止と音量を操作できます。停止すると曲の先頭へ戻ります。
+風景の「動き」の隣にある「BGM」で再生・停止と音量を操作できます。曲名は表示しません。停止すると曲の先頭へ戻ります。
 音量（初期値30%）と再生設定は専用キー `namonaki-bunmei:music:v1` に保存しますが、
 ページを開く・再読み込みするたびに停止状態から始まり、保存された再生設定から自動再生しません。
 ブラウザ保存が使えない場合も、そのページ内での操作は可能です。
 
-音楽は歴史・文明の乱数・ゲームセーブから独立しています。HTML audioのloopで原曲の余韻を含めて反復し、
-Web AudioのGainNodeはスマートフォン（HTML audioのvolume変更が効かないiOSを含む）の音量調整だけに使用します。
+音楽は歴史・文明の乱数・ゲームセーブから独立しています。Safariで音声の再生許可を一つの経路に統一するため、
+クリック内でAudioContextを開始し、原曲MP3を取得・デコードしてAudioBufferSourceNodeのloopで余韻を含めて反復します。
+GainNodeで音量を調整します。読み込み中に停止した場合も、後から勝手に再生を始めません。
 音色の合成や再作曲、音源の加工は行いません。
 
 `npm run build` は既存の `scripts/copy-assets.mjs` で音源を `dist/assets/audio/` にコピーし、
 Pagesワークフローは `dist` 全体を配信します。音源URLは相対パスなので `/namonaki-bunmei/` 配下でも利用できます。
-`node --test tests/browser/music.test.mjs`（ビルド後）でPC・Pixel 7相当のChromium、
+`node --test tests/browser/music.test.mjs`（ビルド後、PlaywrightのChromium/WebKitが必要）でPC・Pixel 7相当のChromium、PC・iPhone相当のWebKit、
 サブディレクトリ配信、実音源再生、音量、末尾からのループ、停止、再訪時無音、保存データの不変、
 保存拒否・読み込み失敗からの再試行を検証します。既存のブラウザCIにもこのテストが含まれます。
+WebKitでは実音源の出力信号、ループ、音量変更、再訪時の無音と読み込み中の停止も検証します。
 スマートフォン検証はエミュレーションであり、実機iOS/Safariでの聴感確認は別途必要です。

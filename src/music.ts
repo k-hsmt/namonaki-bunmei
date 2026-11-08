@@ -1,7 +1,6 @@
-/** Presentation-only audio. Never reads or writes the civilization/session save. */
+/** Presentation-only playback of the original recording; independent of game saves. */
 const SETTINGS_KEY='namonaki-bunmei:music:v1';
 export function mountMusic(){
- const audio=document.getElementById('music') as HTMLAudioElement;
  const button=document.getElementById('music-toggle') as HTMLButtonElement;
  const volume=document.getElementById('music-volume') as HTMLInputElement;
  const status=document.getElementById('music-status')!;
@@ -9,33 +8,34 @@ export function mountMusic(){
  try{const saved=JSON.parse(localStorage.getItem(SETTINGS_KEY)??'null');if(typeof saved?.volume==='number'&&Number.isFinite(saved.volume))level=Math.max(0,Math.min(100,saved.volume));}catch{/* Storage is optional. */}
  volume.value=String(level);
  let context:AudioContext|undefined,gain:GainNode|undefined;
- let requested=false;
- const applyVolume=()=>{if(gain)gain.gain.setTargetAtTime(level/100,context!.currentTime,.03);else audio.volume=level/100;};
- const persist=()=>{try{localStorage.setItem(SETTINGS_KEY,JSON.stringify({volume:level,enabled:requested}));}catch{/* Playback remains available in private/restricted storage. */}};
- const render=()=>{button.textContent=requested?'停止 □':'再生 ▷';button.setAttribute('aria-pressed',String(requested));};
- const stop=()=>{requested=false;audio.pause();audio.currentTime=0;render();persist();};
- applyVolume();
- volume.addEventListener('input',()=>{level=Number(volume.value);applyVolume();persist();});
- audio.addEventListener('error',()=>{stop();status.textContent='音楽を読み込めませんでした。再生を押して再試行できます。';});
+ let recording:Promise<AudioBuffer>|undefined,source:AudioBufferSourceNode|undefined;
+ let requested=false,generation=0;
+ const persist=()=>{try{localStorage.setItem(SETTINGS_KEY,JSON.stringify({volume:level,enabled:requested}));}catch{/* Playback remains available without storage. */}};
+ const render=()=>{button.textContent=requested?'BGM □':'BGM ▷';button.setAttribute('aria-pressed',String(requested));button.setAttribute('aria-label',requested?'BGMを停止':'BGMを再生');};
+ const stop=()=>{generation++;requested=false;source?.stop();source?.disconnect();source=undefined;status.textContent='';render();persist();};
+ volume.addEventListener('input',()=>{level=Number(volume.value);gain?.gain.setTargetAtTime(level/100,context!.currentTime,.03);persist();});
  button.addEventListener('click',async()=>{
   if(requested){stop();return;}
-  requested=true;render();status.textContent='';persist();
+  requested=true;const attempt=++generation;render();persist();status.textContent='BGMを読み込み中…';
   try{
-   // iOS does not implement HTMLMediaElement.volume. Gain changes the original
-   // recording's level only; it does not synthesize or recompose the music.
-   if(!context&&typeof AudioContext!=='undefined'){
-    context=new AudioContext();gain=context.createGain();
-    context.createMediaElementSource(audio).connect(gain);gain.connect(context.destination);
-    audio.volume=1;gain.gain.value=level/100;
-   }
-   if(audio.error)audio.load();
-   const resumed=context?.resume();
-   const playing=audio.play();
-   await Promise.all([resumed,playing]);
+   // Unlock ONE audio system synchronously inside the gesture. Safari can gate
+   // HTMLMediaElement playback separately from a connected AudioContext.
+   // Decode the supplied MP3 as-is: no synthesized notes or rewritten music.
+   if(!context){context=new AudioContext();gain=context.createGain();gain.gain.value=level/100;gain.connect(context.destination);}
+   const resumed=context.resume();
+   recording??=fetch(button.dataset.musicSrc!).then(response=>{
+    if(!response.ok)throw Error('Audio download failed');
+    return response.arrayBuffer();
+   }).then(bytes=>context!.decodeAudioData(bytes)).catch(error=>{recording=undefined;throw error;});
+   const [buffer]=await Promise.all([recording,resumed]);
+   // A stop or a newer click during download must never start stale playback.
+   if(!requested||attempt!==generation)return;
+   source=context.createBufferSource();source.buffer=buffer;source.loop=true;
+   source.connect(gain!);source.start();status.textContent='';
   }catch{
-   if(requested){stop();status.textContent='音楽を再生できませんでした。もう一度再生を押してください。';}
+   if(attempt===generation){stop();status.textContent='BGMを再生できませんでした。もう一度BGMを押してください。';}
   }
  });
- // Saved intent is informational only: every document starts silent.
+ // Persisted intent never authorizes autoplay in a new document.
  render();
 }
