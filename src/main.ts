@@ -9,6 +9,8 @@ import {siteAt} from './story/settlement-history.js';
 import {practiceNames} from './story/society.js';
 const el=(id:string)=>document.getElementById(id)!;
 const randomSeed=()=>Math.floor(Math.random()*4294967295)+1;
+/** Paint feedback before native JSON/terrain validation; hidden tabs use a bounded timer. */
+async function paintFeedback(){await new Promise<void>(resolve=>{const timer=setTimeout(resolve,50);requestAnimationFrame(()=>requestAnimationFrame(()=>{clearTimeout(timer);resolve();}));});}
 function verifyWorldCandidate(candidate:WorldSession){for(let i=0;i<3;i++){const s=drawWorldSession(document.createElement('canvas'),candidate,lastObservedYear(candidate.state),i);if(!Number.isFinite(s.population)||s.population<0||s.local&&(!Number.isFinite(s.local.population)||s.local.population<0)||s.objects.some(o=>typeof o.id!=='string'||!['house','hall','bridge','field','ruin','memorial','market','workshop','granary'].includes(o.kind)||![o.x,o.y,o.builtYear].every(Number.isSafeInteger)||o.x<0||o.x>320||o.y<0||o.y>180||o.builtYear<0||o.builtYear>s.year||!['intact','damaged','ruined'].includes(o.condition)))throw Error('Invalid observed world');}}
 function mount(initial:WorldSession){
 const input=el('seed') as HTMLInputElement;
@@ -164,8 +166,8 @@ async function restart(seed:number){
  catch{el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
  finally{setBusy(false);render();}
 }
-el('enable-irrigation').addEventListener('click',()=>{
- if(busy||world.mode!=='generated')return;stop();setBusy(true);try{adopt(enableWorldIrrigation(world),true);el('feedback').textContent='これまでの風景を保ち、これからの水路を記録します。「この歴史を保存」で変更を残せます。';}catch{el('feedback').textContent='水路の記録を始められませんでした。現在の歴史と保存はそのままです。';}finally{setBusy(false);render();}
+el('enable-irrigation').addEventListener('click',async()=>{
+ if(busy||world.mode!=='generated')return;stop();setBusy(true);el('feedback').textContent='水路の記録を準備しています。';await paintFeedback();try{adopt(enableWorldIrrigation(world),true);el('feedback').textContent='これまでの風景を保ち、これからの水路を記録します。「この歴史を保存」で変更を残せます。';}catch{el('feedback').textContent='水路の記録を始められませんでした。現在の歴史と保存はそのままです。';}finally{setBusy(false);render();}
 });
 el('slow-climate').addEventListener('click',()=>{
  if(busy||world.mode!=='generated'||!world.review.environment)return;stop();adopt(slowWorldClimate(world),true);el('feedback').textContent='これからの気候をゆったりした巡りにしました。過去の歴史と景観はそのままです。「この歴史を保存」で設定を残せます。';
@@ -189,7 +191,7 @@ el('save').addEventListener('click',async()=>{
 });
 el('load').addEventListener('click',async()=>{
  if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を開いています。';
- try{const saved=await findWorldSave(key=>localStorage.getItem(key));if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
+ try{await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
   const candidate=restoreWorldSession(saved);adopt(candidate);el('feedback').textContent='保存された歴史を開きました。';
  }catch{el('feedback').textContent='この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
  finally{setBusy(false);render();}
@@ -202,6 +204,7 @@ const file=el('import-file') as HTMLInputElement;
 el('import').addEventListener('click',()=>{if(!busy)file.click();});
 file.addEventListener('change',async()=>{
  const selected=file.files?.[0];if(!selected||busy)return;stop();setBusy(true);
+ el('feedback').textContent='記録ファイルを開いています。';await paintFeedback();
  try{if(selected.size>16*1024*1024)throw Error('File too large');const candidate=restoreWorldSession(await decodeWorldSave(await selected.text()));adopt(candidate);el('feedback').textContent='記録ファイルを開きました。';}
  catch{el('feedback').textContent='この記録ファイルを開けませんでした。現在の歴史と保存値はそのままです。';}
  finally{file.value='';setBusy(false);render();}
@@ -220,7 +223,7 @@ async function boot(){
  for(const id of bootControls)(el(id) as HTMLButtonElement).disabled=true;
  el('feedback').textContent='文明の記録を準備しています。';
  try{
-  const saved=await findWorldSave(key=>localStorage.getItem(key));
+  await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));
   const world=saved?restoreWorldSession(saved):(await import('./story/new-world.js')).createNewIrrigatedWorld(randomSeed());
   startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
  }catch{
