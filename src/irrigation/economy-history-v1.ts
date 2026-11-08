@@ -2,8 +2,6 @@
 import {wireObject,sameWire,assertJsonWire} from '../story/generated-state-review.js';
 import {parseWorldSaveAsync,restoreGeneratedWorld,type GeneratedWorldSave} from '../story/world-save.js';
 import {updateRegionalEconomy,regionalHarvestFactors,createRegionalEconomy,type RegionalEconomy,type EconomyRecord} from '../story/regional-economy.js';
-import {observationAt} from '../story/observations.js';
-import {siteAt} from '../story/settlement-history.js';
 import {regions} from '../story/population.js';
 import {freezeReview,reviewBaseHash} from './wire-v1.js';
 import {economyEffectReader} from './economy-model-v1.js';
@@ -11,10 +9,17 @@ import {economyPolicies,irrigationEconomyRule,type IrrigationEconomyReview,type 
 export const economyReviewMaxBytes=16*1024*1024;
 const owned=new WeakMap<object,ReturnType<typeof context>>();
 const normalized=(e:EconomyRecord)=>({title:e.title,body:e.body,causes:e.causes,relatedIds:e.relatedIds??[]});
-function context(base:GeneratedWorldSave,intro:number){const world=restoreGeneratedWorld(base);if(!world.irrigation||!world.environment||base.version!==6)throw Error('C1 requires a production irrigation world');return {world,effect:economyEffectReader(world,intro),records:new Map(world.review.state.history.map(r=>[r.id,r]))};}
+function context(base:GeneratedWorldSave,intro:number){
+ const world=restoreGeneratedWorld(base);if(!world.irrigation||!world.environment||base.version!==6)throw Error('C1 requires a production irrigation world');const end=world.environment.confirmedThrough,granaries=new Int8Array(end+1),floods:(string|null)[]=Array(end+1).fill(null),populations:number[][]=[];
+ // Index only the exact recorded practice and population prefixes; no scene/building reconstruction.
+ for(const [site,history]of world.review.state.observation!.sites!.entries()){let cursor=0,active=false;for(let year=2;year<=end;year++){while(cursor<history.practiceChanges.length&&history.practiceChanges[cursor]!.year<=year-1){active=history.practiceChanges[cursor++]!.practices.some(p=>p.kind==='granary'&&p.active);}if(active)granaries[year]!|=1<<site;}}if(end>=1)granaries[1]=-1;
+ for(const event of world.review.state.history)if(event.kind==='flood')for(let y=event.year;y<=Math.min(end,event.year+2);y++)floods[y]=event.id;
+ for(const block of world.review.state.observation!.blocks){const people=[...block.population];populations[block.year]=[...people];for(const [index,change]of block.changes.entries()){for(let i=0;i<people.length;i++)people[i]!+=change[i]!;populations[block.year+index+1]=[...people];}}
+ return {world,effect:economyEffectReader(world,intro),records:new Map(world.review.state.history.map(r=>[r.id,r])),granaries,floods,populations};
+}
 export function emptyEconomyTotals():EconomyTotals{return {harvestDelta:economyPolicies.map(()=>[0,0,0]),gainBp:0,requestedCostBp:0,costBp:0,cappedCostYears:0,zeroPopulationWorkYears:0,activeYears:0,idleYears:0};}
 export function ownEconomyReview(trial:IrrigationEconomyReview,ctx=context(trial.base,trial.introducedYear)):IrrigationEconomyReview {freezeReview(trial);owned.set(trial,ctx);return trial;}
-export function knownEconomyReview(trial:IrrigationEconomyReview){const ctx=owned.get(trial);if(!ctx)throw Error('Validate the economy review');return ctx;}
+export function knownEconomyReview(trial:IrrigationEconomyReview):void {if(!owned.has(trial))throw Error('Validate the economy review');}
 function snapshot(raw:unknown,year:number,ctx:ReturnType<typeof context>):RegionalEconomy {
  const e=wireObject(raw,['districts','routes','migrationYears']);if(!Array.isArray(e.districts)||e.districts.length!==3||!Array.isArray(e.routes)||e.routes.length!==2)throw Error('Invalid initial regional economy');
  const number=(x:unknown,max=1e12)=>typeof x==='number'&&Number.isFinite(x)&&x>=0&&x<=max,integer=(x:unknown,max=year)=>number(x,max)&&Number.isSafeInteger(x),reference=(x:unknown)=>x===null||typeof x==='string'&&ctx.records.has(x)&&ctx.records.get(x)!.year<=year;
@@ -25,15 +30,15 @@ function snapshot(raw:unknown,year:number,ctx:ReturnType<typeof context>):Region
 function conditions(row:EconomyTapeRow,year:number,seed:number){return {harvestFactors:regionalHarvestFactors(year,seed,row[1]),blockedRegions:new Set(regions.filter((_,i)=>row[2]&(1<<i)).map(r=>r.id)),...(row[4]?{disruptionId:row[4]}:{}),...(row[3]>=0?{granaries:regions.map((_,i)=>Boolean(row[3]&(1<<i)))}:{})};}
 function checkRow(row:EconomyTapeRow,year:number,ctx:ReturnType<typeof context>){
  if(!Array.isArray(row)||row.length!==6||!Array.isArray(row[0])||row[0].length!==4||row[0].some(n=>!Number.isSafeInteger(n)||n<0||n>1e9)||!Number.isSafeInteger(row[1])||row[1]<0||row[1]>10000||!Number.isSafeInteger(row[2])||row[2]<0||row[2]>7||!Number.isSafeInteger(row[3])||row[3]<-1||row[3]>7||row[4]!==null&&typeof row[4]!=='string'||!Array.isArray(row[5])||row[5].length>1000||new Set(row[5]).size!==row[5].length)throw Error('Invalid annual economy tape');
- const floods=ctx.world.review.state.history.filter(e=>e.kind==='flood'&&e.year<=year),flood=floods.at(-1),expected=flood&&year-flood.year<3?flood.id:null;if(row[4]!==expected||row[2]!== (expected?1:0))throw Error('Economy tape flood sources differ');
- const granaries=year===1?-1:regions.reduce((mask,_,i)=>mask|(siteAt(ctx.world.review.state.observation!.sites,i,year-1)!.practices.some(p=>p.kind==='granary'&&p.active)?1<<i:0),0);if(row[3]!==granaries)throw Error('Economy tape granary sources differ');
+ const expected=ctx.floods[year]??null;if(row[4]!==expected||row[2]!== (expected?1:0))throw Error('Economy tape flood sources differ');
+ if(row[3]!==ctx.granaries[year])throw Error('Economy tape granary sources differ');
  for(const id of row[5])if(typeof id!=='string'||ctx.records.get(id)?.year!==year)throw Error('Missing annual economic record');
 }
 export function compareEconomyYear(ctx:ReturnType<typeof context>,before:RegionalEconomy,row:EconomyTapeRow,year:number,intro:number){
  checkRow(row,year,ctx);const c=conditions(row,year,ctx.world.review.state.seed),effect:EconomyEffect=ctx.effect(year),views=economyPolicies.map(policy=>{
   const economy=structuredClone(before),people=[...row[0]],gain=policy==='yield-only'||policy==='combined'?effect.gainBp:0,cost=policy==='cost-only'||policy==='combined'?effect.costBp:0,harvestFactors=[...c.harvestFactors];harvestFactors[0]=harvestFactors[0]!*(1+(gain-cost)/10000);let index=0;const records:{id:string;event:EconomyRecord}[]=[];
   const totals=updateRegionalEconomy(economy,people,year,{...c,harvestFactors},event=>{const id=row[5][index],source=id?ctx.records.get(id):undefined,match=source&&sameWire(normalized(event),normalized(source));if(policy==='baseline'&&!match)throw Error('Baseline economic record differs');const chosen=match?id!:`c1/${policy}/${year}/${index}`;index++;records.push({id:chosen,event});return chosen;});
-  if(policy==='baseline'){if(index!==row[5].length)throw Error('Unused baseline economic records');const observed=observationAt(ctx.world.review.state.observation!,year);if(!observed||!sameWire(people,observed.residents.map(r=>r.population)))throw Error('Baseline population differs from recorded year');}
+  if(policy==='baseline'){if(index!==row[5].length)throw Error('Unused baseline economic records');const observed=ctx.populations[year];if(!observed||!sameWire(people,observed))throw Error('Baseline population differs from recorded year');}
   return {policy,economy,people,records,...totals};
  });return {year,effect,views};
 }
