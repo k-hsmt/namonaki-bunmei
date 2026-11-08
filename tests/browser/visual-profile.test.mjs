@@ -12,7 +12,7 @@ test('fixed-observation visual comparison: four sizes and historical contraction
  try{
   await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
-  const page=await browser.newPage({viewport:{width:960,height:540},deviceScaleFactor:1});
+  const page=await browser.newPage({reducedMotion:'reduce',viewport:{width:960,height:540},deviceScaleFactor:1});
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+port);

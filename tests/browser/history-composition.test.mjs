@@ -20,7 +20,7 @@ test('natural 1000-year history produces reproducible observed canvases',async()
  try{
   await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
-  const page=await browser.newPage();
+  const page=await browser.newPage({reducedMotion:'reduce'});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+port);
   await mkdir('artifacts/history-b',{recursive:true});

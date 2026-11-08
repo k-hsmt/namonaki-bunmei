@@ -21,7 +21,7 @@ test.before(async()=>{
 });
 test.after(async()=>{try{await browser?.close();}finally{server?.kill();}});
 const open=async t=>{
- const page=await browser.newPage();
+ const page=await browser.newPage({reducedMotion:'reduce'});
  t.after(()=>page.close());
  const errors=[];
  page.on('pageerror',e=>errors.push(e.message));

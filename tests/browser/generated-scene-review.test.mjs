@@ -6,7 +6,7 @@ test('generated Canvas preserves source geometry, projects west-side coordinates
  const terrain=captureTerrainRecord(generateWorldPrototype(6).world,'browser-generated-scene'),initial=createGeneratedBridgeReview(terrain,captureRiverReaches(terrain),'field-only');
  const input=advanceGeneratedBridgeReview(initial,2000,'automatic'),westTerrain=captureTerrainRecord(generateWorldPrototype(1).world,'browser-generated-west'),west=createGeneratedBridgeReview(westTerrain,captureRiverReaches(westTerrain),'field-only'),port='5304',server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:port},stdio:['ignore','pipe','inherit']});let browser;
  try{
-  await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});const page=await browser.newPage();
+  await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});const page=await browser.newPage({reducedMotion:'reduce'});
   await page.route('**/generated-test',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><title>Generated Canvas test</title>'}));await page.goto('http://127.0.0.1:'+port+'/generated-test');
   const results=await page.evaluate(async ({input,west})=>{
    const {observeGeneratedSceneReview}=await import('/scene/generated-scene-review.js');const {drawGeneratedSceneReview}=await import('/scene/draw-generated-review.js');const {drawTerrainRecord}=await import('/terrain/draw-terrain-record-v1.js');
