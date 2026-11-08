@@ -392,6 +392,17 @@ jobs:
         run: node scripts/review-irrigation-kernel.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify irrigation lifecycle, trial saves, local ecology and 10,000-year continuation
+        run: node scripts/review-irrigation-history.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-history
+          retention-days: 14
+          path: artifacts/environment34-irrigation-history/*
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:

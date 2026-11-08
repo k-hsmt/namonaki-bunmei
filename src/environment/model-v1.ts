@@ -52,7 +52,11 @@ export function stepPatch(p:PatchState,humidity:number,temperature:number,buffer
 }
 export function initialEnvironment(v:CoupledVegetation):EnvironmentState{return {year:0,humidity:0,temperature:0,patches:Object.fromEntries(vegetationSites.map(site=>[site,v.initial[site].map(p=>p?[Math.min(600,p[0]*4),0,0,0]:null)])) as unknown as EnvironmentState['patches']};}
 function covered(plot:GroundPlot){const indices:number[]=[];for(let row=Math.floor((plot.y-96)/8);row<=Math.floor((plot.y+plot.depth-97)/8);row++)for(let col=Math.floor(plot.x/8);col<=Math.floor((plot.x+plot.width-1)/8);col++){const i=row*40+col;if(i>=0&&i<440&&vegetationOverlap(vegetationPatchPlot(i),plot))indices.push(i);}return indices;}
-export function environmentRunner(v:CoupledVegetation,r:GeneratedFacilityReview,uses:readonly LandUseEvent[],from:EnvironmentState){
+/** Trial-only extension. The D2 entry point never supplies these effects. */
+export interface IrrigationPatchEffects {readonly moisture:readonly number[];readonly occupiedPatches:readonly number[];readonly disturbedPatches:readonly number[]}
+export function environmentRunner(v:CoupledVegetation,r:GeneratedFacilityReview,uses:readonly LandUseEvent[],from:EnvironmentState){return runEnvironment(v,r,uses,from);}
+export function irrigationEnvironmentRunner(v:CoupledVegetation,r:GeneratedFacilityReview,uses:readonly LandUseEvent[],from:EnvironmentState,effectsAt:(year:number)=>IrrigationPatchEffects){return runEnvironment(v,r,uses,from,effectsAt);}
+function runEnvironment(v:CoupledVegetation,r:GeneratedFacilityReview,uses:readonly LandUseEvent[],from:EnvironmentState,effectsAt?:(year:number)=>IrrigationPatchEffects){
  const patches=Object.fromEntries(vegetationSites.map(site=>[site,from.patches[site].map(p=>p?[...p]:null)])) as Record<RecordSite,(number[]|null)[]>,occupied=Object.fromEntries(vegetationSites.map(s=>[s,new Int16Array(440)])) as Record<RecordSite,Int16Array>,farms=Object.fromEntries(vegetationSites.map(s=>[s,new Int16Array(440)])) as Record<RecordSite,Int16Array>;
  const active=new Map<string,LandUseEvent>(),useYears=new Map<number,{e:LandUseEvent;indices:number[]}[]>(),disturbances=new Map<number,{site:RecordSite;indices:number[]}[]>();
  const apply=(e:LandUseEvent,indices:readonly number[])=>{const before=active.get(e.site+'/'+e.objectId);if(before?.active)for(const i of indices){occupied[e.site][i]!--;if(before.farm)farms[e.site][i]!--;}active.set(e.site+'/'+e.objectId,e);if(e.active)for(const i of indices){occupied[e.site][i]!++;if(e.farm)farms[e.site][i]!++;}};
@@ -65,6 +69,8 @@ export function environmentRunner(v:CoupledVegetation,r:GeneratedFacilityReview,
   const changes=useYears.get(year),before=changes?Object.fromEntries(vegetationSites.map(s=>[s,farms[s].slice()])) as Record<RecordSite,Int16Array>:null;
   for(const {e,indices}of changes??[])apply(e,indices);
   for(const {site,indices}of disturbances.get(year)??[])for(const i of indices){const p=patches[site][i];if(p){p[0]=0;p[1]=0;}}
-  for(const site of vegetationSites)for(let i=0;i<440;i++){const p=patches[site][i],initial=v.initial[site][i];if(p&&initial)patches[site][i]=stepPatch(p as unknown as PatchState,humidity,temperature,buffers[site][i]!,initial[1],initial[2],occupied[site][i]!>0,farms[site][i]!>0,before!==null&&Boolean(before[site][i])!==Boolean(farms[site][i])) as unknown as number[];}
+  const extra=effectsAt?.(year),channel=extra?new Set(extra.occupiedPatches):null;
+  for(const i of extra?.disturbedPatches??[]){const p=patches['river-bank'][i];if(p){p[0]=0;p[1]=0;}}
+  for(const site of vegetationSites)for(let i=0;i<440;i++){const p=patches[site][i],initial=v.initial[site][i];if(p&&initial)patches[site][i]=stepPatch(p as unknown as PatchState,humidity,temperature,buffers[site][i]!+(site==='river-bank'?(extra?.moisture[i]??0):0),initial[1],initial[2],occupied[site][i]!>0||site==='river-bank'&&Boolean(channel?.has(i)),farms[site][i]!>0,before!==null&&Boolean(before[site][i])!==Boolean(farms[site][i])) as unknown as number[];}
  }};
 }
