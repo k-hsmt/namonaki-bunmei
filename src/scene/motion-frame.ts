@@ -8,7 +8,7 @@ import {planSceneMotion,journeyAt,sceneActivityCount} from './motion-plan.js';
 /** Equivalent paint/activities within one immutable terrain; ages remain in history. */
 export function sceneMotionVisualKey(o:GeneratedSceneObservation):string {
  const {snapshot:s,composition:c,ground:g}=o;
- return JSON.stringify([environmentAppearance(g.environment),g.site,g.terrain.source.seed,s.objects,s.publicSpaces,s.scars,c.residentialBlocks,g.facilities,g.bridges,
+ return JSON.stringify([environmentAppearance(g.environment,g.environmentAppearance),g.site,g.terrain.source.seed,s.objects,s.publicSpaces,s.scars,c.residentialBlocks,g.facilities,g.bridges,
   g.vegetation?.map(p=>[p.index,p.stage,p.stage===0&&p.disturbedYear!==null&&s.year-p.disturbedYear<15]),
   Math.floor(s.year/20),sceneActivityCount(c.population,c.scale),presentationPeopleCount(c.population,s.scars.includes('epidemic'))]);
 }
@@ -32,7 +32,7 @@ export function drawSceneMotion(canvas:HTMLCanvasElement,prepared:PreparedSceneM
  // Every moving crest is clipped per pixel to visible saved water, including under bridges.
  c.fillStyle='#b0ccc7';for(const track of prepared.waterTracks){const a=waterStrokeAt(track,seconds);c.globalAlpha=a.alpha;for(let n=0;n<track.width;n++){const x=a.point[0]+(a.vertical?0:n)-Math.floor(a.vertical?0:track.width/2),y=a.point[1]+(a.vertical?n-Math.floor(track.width/2):0);if(x>=0&&x<320&&y>=96&&y<180&&prepared.waterMask[y*320+x])c.fillRect(x,y,1,1);}}c.globalAlpha=1;
  c.fillStyle='#9ab8b4';for(const q of p.ripples)if((Math.floor(seconds*2)+q.phase)%5===0)c.fillRect(q.point[0],q.point[1],1,1);
- for(const [i,t] of p.trees.entries())drawSceneTree(c,t.point[0],t.point[1],t.scale,Math.round(Math.sin(seconds*.7+i*2.3)));
+ for(const [i,t] of p.trees.entries())drawSceneTree(c,t.point[0],t.point[1],t.scale,Math.round(Math.sin(seconds*.7+i*2.3)),t.palette);
  for(const [i,g] of p.grass.entries())if(Math.sin(seconds*.8+i*2)>0){c.fillStyle=g.color;c.fillRect(g.point[0]+1,g.point[1]-1,1,1);}
  const people=[...p.journeys.map(j=>journeyAt(j,seconds)),...p.idle.map(point=>({point,walking:false,step:0}))];
  for(const [i,a] of people.entries()){

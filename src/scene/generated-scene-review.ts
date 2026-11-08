@@ -11,13 +11,14 @@ import type {SceneComposition} from './composition.js';
 import {composeGeneratedScene,type GeneratedSceneGround} from './generated-ground-review.js';
 export interface GeneratedSceneObservation {readonly snapshot:SiteSnapshot;readonly composition:SceneComposition;readonly ground:GeneratedSceneGround}
 export function observeGeneratedSceneReview(input:GeneratedBridgeReview,year:number,siteIndex=0):GeneratedSceneObservation {
+ if(input.environmentAppearance!==undefined&&(input.environmentAppearance!=='landscape-v2'||!input.environment))throw Error('Invalid environment appearance');
  if(input.format!=='generated-bridge-review'||input.status!=='review-only'||!Number.isSafeInteger(siteIndex)||siteIndex<0||siteIndex>2)throw Error('Invalid generated scene boundary');
  const review={...input.review,terrain:readOwnedTerrainRecord(input.review.terrain)};
  validateGeneratedBridgeLedger(review);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));
  const site=(['river-bank','hill-side','coast-inlet'] as const)[siteIndex]!,snapshot=snapshotAt(review.state,year,siteIndex,'generated-review-only');
  if(!input.environment&&input.vegetation?.schemaVersion===2)throw Error('Missing environment');
  const ecology=input.environment?(()=>{const v=validateCoupledVegetation(input.vegetation,review);return environmentProjection(validateEnvironment(input.environment,v,review),v,review,year,site);})():input.vegetation?{vegetation:vegetationAt(validateVegetationHistory(input.vegetation,review),year,site)}:{};
- const ground:GeneratedSceneGround={...ecology,terrain:review.terrain,site,primaryRoot:review.plans[site].primaryRoot,
+ const ground:GeneratedSceneGround={...ecology,...(input.environmentAppearance?{environmentAppearance:input.environmentAppearance}:{}),terrain:review.terrain,site,primaryRoot:review.plans[site].primaryRoot,
   facilities:review.placements.filter(p=>p.site===site&&p.builtYear<=year).map(p=>({id:p.objectId,purpose:p.kind,plot:p.plot})),
   bridges:site==='river-bank'?review.bridgeReview!.bridges.filter(b=>b.builtYear<=year).map(b=>b.geometry):[]};
  return {snapshot,ground,composition:composeGeneratedScene(snapshot,review.state.housing,ground)};

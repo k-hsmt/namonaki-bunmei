@@ -43,3 +43,10 @@ export function improveWorldGrowth(session:WorldSession):WorldSession {
  if(session.review.review.growthPattern==='organic-v3')return session;
  return generatedSession({...session.review,review:{...session.review.review,growthPattern:'organic-v3'}});
 }
+
+/** Explicit appearance upgrade; every recorded model value stays intact. */
+export function improveWorldEnvironment(session:WorldSession):WorldSession {
+ if(session.mode!=='generated'||!session.review.environment)throw Error('No recorded environment');
+ if(session.review.environmentAppearance==='landscape-v2')return session;
+ return generatedSession({...session.review,environmentAppearance:'landscape-v2'});
+}

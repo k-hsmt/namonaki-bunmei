@@ -1,0 +1,52 @@
+{
+  "sourceSHA": "4a3faa9b1912cb87fe5ff19cb24c7cae2fcabc2e",
+  "seed": 42,
+  "rendererId": "generated-scene-v3",
+  "cases": [
+    {
+      "year": 0,
+      "site": 0,
+      "sha256": "e8cac147cd197d64527cb9f32042b3124cb93f0dd89ce39029e2f58486ba3bc1"
+    },
+    {
+      "year": 0,
+      "site": 1,
+      "sha256": "c052ce8a76708247abb6496d06434660df44509b1b7294a53dd6540a2d05fc58"
+    },
+    {
+      "year": 0,
+      "site": 2,
+      "sha256": "dce01640837ed93134437ff48da7a40c255adc2c433f041aa2e0dd2e9476538c"
+    },
+    {
+      "year": 300,
+      "site": 0,
+      "sha256": "12f4f8f374e8453468c8d777bfe107a414f30b7d18afe2e07bd8f182eb69b7d1"
+    },
+    {
+      "year": 300,
+      "site": 1,
+      "sha256": "a630b1fc2e45d25669916834ecdb69b2396597386d2d3ad84d230294d52f5453"
+    },
+    {
+      "year": 300,
+      "site": 2,
+      "sha256": "3e54d0188bf8776320eeb576aa7a0a53f50980a1ef42a7c08b6e56872815d983"
+    },
+    {
+      "year": 1000,
+      "site": 0,
+      "sha256": "d731e59c702e72e5b30612a90c4afa6ca4a9d92c3ba44e6a5968b0326561547b"
+    },
+    {
+      "year": 1000,
+      "site": 1,
+      "sha256": "522f25df64cf9b81408a3eef7685e435d9cb6b973a47a0bb7156babf97d04ca9"
+    },
+    {
+      "year": 1000,
+      "site": 2,
+      "sha256": "fffb83dd4c180c98466879c6ffd95775931d6857a338e89a7fd364fbe0f3867d"
+    }
+  ]
+}

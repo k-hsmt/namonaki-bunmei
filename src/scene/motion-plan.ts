@@ -1,3 +1,4 @@
+import type {TreePaint} from '../vegetation/presentation-v1.js';
 /** Ephemeral, deterministic activities on a confirmed observation. Never saved. */
 import type {GeneratedSceneObservation} from './generated-scene-review.js';
 import type {RecordPoint} from '../terrain/terrain-record-types.js';
@@ -13,7 +14,7 @@ const recentRoutes=new WeakMap<object,CachedRoutes>();
 export function sceneActivityCount(population:number,scale:0|1|2|3):number {return population<=0?0:Math.min([2,3,4,6][scale]!,Math.max(1,Math.ceil(Math.log2(1+population/1500))));}
 export function planSceneMotion(o:GeneratedSceneObservation,paint?:ScenePaintProjection){
  if(paint&&paint.observation!==o)throw Error('Motion paint projection mismatch');
- const {ground:g,snapshot:s,composition:c}=o,{presentation,vegetation}=paint??projectScenePaint(o),trees=vegetation?.trees??presentation.trees,r=readOwnedRecordPhysics(g.terrain.sites[g.site].physics),ctx=generatedSceneWalkContext(o);
+ const {ground:g,snapshot:s,composition:c}=o,{presentation,vegetation}=paint??projectScenePaint(o),trees=(vegetation?.trees??presentation.trees) as readonly TreePaint[],r=readOwnedRecordPhysics(g.terrain.sites[g.site].physics),ctx=generatedSceneWalkContext(o);
  const blockers=[...trees.map(t=>({x:t.point[0],y:t.point[1],width:2,depth:2})),...(presentation.cart?[presentation.cart]:[])],hash=(label:string,id:string)=>terrainHash(['scene-motion-v1',g.terrain.source.seed,g.site,label,id]);
  const objects=new Map(s.objects.map(b=>[b.id,b])),homes=[...g.facilities.filter(f=>f.purpose==='house'&&objects.has(f.id)&&objects.get(f.id)?.condition!=='ruined').map(f=>({id:f.id,entrance:southEntrance(f.plot)})),...c.residentialBlocks.filter(b=>b.condition!=='ruined'&&b.use!=='vacant').map(b=>({id:b.blockId,entrance:southEntrance(b.footprint)}))];
  const destinations=g.facilities.filter(f=>['field','market','workshop'].includes(f.purpose)&&objects.get(f.id)?.condition==='intact'),count=sceneActivityCount(c.population,c.scale);
