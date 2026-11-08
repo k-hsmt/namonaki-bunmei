@@ -1,4 +1,4 @@
-import {frozenEconomyCapture,type EconomyObserver} from './economy-observer.js';
+import {beginEconomyCapture,frozenEconomyCapture,type EconomyObserver} from './economy-observer.js';
 import {publicSpacesAt,overlapsPublicSpace,appendConfirmedPublicSpace,appendConfirmedPublicSpaceUse} from './public-space-history.js';
 import {proposePublicSpaceProgression} from './public-space-progression.js';
 import type {PublicSpaceHistory} from './public-space-history.js';
@@ -78,7 +78,7 @@ function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
  const harvestFactors=regionalHarvestFactors(s.year,s.seed,s.drought);
  s.economy??=createRegionalEconomy();
  const observer=land?.observeEconomy;if(observer!==undefined&&typeof observer!=='function')throw Error('Invalid economy observer');
- const before=observer?structuredClone({economy:s.economy,people:ledger.people}):undefined,records:import('./economy-observer.js').EconomyCapture['records'][number][]=[];
+ const before=observer?beginEconomyCapture(s.economy,ledger.people):undefined,records:import('./economy-observer.js').EconomyCapture['records'][number][]=[];
  const conditions={
   harvestFactors,blockedRegions:new Set(flood?['river']:[]),disruptionId:flood?.id,
   granaries:s.society?.sites.map(site=>site.practices.some(p=>p.kind==='granary'&&p.active)),
