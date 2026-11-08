@@ -31,3 +31,25 @@ test('returned walk arrays cannot poison subsequent route reuse or bridge-state 
  const o=observeGeneratedSceneReview(world,1000,0),first=planSceneMotion(o),expected=first.windows.slice();first.windows.fill(0);assert.deepEqual(planSceneMotion(o).windows,expected);
  const broken={...o,snapshot:{...o.snapshot,objects:o.snapshot.objects.map(b=>b.kind==='bridge'?{...b,condition:'ruined'}:b)}};assert.notDeepEqual(planSceneMotion(broken).windows,expected);assert.deepEqual(planSceneMotion(o).windows,expected);
 });
+
+test('old placement policies and mirrored worlds keep every foot cell on clear ground or an intact bridge',()=>{
+ let journeys=0,mirrored=0;
+ for(const [seed,policy] of [[1,'terrain-placement-v1'],[21,'terrain-placement-v2'],[42,'terrain-placement-v3']]){
+  const w=advanceGeneratedBridgeReview(createNewWorld(seed,policy).review,1000,'automatic'),before=createGeneratedWorldSave(w);
+  for(let site=0;site<3;site++){
+   const o=observeGeneratedSceneReview(w,1000,site),p=planSceneMotion(o),r=decodeRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),inside=(x,y,b)=>x>=b.x&&x<b.x+b.width&&y>=b.y&&y<b.y+b.depth;
+   mirrored+=+p.mirror;
+   const ordinary=[...o.ground.facilities.map(f=>f.plot),...o.composition.residentialBlocks.map(b=>b.footprint),...(o.snapshot.publicSpaces??[]).map(s=>s.footprint)],open=o.ground.bridges.filter(b=>o.snapshot.objects.some(s=>s.id===b.bridgeId&&s.condition==='intact'));
+   for(const j of p.journeys){journeys++;
+    for(const [x,y] of j.path)for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
+     const a=x+dx,b=y+dy,i=b*320+a;assert.ok(a>=0&&a<320&&b>=96&&b<180);
+     assert.equal(ordinary.some(plot=>inside(a,b,plot)),false,'person enters an occupied plot');
+     assert.equal(p.trees.some(t=>inside(a,b,{x:t.point[0],y:t.point[1],width:2,depth:2})),false,'person enters a tree root');
+     if(!open.some(bridge=>inside(a,b,bridge.deck))){assert.equal(r.surface[i],1,'person walks on water without an intact bridge');assert.equal(r.bearing[i],0);assert.ok(r.grade[i]<=1);}
+    }
+   }
+  }
+  assert.deepEqual(createGeneratedWorldSave(w),before);
+ }
+ assert.ok(journeys>0);assert.ok(mirrored>0,'exercise mirrored projections');
+});
