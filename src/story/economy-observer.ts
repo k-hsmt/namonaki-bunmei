@@ -10,12 +10,13 @@ export interface EconomyCapture {
  readonly totals:Immutable<AnnualEconomyTotals>;
 }
 export type EconomyObserver=(capture:EconomyCapture)=>unknown;
-const owned=new WeakSet<object>();
-function freeze<T>(v:T):T {if(v&&typeof v==='object'&&!owned.has(v)){Object.values(v).forEach(freeze);Object.freeze(v);owned.add(v);}return v;}
+const ownedBefore=new WeakSet<object>();
+function freeze<T>(v:T):T {if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
 /** Copy exactly the regional contract; never freeze references owned by the live engine. */
 function copyEconomy(e:EconomyCapture['before']['economy']):RegionalEconomy {return {districts:e.districts.map(d=>({reserve:d.reserve,coverage:[...d.coverage],importShare:d.importShare,shortageRecord:d.shortageRecord,shortageYears:d.shortageYears})),routes:e.routes.map(r=>({tradeYears:[...r.tradeYears],blocked:r.blocked,closureRecord:r.closureRecord,agreementRecord:r.agreementRecord,originRecord:r.originRecord,missedMaintenance:r.missedMaintenance,capacityBonus:r.capacityBonus})),migrationYears:{...e.migrationYears}};}
-export function beginEconomyCapture(economy:RegionalEconomy,people:readonly number[]):EconomyCapture['before'] {return freeze({economy:copyEconomy(economy),people:[...people]});}
+export function beginEconomyCapture(economy:RegionalEconomy,people:readonly number[]):EconomyCapture['before'] {const before=freeze({economy:copyEconomy(economy),people:[...people]});ownedBefore.add(before);return before;}
 export function frozenEconomyCapture(value:EconomyCapture):EconomyCapture {
- const before=owned.has(value.before)?value.before:freeze({economy:copyEconomy(value.before.economy),people:[...value.before.people]});
- return freeze({year:value.year,drought:value.drought,before,conditions:{...value.conditions,harvestFactors:[...value.conditions.harvestFactors],blockedRegions:[...value.conditions.blockedRegions],...(value.conditions.granaries?{granaries:[...value.conditions.granaries]}:{})},after:{economy:copyEconomy(value.after.economy),people:[...value.after.people]},records:value.records.map(r=>({id:r.id,event:{...r.event,causes:[...r.event.causes],...(r.event.relatedIds?{relatedIds:[...r.event.relatedIds]}:{})}})),totals:{harvest:[...value.totals.harvest],imports:[...value.totals.imports],traded:[...value.totals.traded],discarded:[...value.totals.discarded],moves:value.totals.moves.map(m=>({...m}))}});
+ const before=ownedBefore.has(value.before)?value.before:freeze({economy:copyEconomy(value.before.economy),people:[...value.before.people]});
+ const rest=freeze({conditions:{...value.conditions,harvestFactors:[...value.conditions.harvestFactors],blockedRegions:[...value.conditions.blockedRegions],...(value.conditions.granaries?{granaries:[...value.conditions.granaries]}:{})},after:{economy:copyEconomy(value.after.economy),people:[...value.after.people]},records:value.records.map(r=>({id:r.id,event:{...r.event,causes:[...r.event.causes],...(r.event.relatedIds?{relatedIds:[...r.event.relatedIds]}:{})}})),totals:{harvest:[...value.totals.harvest],imports:[...value.totals.imports],traded:[...value.totals.traded],discarded:[...value.totals.discarded],moves:value.totals.moves.map(m=>({...m}))}});
+ return Object.freeze({year:value.year,drought:value.drought,before,...rest});
 }
