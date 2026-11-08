@@ -56,3 +56,9 @@ test('verified bridge decks stay reserved for crossing and cannot become conveya
 test('target order is by confirmed birth then ID; a failed earlier field does not hide a feasible later field',()=>{
  const ctx=fixture(),old={id:'older-field',plot:plot(20,120),builtYear:0,sourceRecordId:'old-birth'};ctx.fields=[ctx.fields[0],old];ctx.ground.occupancy.push({id:old.id,plot:old.plot,entrance:[24,128]});const result=proposeIrrigation(ctx);assert.equal(result.status,'proposed',JSON.stringify(result));assert.equal(result.geometry.field.id,'controlled-field');assert.equal(result.diagnostics[0].fieldId,'older-field');assert.equal(result.diagnostics[0].reason,'too-long');assert.equal(result.diagnostics[0].causeRecordId,ctx.cause.recordId);
 });
+
+test('a stored canal cannot acquire additional river contacts along its conveyance',()=>{
+ const ctx=fixture(),g=structuredClone(proposeIrrigation(ctx).geometry);g.intake.bank=[149,110];g.intake.water=[150,110];g.path=[...Array.from({length:11},(_,i)=>[148,110+i]),...Array.from({length:8},(_,i)=>[147-i,120])];g.cells=[...new Set(g.path.flatMap(([x,y])=>[y*320+x,y*320+x+1]))].sort((a,b)=>a-b).map(i=>[i%320,Math.floor(i/320)]);assert.throws(()=>validateIrrigationGeometry(g,ctx),/conveyance/);
+ const result=proposeIrrigation(ctx),r=decodeRecordPhysics(ctx.ground.terrain.sites['river-bank'].physics),first=new Set(result.geometry.path.slice(0,1).flatMap(([x,y])=>[y*320+x,y*320+x+1]));
+ for(const p of result.geometry.cells){if(first.has(at(p)))continue;for(const delta of [-320,-1,1,320])assert.notEqual(r.surface[at(p)+delta],2);}
+});

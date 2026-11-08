@@ -31,10 +31,11 @@ function prepare(ctx:IrrigationContext){
  const terrain=readOwnedTerrainRecord(g.terrain),h=validateRiverReaches(ctx.hydrology,terrain),r=readOwnedRecordPhysics(terrain.sites['river-bank'].physics),ownership=riverOwnershipRaster(h,terrain);
  for(const f of ctx.fields)if(reviewPhysicalPlot(r,'field',f.plot).status!=='clear')throw Error('Invalid irrigation field ground');
  const blocked=new Uint8Array(N);for(const o of [...g.occupancy,...g.reservations])mark(blocked,o.plot);
- const physical=new Uint8Array(N),available=new Uint8Array(N);
+ const physical=new Uint8Array(N),available=new Uint8Array(N),contacts=new Map<number,number[]>();
  for(let y=96;y<180;y++)for(let x=0;x<319;x++){const i=y*W+x;if([i,i+1].every(j=>r.surface[j]===1&&r.bearing[j]===0&&r.grade[j]===0)&&r.elevation[i]===r.elevation[i+1]){physical[i]=1;available[i]=+(!blocked[i]&&!blocked[i+1]);}}
+ for(let i=96*W;i<N;i++)if(physical[i]){const wet=[...new Set([i,i+1].flatMap(j=>neighbors(j,95)).filter(j=>r.surface[j]===2))];if(wet.length)contacts.set(i,wet);}
  const shapeMasks=new Map(terrain.sites['river-bank'].shapes.filter(s=>s.kind==='freshwater').map(s=>[s.id,rasterizeRecordShapes([s],false).surface]));
- return {g,terrain,h,r,ownership,physical,available,shapeMasks};
+ return {g,terrain,h,r,ownership,physical,available,shapeMasks,contacts};
 }
 type Prepared=ReturnType<typeof prepare>;
 function intakes(p:Prepared,mask:Uint8Array,budget:RouteBudget):Map<number,IrrigationIntake>{
@@ -43,6 +44,7 @@ function intakes(p:Prepared,mask:Uint8Array,budget:RouteBudget):Map<number,Irrig
    const streamId=p.ownership.streamIds[p.ownership.owners[water]!];if(!streamId)continue;
    const y=Math.floor(water/W),shape=p.terrain.sites['river-bank'].shapes.find(s=>s.kind==='freshwater'&&p.shapeMasks.get(s.id)![water]===2&&p.h.reaches.some(reach=>reach.parentShapeId===s.id&&reach.streamId===streamId&&y>=reach.fromY&&y<reach.toY));
    if(!shape)continue;const reach=p.h.reaches.find(q=>q.parentShapeId===shape.id&&q.streamId===streamId&&y>=q.fromY&&y<q.toY)!;
+   if(p.contacts.get(i)?.some(j=>p.shapeMasks.get(shape.id)![j]!==2||p.ownership.streamIds[p.ownership.owners[j]!]!==streamId||Math.floor(j/W)<reach.fromY||Math.floor(j/W)>=reach.toY||riverJunctionExcludes(p.h,Math.floor(j/W),Math.floor(j/W)+1)))continue;
    const candidate:IrrigationIntake={water:point(water),bank:point(bank),head:p.r.elevation[bank]!,parentShapeId:reach.parentShapeId,streamId,fromY:reach.fromY,toY:reach.toY};
    if(!found||index(candidate.bank)<index(found.bank)||index(candidate.bank)===index(found.bank)&&index(candidate.water)<index(found.water))found=candidate;
   }
@@ -53,7 +55,7 @@ function graph(p:Prepared,field:IrrigationField,mask:Uint8Array,sources:Map<numb
  const starts=[...sources.keys()].sort((a,b)=>index(sources.get(a)!.bank)-index(sources.get(b)!.bank)||a-b),target=new Uint8Array(N),own=new Uint8Array(N);mark(own,field.plot);
  const valid=(i:number)=>Boolean(mask[i]&&!own[i]&&!own[i+1]);
  for(let i=96*W;i<N;i++)if(valid(i))for(const cell of [i,i+1])if(neighbors(cell).some(j=>own[j]&&p.r.elevation[j]===p.r.elevation[i])){target[i]=1;break;}
- return {size:N+2,source:S,sink:T,neighbors(node){if(node===T)return [];if(node===S)return starts.filter(valid);if(!valid(node))return [];return [...(target[node]?[T]:[]),...neighbors(node).filter(j=>valid(j)&&p.r.elevation[j]===p.r.elevation[node])];}};
+ return {size:N+2,source:S,sink:T,neighbors(node){if(node===T)return [];if(node===S)return starts.filter(valid);if(!valid(node))return [];return [...(target[node]?[T]:[]),...neighbors(node).filter(j=>valid(j)&&!p.contacts.has(j)&&p.r.elevation[j]===p.r.elevation[node])];}};
 }
 function compareRoutes(a:readonly number[],b:readonly number[],sources:Map<number,IrrigationIntake>){let d=a.length-b.length||index(sources.get(a[1]!)!.bank)-index(sources.get(b[1]!)!.bank)||a[1]!-b[1]!;if(d)return d;
  const direction=(delta:number)=>delta===-W?0:delta===1?1:delta===W?2:3;
