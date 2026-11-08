@@ -11,13 +11,13 @@ function noiseHash(x:number,y:number,seed:number){let h=Math.imul(x+17,374761393
 export function landscapeNoise(x:number,y:number,seed:number):number {const a=x/32,b=(y-96)/24,i=Math.floor(a),j=Math.floor(b),u=a-i,v=b-j;return (noiseHash(i,j,seed)*(1-u)+noiseHash(i+1,j,seed)*u)*(1-v)+(noiseHash(i,j+1,seed)*(1-u)+noiseHash(i+1,j+1,seed)*u)*v;}
 function moistureField(g:GeneratedSceneGround,x:number,y:number){const e=g.environment!,a=clamp((x-4)/8,0,39),b=clamp((y-100)/8,0,10),i=Math.floor(a),j=Math.floor(b),u=a-i,v=b-j;let sum=0,weight=0;for(const [dx,dy,w]of [[0,0,(1-u)*(1-v)],[1,0,u*(1-v)],[0,1,(1-u)*v],[1,1,u*v]]){const m=e.moisture[Math.min(10,j+dy!)*40+Math.min(39,i+dx!)];if(m!==null&&m!==undefined&&w!>0){sum+=landscapeBand(m)*w!;weight+=w!;}}return weight?sum/weight:0;}
 export function paintLandscapeGround(c:CanvasRenderingContext2D,g:GeneratedSceneGround):void {
- const e=g.environment;if(!e)return;const r=readOwnedRecordPhysics(g.terrain.sites[g.site].physics),image=c.getImageData(0,0,320,180),bytes=image.data,cold=clamp((-landscapeBand(e.temperature)-18)/30,0,.7),humidity=landscapeBand(e.humidity),seed=g.terrain.source.seed^(['river-bank','hill-side','coast-inlet'].indexOf(g.site)+1)*977;
+ const e=g.environment;if(!e)return;const mirrored=c.getTransform().a<0,r=readOwnedRecordPhysics(g.terrain.sites[g.site].physics),image=c.getImageData(0,0,320,180),bytes=image.data,cold=clamp((-landscapeBand(e.temperature)-18)/30,0,.7),humidity=landscapeBand(e.humidity),seed=g.terrain.source.seed^(['river-bank','hill-side','coast-inlet'].indexOf(g.site)+1)*977;
  for(let y=96;y<180;y++)for(let x=0;x<320;x++){
   const i=y*320+x;if(r.surface[i]!==1||r.bearing[i]!==0)continue;const m=moistureField(g,x,y),dry=clamp((-m-8)/52,0,.85),wet=clamp((m-20)/50,0,.55)*clamp(humidity/40,0,1),strength=Math.max(dry,cold,wet);if(strength===0)continue;
-  const target=dry>=cold&&dry>=wet?[185,169,119]:cold>=wet?[177,185,170]:[119,147,102],shade=(landscapeNoise(x,y,seed)-128)/32+(noiseHash(x,y,seed)%32===0?-3:0),sx=g.terrain.sites[g.site].render.mirrorX?319-x:x,j=(y*320+sx)*4;
+  const target=dry>=cold&&dry>=wet?[185,169,119]:cold>=wet?[177,185,170]:[119,147,102],shade=(landscapeNoise(x,y,seed)-128)/32+(noiseHash(x,y,seed)%32===0?-3:0),sx=mirrored?319-x:x,j=(y*320+sx)*4;
   for(let ch=0;ch<3;ch++)bytes[j+ch]=Math.round(bytes[j+ch]!*(1-strength)+(target[ch]!+shade)*strength);bytes[j+3]=255;
  }
- // putImageData ignores the canonical-to-screen transform; indices above include mirroring.
+ // Native canvas identity/mirror transforms: putImageData ignores the transform.
  c.putImageData(image,0,0);
 }
 export function landscapePalette(m:number,temperature:number):LeafPalette {return landscapeBand(temperature)< -24?['#849688','#abb6a4','#647e72']:m< -32?['#7e8053','#a0a36b','#626e46']:m>=24?['#52754a','#789760','#3c6242']:['#5e7d50','#829c65','#466c48'];}
