@@ -9,6 +9,7 @@ import {reviewBaseHash} from './wire-v1.js';
 import {irrigationHistoryLimits as limits,type IrrigationReview,type IrrigationControl} from './review-types-v1.js';
 export interface IrrigationAdvanceTimings {restoreMs:number;civilizationMs:number;snapshotMs:number;ecologyMs:number;bindingMs:number;ownershipMs:number;totalMs:number}
 async function commit(world:GeneratedBridgeReview,introducedYear:number,mode:'natural'|'controlled',controls:readonly IrrigationControl[],previous?:IrrigationReview,timing?:IrrigationAdvanceTimings):Promise<IrrigationReview>{
+ if(world.irrigation)throw Error('Production worlds are not independent D2 trials');
  let mark=timing?performance.now():0;const base=createGeneratedWorldSave(world),end=lastObservedYear(world.review.state);if(!base.environment||world.vegetation?.schemaVersion!==2||!Number.isSafeInteger(introducedYear)||introducedYear<0||introducedYear>end||end>limits.maxYears)throw Error('Invalid irrigation introduction');
  if(timing){timing.snapshotMs=performance.now()-mark;mark=performance.now();}
  const input=structuredClone(validateControls(controls,mode,introducedYear,end)),replay=replayIrrigation(base,introducedYear,input,proposeIrrigation,previous);

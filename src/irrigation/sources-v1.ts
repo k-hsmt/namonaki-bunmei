@@ -1,3 +1,4 @@
+import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
 /** Read-only, prefix-scoped source views shared by writer and replay. */
 import {restoreGeneratedWorld,type GeneratedWorldSave} from '../story/world-save.js';
 import {irrigationFrameAt} from './context-v1.js';
@@ -5,7 +6,10 @@ import {freezeReview} from './wire-v1.js';
 import type {IrrigationGeometry,IrrigationContext} from './types-v1.js';
 import {validateIrrigationGeometry} from './geometry-v1.js';
 export function irrigationSources(base:GeneratedWorldSave){
- const world=freezeReview(restoreGeneratedWorld(base)),r=world.review;if(!world.environment||world.vegetation?.schemaVersion!==2)throw Error('Irrigation requires recorded D2 ecology');
+ return irrigationSourcesFromWorld(freezeReview(restoreGeneratedWorld(base)));
+}
+export function irrigationSourcesFromWorld(world:GeneratedBridgeReview){
+ const r=world.review;if(!world.environment||world.vegetation?.schemaVersion!==2)throw Error('Irrigation requires recorded D2 ecology');
  const changed=new Map<number,Set<string>>();const add=(year:number,id:string|undefined)=>{if(!id)throw Error('Missing land-use source');const list=changed.get(year)??new Set<string>();list.add(id);changed.set(year,list);};
  for(const p of r.placements)if(p.site==='river-bank')add(p.builtYear,p.sourceRecordId);
  for(const c of r.state.observation?.sites?.[0]?.buildingChanges??[])add(c.year,c.building.recordId??(c.year===0?r.placements.find(p=>p.objectId===c.building.id&&p.builtYear===0)?.sourceRecordId:undefined));

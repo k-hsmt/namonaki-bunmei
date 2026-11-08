@@ -8,10 +8,10 @@ import {lastObservedYear} from '../story/engine.js';
 export type CoupledVegetation=Omit<VegetationHistory,'schemaVersion'|'ruleId'>&{readonly schemaVersion:2;readonly ruleId:'patch-environment-v2'};
 /** Growth in quarter-years, consecutive stress, soil debt, use/recovery clock. */
 export type PatchState=readonly [number,number,number,number];
-export interface EnvironmentState {readonly year:number;readonly humidity:number;readonly temperature:number;readonly patches:Readonly<Record<RecordSite,readonly (PatchState|null)[]>>}
+export interface EnvironmentState {readonly year:number;readonly humidity:number;readonly temperature:number;readonly patches:Readonly<Record<RecordSite,readonly (PatchState|null)[]>>;readonly channel?:import('../irrigation/review-types-v1.js').ChannelState|null}
 export interface ClimateTarget {readonly year:number;readonly humidity:number;readonly temperature:number}
 export interface LandUseEvent {readonly id:string;readonly year:number;readonly site:RecordSite;readonly objectId:string;readonly sourceRecordId:string;readonly plot:GroundPlot;readonly active:boolean;readonly farm:boolean}
-export interface EnvironmentHistory {readonly schemaVersion:1;readonly ruleId:'environment-coupled-v1'|'environment-coupled-v2';readonly climateStart?:number;readonly introducedYear:0;readonly confirmedThrough:number;readonly seed:number;readonly targets:readonly ClimateTarget[];readonly uses:readonly LandUseEvent[];readonly checkpoints:readonly EnvironmentState[];readonly current:EnvironmentState}
+export interface EnvironmentHistory {readonly schemaVersion:1|2;readonly ruleId:'environment-coupled-v1'|'environment-coupled-v2'|'environment-irrigated-v1';readonly climateRule?:'environment-coupled-v1'|'environment-coupled-v2';readonly climateStart?:number;readonly introducedYear:0;readonly confirmedThrough:number;readonly seed:number;readonly targets:readonly ClimateTarget[];readonly uses:readonly LandUseEvent[];readonly checkpoints:readonly EnvironmentState[];readonly current:EnvironmentState}
 export interface EnvironmentView {readonly humidity:number;readonly temperature:number;readonly moisture:readonly (number|null)[];readonly soil:readonly (number|null)[]}
 export const environmentLimits=Object.freeze({interval:100,soilMax:40,dryYears:40,growthMax:600});
 export function landUseEvents(r:GeneratedFacilityReview):readonly LandUseEvent[]{

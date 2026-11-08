@@ -7,6 +7,7 @@ import {prepareSceneMotion,drawSceneMotion,sceneMotionVisualKey,type PreparedSce
 import type {SiteSnapshot} from './model.js';
 export const sceneMotionPreferenceKey='namonaki-scene-motion-v1';
 export class SceneMotionPlayer {
+ get channelView(){return this.observation?.ground.channelView;}
  private world:WorldSession|null=null;private year=-1;private site=-1;private snapshot:SiteSnapshot|null=null;private observation:GeneratedSceneObservation|null=null;private prepared:PreparedSceneMotion|null=null;private visualKey:string|null=null;private terrain:object|null=null;
  private raf:number|null=null;private lastTimestamp:number|null=null;private seconds=0;private lastPaint=-Infinity;private preferred=true;private disposed=false;private frames=0;private builds=0;
  private readonly media=matchMedia('(prefers-reduced-motion: reduce)');

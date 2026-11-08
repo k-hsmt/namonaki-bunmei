@@ -1,3 +1,4 @@
+import {channelMask,clearChannelRoot,drawProductionCanal} from '../irrigation/presentation-v1.js';
 import type {Foliage} from '../environment/landscape-v3.js';
 import type {LeafPalette} from '../environment/landscape-v2.js';
 import {paintEnvironmentGround} from '../environment/presentation-v1.js';
@@ -32,7 +33,11 @@ export function drawSceneTree(c:CanvasRenderingContext2D,x:number,y:number,k:num
   x+=sway;c.fillStyle='#607b57';c.fillRect(x-w,y-h-8,2*w+2,7);c.fillStyle='#77916a';c.fillRect(x-w-2,y-h-5,w+2,6);
   c.fillStyle='#4d7055';c.fillRect(x+2,y-h-5,w+1,5);
 }
-export function projectScenePaint(observation:GeneratedSceneObservation){return {observation,presentation:projectGeneratedPresentation(observation),vegetation:observation.ground.vegetation?projectVegetation(observation):null};}
+export function projectScenePaint(observation:GeneratedSceneObservation){
+ const presentation=projectGeneratedPresentation(observation),raw=observation.ground.vegetation?projectVegetation(observation):null,mask=channelMask(observation.ground.channelView);
+ const clear=(p:{point:readonly [number,number]},width=2)=>clearChannelRoot(mask,p.point[0],p.point[1],width);
+ return {observation,presentation:mask?{...presentation,trees:presentation.trees.filter(p=>clear(p)),wear:presentation.wear.filter(([x,y])=>clearChannelRoot(mask,x,y,1,1)),people:presentation.people.filter(([x,y])=>clearChannelRoot(mask,x,y))}:presentation,vegetation:mask&&raw?{...raw,grass:raw.grass.filter(p=>clear(p)),shrubs:raw.shrubs.filter(p=>clear(p,3)),trees:raw.trees.filter(p=>clear(p))}:raw};
+}
 export type ScenePaintProjection=ReturnType<typeof projectScenePaint>;
 export type GeneratedSceneLayer='backdrop'|'structures';
 export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:GeneratedSceneObservation,layer?:GeneratedSceneLayer,paint?:ScenePaintProjection):void {
@@ -55,6 +60,7 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
   for(const mark of vegetation.grass){const [x,y]=mark.point;c.fillStyle=mark.color;if(mark.height!==undefined&&mark.height>1){c.fillRect(x,y-mark.height+1,1,mark.height);c.fillRect(x+1,y-1,1,2);}else c.fillRect(x,y,1,1);}
   for(const mark of vegetation.shrubs){const [x,y]=mark.point;if(mark.foliage==='bare'||mark.foliage==='sparse'){c.fillStyle='#8c8063';c.fillRect(x,y-3,1,4);c.fillRect(x+1,y-2,2,1);if(mark.foliage==='sparse'){c.fillStyle=mark.palette![0];c.fillRect(x+1,y-3,2,1);}continue;}if(mark.palette!==undefined){c.fillStyle=mark.palette[2];c.fillRect(x,y-2,3,3);c.fillStyle=mark.palette[0];c.fillRect(x-1,y-3,4,2);c.fillStyle=mark.palette[1];c.fillRect(x,y-4,2,2);continue;}c.fillStyle='#718866';c.fillRect(x,y-2,3,2);c.fillStyle='#84956c';c.fillRect(x+1,y-3,2,2);}
  }
+ if(layer!=='structures')drawProductionCanal(c,ground.channelView);
  if(!layer)for(const t of (vegetation?.trees??presentation.trees) as readonly TreePaint[])drawSceneTree(c,t.point[0],t.point[1],t.scale,0,t.palette,t.foliage);
  if(layer!=='structures'){
  c.fillStyle=presentation.drought?'#aa9b77':'#b1a180';for(const [x,y] of presentation.wear)c.fillRect(x,y,1,1);

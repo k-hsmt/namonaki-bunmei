@@ -12,7 +12,7 @@ import {housingAt,type HousingHistory} from '../story/housing-history.js';
 import {projectSceneComposition,type SceneComposition} from './composition.js';
 import type {VegetationPatchView} from '../vegetation/history-v1.js';
 export interface GeneratedSceneGround {
- readonly vegetation?:readonly VegetationPatchView[];readonly environment?:EnvironmentView;readonly environmentAppearance?:'landscape-v2'|'landscape-v3';
+ readonly channelView?:import('../irrigation/production-types-v1.js').ChannelView;readonly vegetation?:readonly VegetationPatchView[];readonly environment?:EnvironmentView;readonly environmentAppearance?:'landscape-v2'|'landscape-v3';
  readonly terrain:ValidatedTerrainRecord;readonly site:RecordSite;
  readonly primaryRoot:RecordPoint;
  readonly facilities:readonly {readonly id:string;readonly purpose:GroundPurpose;readonly plot:GroundPlot}[];
