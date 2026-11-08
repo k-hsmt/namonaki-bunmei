@@ -74,7 +74,7 @@ test('確定住宅の描画は年・地点・巻戻し・再読込で決定的�
  assert.equal(await image(page),current);
  await page.locator('#save').click();
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
- const stored=(await decodeWorldSave(await page.evaluate(()=>localStorage.getItem('namonaki-story-v5')))).state;
+ const stored=(await decodeWorldSave(await page.evaluate(()=>localStorage.getItem('namonaki-story-v6')))).state;
  assert.deepEqual(stored.housing,s.housing);
  assert.deepEqual(stored.observation,s.observation);
  await page.reload();
@@ -105,7 +105,7 @@ test('旧v3の住宅未記録期間は従来のCanvasと同じ。partialをゼ�
  assert.equal(shown,expected,'旧セーブの未記録住宅を表示に加えない');
  await page.locator('#save').click();
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
- const after=(await decodeWorldSave(await page.evaluate(()=>localStorage.getItem('namonaki-story-v5')))).state;
+ const after=(await decodeWorldSave(await page.evaluate(()=>localStorage.getItem('namonaki-story-v6')))).state;
  assert.equal(after.housing.legacyUntracked,true);
  assert.equal(after.housing.introducedYear,y+1);
  assert.deepEqual(after.housing.events,[]);

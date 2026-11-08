@@ -10,7 +10,7 @@ export function generatedSceneWalkContext(o:GeneratedSceneObservation):GroundRev
  return {terrain:g.terrain,site:g.site,year:s.year,confirmedYear:s.year,historyStatus:'known',primaryRoot:g.primaryRoot,reservations:[],
   occupancy:[...g.facilities.map(p=>({id:p.id,plot:p.plot,entrance:southEntrance(p.plot)})),
    ...c.residentialBlocks.map(b=>({id:b.blockId,plot:b.footprint,entrance:southEntrance(b.footprint)})),
-   ...(s.publicSpaces??[]).map(p=>({id:p.id,plot:p.footprint,entrance:southEntrance(p.footprint)})),...g.bridges.flatMap(bridgeOccupancy)],
+   ...(s.publicSpaces??[]).map(p=>({id:p.id,plot:p.footprint,entrance:southEntrance(p.footprint)})),...g.bridges.flatMap(bridgeOccupancy),...(g.channelView?.geometry?.cells??[]).map(([x,y],i)=>({id:'waterway/'+i,plot:{x,y,width:1,depth:1},entrance:[x,y] as RecordPoint}))],
   crossings:g.bridges.filter(b=>s.objects.some(x=>x.id===b.bridgeId&&x.condition==='intact')).map(bridgeCrossing)};
 }
 export function presentationPeopleCount(population:number,epidemic:boolean):number {return population<=0?0:epidemic?1:Math.min(9,Math.max(1,2+Math.floor(Math.log2(Math.max(1,population)/1800))));}

@@ -1,3 +1,4 @@
+import {introduceProductionIrrigation} from '../irrigation/production-progression-v1.js';
 import {coupleVegetation,createEnvironment} from '../environment/progression-v1.js';
 /** This producer is loaded only when explicitly creating a new generated world. */
 import {createInitialVegetation} from '../vegetation/initial-v1.js';
@@ -18,3 +19,6 @@ export function createNewWorld(seed:number,policy?:'terrain-placement-v1'|'terra
  const session=generatedSession({...review,...(v?{vegetation:v}:{}),...(v?.schemaVersion===2?{environment:createEnvironment(v,review.review,true),environmentAppearance:'landscape-v3' as const}:{})});
  for(let i=0;i<3;i++)observeWorldSession(session,0,i);return session;
 }
+
+/** Current production default; createNewWorld remains the versioned D2 producer for comparison. */
+export function createNewIrrigatedWorld(seed:number):WorldSession {const world=createNewWorld(seed);if(world.mode!=='generated')throw Error('Generated world required');return generatedSession(introduceProductionIrrigation(world.review));}

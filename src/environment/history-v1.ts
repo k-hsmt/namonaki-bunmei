@@ -37,11 +37,12 @@ export function environmentStateAt(e:EnvironmentHistory,v:CoupledVegetation,r:Ge
  const checkpoint=e.checkpoints[Math.floor(year/100)]!;if(checkpoint.year===year)return checkpoint;
  const runner=environmentRunner(v,r,e.uses,checkpoint);for(let y=checkpoint.year+1;y<=year;y++)runner.step(e.targets[Math.floor(y/100)]!,e.ruleId==='environment-coupled-v2'&&y>=e.climateStart!);return freezeVegetation(runner.snapshot());
 }
-export function environmentProjection(e:EnvironmentHistory,v:CoupledVegetation,r:GeneratedFacilityReview,year:number,site:RecordSite):{vegetation:readonly VegetationPatchView[];environment:EnvironmentView}{
- if(!vegetationSites.includes(site))throw Error('Invalid environment site');const state=environmentStateAt(e,v,r,year),buffer=waterBuffers(r,site),moisture:(number|null)[]=Array(440).fill(null),soil:(number|null)[]=Array(440).fill(null),vegetation:VegetationPatchView[]=[];
+export function environmentProjection(e:EnvironmentHistory,v:CoupledVegetation,r:GeneratedFacilityReview,year:number,site:RecordSite,extra?:{state:EnvironmentState;moisture:readonly number[];disturbances:readonly {year:number;point:readonly [number,number]}[]}):{vegetation:readonly VegetationPatchView[];environment:EnvironmentView}{
+ if(!vegetationSites.includes(site))throw Error('Invalid environment site');const state=extra?.state??environmentStateAt(e,v,r,year),buffer=waterBuffers(r,site),moisture:(number|null)[]=Array(440).fill(null),soil:(number|null)[]=Array(440).fill(null),vegetation:VegetationPatchView[]=[];
  for(const [index,p] of state.patches[site].entries()){if(!p)continue;const initial=v.initial[site][index]!,plot=vegetationPatchPlot(index);let disturbedYear:number|null=null,fires=0;
   for(const event of v.events){if(event.year>year)break;if(event.site===site&&vegetationOverlap(event.plot,plot)){disturbedYear=event.year;if(event.kind==='fire'&&year-event.year<120)fires++;}}
-  const maximum=fires>=2?2:initial[2];vegetation.push({index,plot,age:p[0]/4,stage:vegetationStage(p[0]/4,maximum),disturbedYear});moisture[index]=moistureAt(state.humidity,buffer[index]!,p[2]);soil[index]=p[2];
+  if(extra&&site==='river-bank')for(const d of extra.disturbances)if(d.point[0]>=plot.x&&d.point[0]<plot.x+plot.width&&d.point[1]>=plot.y&&d.point[1]<plot.y+plot.depth)disturbedYear=Math.max(disturbedYear??-1,d.year);
+  const maximum=fires>=2?2:initial[2];vegetation.push({index,plot,age:p[0]/4,stage:vegetationStage(p[0]/4,maximum),disturbedYear});moisture[index]=moistureAt(state.humidity,buffer[index]!+(extra?.moisture[index]??0),p[2]);soil[index]=p[2];
  }
  return freezeVegetation({vegetation,environment:{humidity:state.humidity,temperature:state.temperature,moisture,soil}});
 }

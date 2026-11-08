@@ -1,3 +1,5 @@
+import {introduceProductionIrrigation,slowProductionClimate} from '../irrigation/production-progression-v1.js';
+import {ownProductionWorld} from '../irrigation/production-history-v1.js';
 import {relaxEnvironment} from '../environment/progression-v1.js';
 import type {CoupledVegetation} from '../environment/model-v1.js';
 /** One explicit mode controls progression, observation and persistence together. */
@@ -23,6 +25,7 @@ export function saveWorldSession(session:WorldSession):WorldSave {
 }
 export function advanceWorldSession(session:WorldSession,maxYears=36):WorldSession {
  if(!Number.isSafeInteger(maxYears)||maxYears<0||maxYears>10000)throw Error('Invalid world advance');
+ if(session.mode==='generated'&&session.review.irrigation){maxYears=Math.min(maxYears,Math.max(0,10000-session.state.year));if(!maxYears)return session;}
  if(session.mode==='generated')return generatedSession(advanceGeneratedBridgeReview(session.review,maxYears,'stop',{stopAtNewRecord:true}));
  const state=structuredClone(session.state),start=state.history.length;
  for(let i=0;i<maxYears&&!state.pending;i++){advance(state,1);if(state.history.length>start)break;}return {...session,state};
@@ -50,12 +53,15 @@ export function improveWorldGrowth(session:WorldSession):WorldSession {
 export function improveWorldEnvironment(session:WorldSession):WorldSession {
  if(session.mode!=='generated'||!session.review.environment)throw Error('No recorded environment');
  if(session.review.environmentAppearance==='landscape-v3')return session;
- return generatedSession({...session.review,environmentAppearance:'landscape-v3'});
+ const next={...session.review,environmentAppearance:'landscape-v3' as const};return generatedSession(next.irrigation?ownProductionWorld(next):next);
 }
 
 /** Switch only future climate; observation, civilization and past ecology stay identical. */
 export function slowWorldClimate(session:WorldSession):WorldSession {
  if(session.mode!=='generated'||!session.review.environment)throw Error('No recorded environment');
+ if(session.review.irrigation)return generatedSession(slowProductionClimate(session.review));
  const environment=relaxEnvironment(session.review.environment,session.review.vegetation as CoupledVegetation,session.review.review);
  return environment===session.review.environment?session:generatedSession({...session.review,environment});
 }
+
+export function enableWorldIrrigation(session:WorldSession):WorldSession {if(session.mode!=='generated')throw Error('Generated environment required');return generatedSession(introduceProductionIrrigation(session.review));}

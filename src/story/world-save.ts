@@ -1,4 +1,6 @@
 import {validateCoupledVegetation,validateEnvironment,type CoupledVegetation,type EnvironmentHistory} from '../environment/history-v1.js';
+import {validateProductionWorld,validateProductionWorldAsync,ownProductionWorld} from '../irrigation/production-history-v1.js';
+import type {ProductionIrrigation} from '../irrigation/production-types-v1.js';
 /** Production v5 contract. Versioned readers preserve compact v1 and organic v2 progression. */
 import {validateVegetationHistory,freezeVegetation,type VegetationHistory} from '../vegetation/history-v1.js';
 import {createGeneratedSaveDraft,validateGeneratedSaveDraft,restoreGeneratedSaveDraft,generatedDraftMaxBytes,type GeneratedSaveDraftReview} from './generated-save-draft-review.js';
@@ -7,11 +9,12 @@ import type {GeneratedBridgeReview} from './generated-bridge-review.js';
 import {wireObject,assertJsonWire} from './generated-state-review.js';
 import {groundReviewLimits} from '../terrain/ground-access-review.js';
 export const WORLD_SAVE_KEY='namonaki-story-v5';
+export const IRRIGATED_WORLD_SAVE_KEY='namonaki-story-v6';
 export const compactPlacementPolicy=Object.freeze({id:'terrain-placement-v1' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
 export const organicPlacementPolicy=Object.freeze({id:'terrain-placement-v2' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
 export const productionPlacementPolicy=Object.freeze({id:'terrain-placement-v3' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
-export type GeneratedWorldSave=Omit<GeneratedSaveDraftReview,'format'|'status'|'progressionPolicy'|'rendererId'>&{
- readonly format:'namonaki-world-save';readonly progressionPolicy:typeof productionPlacementPolicy|typeof organicPlacementPolicy|typeof compactPlacementPolicy;readonly rendererId:'generated-scene-v1'|'generated-scene-v2'|'generated-scene-v3'|'generated-scene-v4'|'generated-scene-v5';readonly vegetation?:VegetationHistory|CoupledVegetation;readonly environment?:EnvironmentHistory;
+export type GeneratedWorldSave=Omit<GeneratedSaveDraftReview,'format'|'status'|'progressionPolicy'|'rendererId'|'version'>&{
+ readonly version:5|6;readonly format:'namonaki-world-save';readonly progressionPolicy:typeof productionPlacementPolicy|typeof organicPlacementPolicy|typeof compactPlacementPolicy;readonly rendererId:'generated-scene-v1'|'generated-scene-v2'|'generated-scene-v3'|'generated-scene-v4'|'generated-scene-v5'|'generated-scene-v6';readonly vegetation?:VegetationHistory|CoupledVegetation;readonly environment?:EnvironmentHistory;readonly irrigation?:ProductionIrrigation;readonly environmentAppearance?:'landscape-v2'|'landscape-v3';
 };
 export type LegacyWorldSave=Omit<LegacySaveDraft,'format'|'status'>&{readonly format:'namonaki-world-save'};
 export type WorldSave=GeneratedWorldSave|LegacyWorldSave;
@@ -30,6 +33,7 @@ function ownEnvironmentSave(save:GeneratedWorldSave,source:GeneratedBridgeReview
 }
 export function validateWorldSave(raw:unknown):WorldSave {
  if(raw&&typeof raw==='object'&&environmentSaves.has(raw))return raw as GeneratedWorldSave;
+ if(raw&&typeof raw==='object'&&'version' in raw&&raw.version===6){const c=productionCandidate(raw);return ownEnvironmentSave(c.save,validateProductionWorld(c.world));}
  const d=wireObject(raw,['format','version','schemaVersion','initialTerrain','progressionPolicy','state'],['rendererId','landHistory','origin','vegetation','environment']);
  if(d.format!=='namonaki-world-save'||d.version!==5||d.schemaVersion!==1)throw Error('Unknown world save contract');
  const t=d.initialTerrain as {mode?:unknown}|null;
@@ -52,14 +56,29 @@ export function validateWorldSave(raw:unknown):WorldSave {
  throw Error('Unknown world terrain mode');
 }
 export function createGeneratedWorldSave(review:GeneratedBridgeReview):GeneratedWorldSave {
+ if(review.irrigation){validateProductionWorld(review);const base=promoteGenerated(createGeneratedSaveDraft(review));return ownEnvironmentSave({...base,version:6,rendererId:'generated-scene-v6',vegetation:review.vegetation,environment:review.environment,irrigation:review.irrigation,...(review.environmentAppearance?{environmentAppearance:review.environmentAppearance}:{})},review);}
  if(review.environmentAppearance!==undefined&&(!['landscape-v2','landscape-v3'].includes(review.environmentAppearance)||!review.environment))throw Error('Invalid environment appearance');
  if(review.review.reservationMode!=='field-only')throw Error('Unapproved production reservation mode');const base=promoteGenerated(createGeneratedSaveDraft(review));if(review.environment){const v=validateCoupledVegetation(review.vegetation,review.review);const e=validateEnvironment(review.environment,v,review.review);return ownEnvironmentSave({...base,rendererId:review.environmentAppearance==='landscape-v3'?'generated-scene-v5':review.environmentAppearance==='landscape-v2'?'generated-scene-v4':'generated-scene-v3',vegetation:v,environment:e},{...review,vegetation:v,environment:e});}return review.vegetation?{...base,rendererId:'generated-scene-v2',vegetation:validateVegetationHistory(review.vegetation,review.review)}:base;
 }
 export function restoreGeneratedWorld(save:GeneratedWorldSave):GeneratedBridgeReview {
- const valid=validateWorldSave(save) as GeneratedWorldSave,cached=environmentSaves.get(valid);if(cached)return {...cached,review:{...cached.review,state:structuredClone(cached.review.state)}};
+ const valid=validateWorldSave(save) as GeneratedWorldSave,cached=environmentSaves.get(valid);if(cached){const result={...cached,review:{...cached.review,state:structuredClone(cached.review.state)}};return result.irrigation?ownProductionWorld(result):result;}
  const {vegetation,environment,...payload}=valid;
  const restored=restoreGeneratedSaveDraft({...payload,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...valid.progressionPolicy,id:valid.progressionPolicy.id==='terrain-placement-v3'?'generated-land-review-v3':valid.progressionPolicy.id==='terrain-placement-v2'?'generated-land-review-v2':'generated-land-review-v1'}});
  if(environment){const v=validateCoupledVegetation(vegetation,restored.review);return {...restored,vegetation:v,environment:validateEnvironment(environment,v,restored.review)};}return vegetation?{...restored,vegetation:validateVegetationHistory(vegetation,restored.review)}:restored;
+}
+/** Structural validation shares the existing terrain/civilization reader, never a D2 ecology replay. */
+function productionCandidate(raw:unknown):{save:GeneratedWorldSave;world:GeneratedBridgeReview}{
+ assertJsonWire(raw);const text=JSON.stringify(raw);if(new TextEncoder().encode(text).length>generatedDraftMaxBytes)throw Error('World save exceeds 16MiB');
+ const d=wireObject(JSON.parse(text),['format','version','schemaVersion','initialTerrain','progressionPolicy','rendererId','landHistory','state','vegetation','environment','irrigation'],['environmentAppearance']);
+ const p=wireObject(d.progressionPolicy,['id','reservationMode','limits']);if(d.format!=='namonaki-world-save'||d.version!==6||d.schemaVersion!==1||d.rendererId!=='generated-scene-v6'||p.id!=='terrain-placement-v3'||p.reservationMode!=='field-only'||d.environmentAppearance!==undefined&&!['landscape-v2','landscape-v3'].includes(d.environmentAppearance as string))throw Error('Unknown production v6 contract');
+ const {irrigation,environment,vegetation,environmentAppearance,...parts}=d;
+ const draft=validateGeneratedSaveDraft({...parts,version:5,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...p,id:'generated-land-review-v3'}}),restored=restoreGeneratedSaveDraft(draft),v=validateCoupledVegetation(vegetation,restored.review);
+ const save={...promoteGenerated(draft),version:6,rendererId:'generated-scene-v6',vegetation:v,environment,irrigation,...(environmentAppearance?{environmentAppearance}:{})} as GeneratedWorldSave;
+ return {save,world:{...restored,vegetation:v,environment:environment as EnvironmentHistory,irrigation:irrigation as ProductionIrrigation,...(environmentAppearance?{environmentAppearance:environmentAppearance as 'landscape-v2'|'landscape-v3'}:{})}};
+}
+export async function parseWorldSaveAsync(json:string):Promise<WorldSave>{
+ if(typeof json!=='string'||new TextEncoder().encode(json).length>generatedDraftMaxBytes)throw Error('World save exceeds 16MiB');const raw:unknown=JSON.parse(json);
+ if(raw&&typeof raw==='object'&&'version' in raw&&raw.version===6){const candidate=productionCandidate(raw);await new Promise(resolve=>setTimeout(resolve,0));const world=await validateProductionWorldAsync(candidate.world);return ownEnvironmentSave(candidate.save,world);}return parseWorldSave(json);
 }
 export function migrateOldWorld(raw:unknown):LegacyWorldSave{return promoteLegacy(migrateLegacySave(raw));}
 export function parseWorldSave(json:string):WorldSave {

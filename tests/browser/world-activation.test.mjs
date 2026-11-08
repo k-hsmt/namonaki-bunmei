@@ -6,7 +6,7 @@ test.after(async()=>{await browser?.close();server?.kill();});
 async function pageFor(t,{corrupt=false,quota=false,block=false}={}){
  const page=await browser.newPage({reducedMotion:'reduce'});t.after(()=>page.close());const errors=[];page.on('pageerror',e=>errors.push(e.message));t.after(()=>assert.deepEqual(errors,[]));
  await page.addInitScript(({encoded,old,corrupt,quota})=>{const write=Storage.prototype.setItem;write.call(localStorage,'namonaki-story-v5',corrupt?'broken-v5':encoded);write.call(localStorage,'namonaki-story-v4',old);
-  if(quota)Storage.prototype.setItem=function(key,value){if(key==='namonaki-story-v5')throw new DOMException('controlled quota','QuotaExceededError');return write.call(this,key,value);};
+  if(quota)Storage.prototype.setItem=function(key,value){if(key==='namonaki-story-v6')throw new DOMException('controlled quota','QuotaExceededError');return write.call(this,key,value);};
  },{encoded,old,corrupt,quota});
  if(block)await page.route('**/*',r=>{const p=new URL(r.request().url()).pathname;return p.includes('prototype')||p.includes('/capture-terrain')||p.endsWith('/new-world.js')?r.abort():r.continue();});
  await page.goto(origin);await page.waitForFunction(()=>!document.getElementById('load').disabled);return page;
@@ -17,7 +17,7 @@ const rewind=(p,year)=>p.locator('#rewind-year').evaluate((e,y)=>{e.value=String
 test('production UI cold-loads saved terrain without generators, preserves past scenes and exports complete JSON',async t=>{
  const p=await pageFor(t,{block:true});await feedback(p,'保存された歴史を開きました');const current=await png(p);
  await rewind(p,755);const past=await png(p);assert.notEqual(past,current);await p.locator('#site-select').selectOption('1');const hill=await png(p);assert.notEqual(hill,past);
- await p.locator('#save').click();await feedback(p,'ブラウザに保存しました');const stored=await decodeWorldSave(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')));assert.deepEqual(stored.state,session.state);
+ await p.locator('#save').click();await feedback(p,'ブラウザに保存しました');const stored=await decodeWorldSave(await p.evaluate(()=>localStorage.getItem('namonaki-story-v6')));assert.deepEqual(stored.state,session.state);
  const download=p.waitForEvent('download');await p.locator('#export').click();const file=await download,restored=await decodeWorldSave(await readFile(await file.path(),'utf8'));assert.deepEqual(restored.state,session.state);
  await p.reload();await feedback(p,'保存された歴史を開きました');await p.locator('#site-select').selectOption('1');await rewind(p,755);assert.equal(await png(p),hill);
  assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v4')),old);
@@ -44,7 +44,7 @@ test('saved organic v2 can opt into cross-river growth without moving the presen
  await p.addInitScript(wire=>localStorage.setItem('namonaki-story-v5',wire),oldWire);await p.goto(origin);await feedback(p,'保存された歴史を開きました');const before=await png(p);
  await p.locator('#improve-growth').click();await feedback(p,'今後の建設');assert.equal(await png(p),before);assert.equal(await p.locator('#improve-growth').isVisible(),false);
  assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')),oldWire,'opt-in does not silently overwrite the previous save');
- await p.locator('#save').click();await feedback(p,'ブラウザに保存しました');const result=await decodeWorldSave(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')));assert.equal(result.progressionPolicy.id,'terrain-placement-v3');assert.deepEqual(result.state,oldSave.state);assert.deepEqual(result.landHistory,oldSave.landHistory);
+ await p.locator('#save').click();await feedback(p,'ブラウザに保存しました');const result=await decodeWorldSave(await p.evaluate(()=>localStorage.getItem('namonaki-story-v6')));assert.equal(result.progressionPolicy.id,'terrain-placement-v3');assert.deepEqual(result.state,oldSave.state);assert.deepEqual(result.landHistory,oldSave.landHistory);
  // A fresh tab reads the explicit v3 save without the old-save boot fixture.
  const fresh=await p.context().newPage();t.after(()=>fresh.close());await fresh.goto(origin);await feedback(fresh,'保存された歴史を開きました');assert.equal(await fresh.locator('#improve-growth').isVisible(),false);assert.equal(await png(fresh),before);assert.deepEqual(errors,[]);
 });

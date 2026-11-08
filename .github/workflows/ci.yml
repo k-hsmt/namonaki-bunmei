@@ -528,3 +528,37 @@ jobs:
           retention-days: 14
           path: artifacts/environment34-irrigation-acceptance/*
           if-no-files-found: error
+
+  irrigation-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Benchmark actual production annual advancement and complete snapshots
+        run: node scripts/benchmark-irrigation-production.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit five complete production worlds and exact A3 ecology with gzip continuation
+        run: node scripts/audit-irrigation-production.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Compare production scenery, walking and moving water with desktop and CPU4x timings
+        run: node scripts/review-irrigation-production.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-production
+          retention-days: 14
+          path: artifacts/environment34-irrigation-production/**
+          if-no-files-found: error

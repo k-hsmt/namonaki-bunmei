@@ -22,7 +22,7 @@ export function validateControls(raw:unknown,mode:'natural'|'controlled',introdu
  return raw as IrrigationControl[];
 }
 const reasons=['unsupported-site','unknown-history','unconfirmed-year','no-active-field','no-owned-intake','no-flat-route','occupied','access-loss','too-long','search-limit','awaiting-backfill'];
-function checkAttempt(a:unknown):ChannelAttempt {
+export function checkAttempt(a:unknown):ChannelAttempt {
  const q=wireObject(a,['year','cause','recordId','outcome','systemId','reason','metrics','diagnostics']);
  if(!Number.isSafeInteger(q.year)||typeof q.recordId!=='string'||!['built','maintained','repaired','hold'].includes(q.outcome as string)||q.systemId!==null&&typeof q.systemId!=='string'||q.reason!==null&&!reasons.includes(q.reason as string)||!Array.isArray(q.diagnostics)||q.diagnostics.length>1000)throw Error('Invalid irrigation decision receipt');
  if(q.metrics!==null){const m=wireObject(q.metrics,['searchStates','intakes','fields','candidates','accessChecks','walkVisits','accessRejected']);if(Object.values(m).some(n=>!Number.isSafeInteger(n)||Number(n)<0||Number(n)>20000000)||Number(m.searchStates)>250000||Number(m.candidates)>128||Number(m.accessChecks)>Number(m.candidates)||Number(m.accessRejected)>Number(m.accessChecks))throw Error('Invalid search receipt bounds');}
@@ -34,7 +34,7 @@ export async function validateIrrigationReview(raw:unknown):Promise<IrrigationRe
  assertJsonWire(raw);const text=JSON.stringify(raw);if(new TextEncoder().encode(text).length>limits.maxBytes)throw Error('Irrigation review exceeds 16MiB');
  const t=wireObject(JSON.parse(text),['format','schemaVersion','ruleId','status','mode','introducedYear','confirmedThrough','base','baseHash','controls','systems','events','attempts','checkpoints','current']);
  if(t.format!=='irrigation-review-v1'||t.schemaVersion!==1||t.ruleId!=='irrigation-history-v1'||t.status!=='review-only'||!['natural','controlled'].includes(t.mode as string))throw Error('Unknown irrigation review');
- const base=validateWorldSave(t.base);if(base.initialTerrain.mode!=='generated'||!('environment' in base)||!base.environment||!('vegetation' in base)||base.vegetation?.schemaVersion!==2)throw Error('Missing base environment');
+ const base=validateWorldSave(t.base);if(base.version!==5||base.initialTerrain.mode!=='generated'||!('environment' in base)||!base.environment||!('vegetation' in base)||base.vegetation?.schemaVersion!==2)throw Error('Missing base environment');
  const end=base.environment.confirmedThrough;if(!Number.isSafeInteger(t.introducedYear)||Number(t.introducedYear)<0||Number(t.introducedYear)>end||t.confirmedThrough!==end||end>limits.maxYears||t.baseHash!==await reviewBaseHash(base))throw Error('Invalid irrigation boundary or base binding');
  const controls=validateControls(t.controls,t.mode as 'natural'|'controlled',Number(t.introducedYear),end);
  for(const key of ['systems','events','attempts','checkpoints'] as const)if(!Array.isArray(t[key])||t[key].length>limits.maxEntries)throw Error('Irrigation array bounds');

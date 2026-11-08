@@ -2,13 +2,15 @@ import {environmentLabel} from './environment/presentation-v1.js';
 import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave} from './story/world-storage.js';
-import {restoreWorldSession,saveWorldSession,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
+import {restoreWorldSession,saveWorldSession,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
 import {serializeWorldSave} from './story/world-save.js';
 import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
 import {practiceNames} from './story/society.js';
 const el=(id:string)=>document.getElementById(id)!;
 const randomSeed=()=>Math.floor(Math.random()*4294967295)+1;
+/** Paint feedback before native JSON/terrain validation; hidden tabs use a bounded timer. */
+async function paintFeedback(){await new Promise<void>(resolve=>{const timer=setTimeout(resolve,50);requestAnimationFrame(()=>requestAnimationFrame(()=>{clearTimeout(timer);resolve();}));});}
 function verifyWorldCandidate(candidate:WorldSession){for(let i=0;i<3;i++){const s=drawWorldSession(document.createElement('canvas'),candidate,lastObservedYear(candidate.state),i);if(!Number.isFinite(s.population)||s.population<0||s.local&&(!Number.isFinite(s.local.population)||s.local.population<0)||s.objects.some(o=>typeof o.id!=='string'||!['house','hall','bridge','field','ruin','memorial','market','workshop','granary'].includes(o.kind)||![o.x,o.y,o.builtYear].every(Number.isSafeInteger)||o.x<0||o.x>320||o.y<0||o.y>180||o.builtYear<0||o.builtYear>s.year||!['intact','damaged','ruined'].includes(o.condition)))throw Error('Invalid observed world');}}
 function mount(initial:WorldSession){
 const input=el('seed') as HTMLInputElement;
@@ -67,8 +69,9 @@ function format(v:number){return new Intl.NumberFormat('ja-JP').format(Math.roun
 function label(v:number,good:string,bad:string){return v>=55?good:v>=30?'揺らいでいる':bad;}
 function inspect(year:number,record?:RecordEntry){stop();viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
 function render(){
+ const irrigationButton=el('enable-irrigation') as HTMLButtonElement;irrigationButton.hidden=world.mode!=='generated'||!world.review.environment||world.review.review.growthPattern!=='organic-v3'||Boolean(world.review.irrigation);irrigationButton.disabled=busy;
  const environmentButton=el('improve-environment') as HTMLButtonElement;environmentButton.hidden=world.mode!=='generated'||!world.review.environment||world.review.environmentAppearance==='landscape-v3';environmentButton.disabled=busy;
- const climateButton=el('slow-climate') as HTMLButtonElement;climateButton.hidden=world.mode!=='generated'||!world.review.environment||world.review.environment.ruleId==='environment-coupled-v2';climateButton.disabled=busy;
+ const climateButton=el('slow-climate') as HTMLButtonElement;climateButton.hidden=world.mode!=='generated'||!world.review.environment||(world.review.environment.ruleId==='environment-coupled-v2'||world.review.environment.climateRule==='environment-coupled-v2');climateButton.disabled=busy;
  const growthButton=el('improve-growth') as HTMLButtonElement;growthButton.hidden=world.mode!=='generated'||world.review.review.growthPattern==='organic-v3';growthButton.disabled=busy;
  const confirmedYear=lastObservedYear(state);
  const viewingPast=viewedYear!==null;
@@ -84,6 +87,7 @@ function render(){
  const siteIndex=Number(siteSelect.value);
  const scene=motion.show(world,y,siteIndex);
  const environment=motion.environment;el('site-environment').hidden=!environment;el('site-environment').textContent=environment?environmentLabel(environment):'';
+ const channel=motion.channelView,waterline=el('site-waterway');waterline.hidden=!channel||siteIndex!==0;waterline.textContent=!channel?'':!channel.introduced?'水路の記録はまだありません':channel.channel?({active:'水路に水が流れています',idle:'水路は休止しています',damaged:'水路は傷み、水が止まっています',abandoned:'放棄された水路の跡があります',retired:'水路は埋め戻されています'}[channel.channel.status]):'記録された水路はありません';
  const site=siteAt(state.observation?.sites,siteIndex,y);
  el('scene-place').hidden=!site;
  if(site&&scene.local){
@@ -154,14 +158,17 @@ el('play').addEventListener('click',()=>{if(busy)return;if(viewedYear!==null){vi
 el('return-now').addEventListener('click',()=>{viewedYear=null;render();});
 scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===state.year?null:y;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
-function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate'])(el(id) as HTMLButtonElement).disabled=value;}
+function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation'])(el(id) as HTMLButtonElement).disabled=value;}
 function adopt(candidate:WorldSession,keepObservation=false){const previousYear=viewedYear;verifyWorldCandidate(candidate);world=candidate;state=world.state;viewedYear=keepObservation?previousYear:null;expanded=false;input.value=String(state.seed);render();}
 async function restart(seed:number){
  if(busy)return;stop();setBusy(true);el('feedback').textContent='新しい土地を探しています。';
- try{const {createNewWorld}=await import('./story/new-world.js');const candidate=createNewWorld(seed);adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
+ try{const {createNewIrrigatedWorld:createNewWorld}=await import('./story/new-world.js');const candidate=createNewWorld(seed);adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
  catch{el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
  finally{setBusy(false);render();}
 }
+el('enable-irrigation').addEventListener('click',async()=>{
+ if(busy||world.mode!=='generated')return;stop();setBusy(true);el('feedback').textContent='水路の記録を準備しています。';await paintFeedback();try{adopt(enableWorldIrrigation(world),true);el('feedback').textContent='これまでの風景を保ち、これからの水路を記録します。「この歴史を保存」で変更を残せます。';}catch{el('feedback').textContent='水路の記録を始められませんでした。現在の歴史と保存はそのままです。';}finally{setBusy(false);render();}
+});
 el('slow-climate').addEventListener('click',()=>{
  if(busy||world.mode!=='generated'||!world.review.environment)return;stop();adopt(slowWorldClimate(world),true);el('feedback').textContent='これからの気候をゆったりした巡りにしました。過去の歴史と景観はそのままです。「この歴史を保存」で設定を残せます。';
 });
@@ -184,7 +191,7 @@ el('save').addEventListener('click',async()=>{
 });
 el('load').addEventListener('click',async()=>{
  if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を開いています。';
- try{const saved=await findWorldSave(key=>localStorage.getItem(key));if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
+ try{await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
   const candidate=restoreWorldSession(saved);adopt(candidate);el('feedback').textContent='保存された歴史を開きました。';
  }catch{el('feedback').textContent='この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
  finally{setBusy(false);render();}
@@ -197,13 +204,14 @@ const file=el('import-file') as HTMLInputElement;
 el('import').addEventListener('click',()=>{if(!busy)file.click();});
 file.addEventListener('change',async()=>{
  const selected=file.files?.[0];if(!selected||busy)return;stop();setBusy(true);
+ el('feedback').textContent='記録ファイルを開いています。';await paintFeedback();
  try{if(selected.size>16*1024*1024)throw Error('File too large');const candidate=restoreWorldSession(await decodeWorldSave(await selected.text()));adopt(candidate);el('feedback').textContent='記録ファイルを開きました。';}
  catch{el('feedback').textContent='この記録ファイルを開けませんでした。現在の歴史と保存値はそのままです。';}
  finally{file.value='';setBusy(false);render();}
 });
 input.value=String(state.seed);render();
 }
-const bootControls=['scene-motion','step','play','save','load','export','import','restart','random','improve-growth','improve-environment','slow-climate'];
+const bootControls=['scene-motion','step','play','save','load','export','import','restart','random','improve-growth','improve-environment','slow-climate','enable-irrigation'];
 let bootBusy=false;
 function startWorld(world:WorldSession){
  verifyWorldCandidate(world);
@@ -215,8 +223,8 @@ async function boot(){
  for(const id of bootControls)(el(id) as HTMLButtonElement).disabled=true;
  el('feedback').textContent='文明の記録を準備しています。';
  try{
-  const saved=await findWorldSave(key=>localStorage.getItem(key));
-  const world=saved?restoreWorldSession(saved):(await import('./story/new-world.js')).createNewWorld(randomSeed());
+  await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));
+  const world=saved?restoreWorldSession(saved):(await import('./story/new-world.js')).createNewIrrigatedWorld(randomSeed());
   startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
  }catch{
   el('feedback').textContent='記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
@@ -228,7 +236,7 @@ async function boot(){
    catch{el('feedback').textContent='文明を開けませんでした。保存値は保持しています。';for(const id of recovery)(el(id) as HTMLButtonElement).disabled=false;}
    finally{bootBusy=false;}
   };
-  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewWorld(seed));
+  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewIrrigatedWorld(seed));
   el('restart').onclick=()=>void fresh(Number((el('seed') as HTMLInputElement).value)||randomSeed());el('random').onclick=()=>void fresh(randomSeed());
   const file=el('import-file') as HTMLInputElement;el('import').onclick=()=>file.click();file.onchange=()=>{const f=file.files?.[0];if(!f)return;void recover(async()=>{if(f.size>16*1024*1024)throw Error('File too large');return restoreWorldSession(await decodeWorldSave(await f.text()));});file.value='';};
  }finally{bootBusy=false;}
