@@ -10,7 +10,7 @@ test('clearing, abandonment and fire restart local recovery without rewriting ea
  assert.deepEqual(vegetationAt(v,150,'river-bank'),vegetationAt(old,150,'river-bank'));assert.equal(vegetationAt(v,160,'river-bank')[0].stage,0);assert.equal(vegetationAt(v,228,'river-bank')[0].stage,2);assert.equal(vegetationAt(v,350,'river-bank')[0].stage,4);assert.equal(vegetationAt(v,380,'river-bank')[0].stage,0);assert.equal(vegetationAt(v,390,'river-bank')[1].stage,2,'the undisturbed adjacent patch keeps its history');
  assert.throws(()=>vegetationAt(v,501,'river-bank'));assert.throws(()=>vegetationAt(v,-1,'river-bank'));
 });
-const initial=createNewWorld(42).review;
+const initial=createNewWorld(42,'terrain-placement-v3',true).review;
 test('new vegetation does not consume civilization RNG or alter architecture, population or decisions',()=>{
  const plain=createNewWorld(42,'terrain-placement-v3').review,a=advanceGeneratedBridgeReview(initial,300,'automatic'),b=advanceGeneratedBridgeReview(plain,300,'automatic');assert.deepEqual(a.review.state,b.review.state);assert.deepEqual(a.review.placements,b.review.placements);assert.ok(a.vegetation.events.some(e=>e.kind==='clear'));assert.equal(b.vegetation,undefined);
 });

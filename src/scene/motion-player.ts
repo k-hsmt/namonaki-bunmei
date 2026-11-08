@@ -14,6 +14,7 @@ export class SceneMotionPlayer {
   try{this.preferred=localStorage.getItem(sceneMotionPreferenceKey)!=='off';}catch{}
   control.addEventListener('change',this.change);this.media.addEventListener('change',this.configure);document.addEventListener('visibilitychange',this.visibility);this.configure();
  }
+ get environment(){return this.observation?.ground.environment;}
  get paintedFrames(){return this.frames;}get preparations(){return this.builds;}get isRunning(){return this.raf!==null;}
  private change=()=>{this.preferred=this.control.checked;try{localStorage.setItem(sceneMotionPreferenceKey,this.preferred?'on':'off');}catch{}this.configure();};
  private visibility=()=>{this.stopClock();if(!document.hidden)this.configure();};

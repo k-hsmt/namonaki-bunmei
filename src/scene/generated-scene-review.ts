@@ -1,3 +1,4 @@
+import {environmentProjection,validateEnvironment,validateCoupledVegetation} from '../environment/history-v1.js';
 /** D4-A confirmed generated observation. No game-mode or storage activation. */
 import {vegetationAt,validateVegetationHistory} from '../vegetation/history-v1.js';
 import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
@@ -14,7 +15,9 @@ export function observeGeneratedSceneReview(input:GeneratedBridgeReview,year:num
  const review={...input.review,terrain:readOwnedTerrainRecord(input.review.terrain)};
  validateGeneratedBridgeLedger(review);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));
  const site=(['river-bank','hill-side','coast-inlet'] as const)[siteIndex]!,snapshot=snapshotAt(review.state,year,siteIndex,'generated-review-only');
- const ground:GeneratedSceneGround={...(input.vegetation?{vegetation:vegetationAt(validateVegetationHistory(input.vegetation,review),year,site)}:{}),terrain:review.terrain,site,primaryRoot:review.plans[site].primaryRoot,
+ if(!input.environment&&input.vegetation?.schemaVersion===2)throw Error('Missing environment');
+ const ecology=input.environment?(()=>{const v=validateCoupledVegetation(input.vegetation,review);return environmentProjection(validateEnvironment(input.environment,v,review),v,review,year,site);})():input.vegetation?{vegetation:vegetationAt(validateVegetationHistory(input.vegetation,review),year,site)}:{};
+ const ground:GeneratedSceneGround={...ecology,terrain:review.terrain,site,primaryRoot:review.plans[site].primaryRoot,
   facilities:review.placements.filter(p=>p.site===site&&p.builtYear<=year).map(p=>({id:p.objectId,purpose:p.kind,plot:p.plot})),
   bridges:site==='river-bank'?review.bridgeReview!.bridges.filter(b=>b.builtYear<=year).map(b=>b.geometry):[]};
  return {snapshot,ground,composition:composeGeneratedScene(snapshot,review.state.housing,ground)};
