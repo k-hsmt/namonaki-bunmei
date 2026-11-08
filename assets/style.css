@@ -20,3 +20,5 @@
 .scene-place { padding: .5rem .75rem; font-size: .85rem; }
 .scene-place p { margin: .25rem 0 0; }
 .scene-place p:empty { display: none; }
+
+.scene-motion-control{display:inline-flex;align-items:center;gap:.25rem;white-space:nowrap;font-size:.72rem}.scene-motion-control input{accent-color:#607b57;margin:0}

@@ -1,3 +1,4 @@
+import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave} from './story/world-storage.js';
 import {restoreWorldSession,saveWorldSession,improveWorldGrowth,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
@@ -13,6 +14,7 @@ const input=el('seed') as HTMLInputElement;
 const scrubber=el('rewind-year') as HTMLInputElement;
 const siteSelect=el('site-select') as HTMLSelectElement;
 const canvas=el('scene') as HTMLCanvasElement;
+const motion=new SceneMotionPlayer(canvas,el('scene-motion') as HTMLInputElement);
 const slot=el('choice');
 const speedInput=el('speed') as HTMLSelectElement;
 const autoChoiceInput=el('auto-choice') as HTMLInputElement;
@@ -77,7 +79,7 @@ function render(){
  const awaitingChoice=!viewingPast&&Boolean(state.pending);
  const historicalStats=viewingPast||awaitingChoice||estimating;
  const siteIndex=Number(siteSelect.value);
- const scene=drawWorldSession(canvas,world,y,siteIndex);
+ const scene=motion.show(world,y,siteIndex);
  const site=siteAt(state.observation?.sites,siteIndex,y);
  el('scene-place').hidden=!site;
  if(site&&scene.local){
@@ -191,7 +193,7 @@ file.addEventListener('change',async()=>{
 });
 input.value=String(state.seed);render();
 }
-const bootControls=['step','play','save','load','export','import','restart','random','improve-growth'];
+const bootControls=['scene-motion','step','play','save','load','export','import','restart','random','improve-growth'];
 let bootBusy=false;
 function startWorld(world:WorldSession){
  verifyWorldCandidate(world);

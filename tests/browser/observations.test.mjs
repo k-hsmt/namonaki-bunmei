@@ -32,7 +32,7 @@ test.after(async () => {
 });
 
 async function openSave(t, key, state) {
-  const page = await browser.newPage();
+  const page = await browser.newPage({reducedMotion:'reduce'});
   t.after(() => page.close());
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

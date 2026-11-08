@@ -1,0 +1,69 @@
+{
+  "source": "eec524e28e0eb16b9d6e6a05f97925b5537befab",
+  "description": "Raw 320x180 RGBA from the pre-animation renderer; not PNG container bytes. Same v3 placements and vegetation-v1.",
+  "cases": [
+    {
+      "seed": 42,
+      "vegetation": true,
+      "year": 0,
+      "site": 0,
+      "sha256": "e8cac147cd197d64527cb9f32042b3124cb93f0dd89ce39029e2f58486ba3bc1"
+    },
+    {
+      "seed": 42,
+      "vegetation": true,
+      "year": 0,
+      "site": 1,
+      "sha256": "c052ce8a76708247abb6496d06434660df44509b1b7294a53dd6540a2d05fc58"
+    },
+    {
+      "seed": 42,
+      "vegetation": true,
+      "year": 0,
+      "site": 2,
+      "sha256": "dce01640837ed93134437ff48da7a40c255adc2c433f041aa2e0dd2e9476538c"
+    },
+    {
+      "seed": 42,
+      "vegetation": true,
+      "year": 1000,
+      "site": 0,
+      "sha256": "9861b70d153f7a852b3350741d1eb44fb2c63c3c300cf7ed45df15d50f8e9a93"
+    },
+    {
+      "seed": 42,
+      "vegetation": true,
+      "year": 1000,
+      "site": 1,
+      "sha256": "3cfbda6f1f04c78e4d74e7954e1463e4c60a8db9f3eb05c7a1cc1ee964f21027"
+    },
+    {
+      "seed": 42,
+      "vegetation": true,
+      "year": 1000,
+      "site": 2,
+      "sha256": "120a127ea92521283dd481276c5baba670bc70c4b11d8d83b2e4787d97657aa1"
+    },
+    {
+      "seed": 1,
+      "vegetation": false,
+      "year": 300,
+      "site": 0,
+      "sha256": "9b5bf225c9481eda2066c5898bb07bd53faac7abf8eeb64cc61b5a88bd413ac9"
+    },
+    {
+      "seed": 1,
+      "vegetation": false,
+      "year": 300,
+      "site": 1,
+      "sha256": "665f760677670ba416d5e55d9bc4888765929f8e0382942a6189d3b7bea7228e"
+    },
+    {
+      "seed": 1,
+      "vegetation": false,
+      "year": 300,
+      "site": 2,
+      "sha256": "b37d8c8755eea17097d1178babe3ed669e9edcc5a8fe9bf16a130f3cf2bf5a77"
+    }
+  ]
+}

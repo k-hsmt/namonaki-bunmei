@@ -42,7 +42,7 @@ test('固定の住宅履歴から320×180pxの描画画像を再生成できる'
  try{
   await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
-  const page=await browser.newPage({viewport:{width:1000,height:700}});
+  const page=await browser.newPage({reducedMotion:'reduce',viewport:{width:1000,height:700}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:'+port);
   await mkdir('artifacts/h1-housing',{recursive:true});

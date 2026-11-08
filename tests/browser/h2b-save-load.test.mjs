@@ -17,7 +17,7 @@ test.before(async()=>{
 });
 test.after(async()=>{try{await browser?.close();}finally{server?.kill();}});
 const pageFor=async t=>{
- const page=await browser.newPage();t.after(()=>page.close());
+ const page=await browser.newPage({reducedMotion:'reduce'});t.after(()=>page.close());
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  t.after(()=>assert.deepEqual(errors,[]));
  await page.goto(origin);return page;
@@ -77,7 +77,7 @@ test('破損現行キーは旧キーを選ばず、表示中の文明と保存�
 });
 
 test('fresh starts choose a new random seed, while explicit seeds and saved worlds remain reproducible',async t=>{
- const page=await browser.newPage();t.after(()=>page.close());
+ const page=await browser.newPage({reducedMotion:'reduce'});t.after(()=>page.close());
  await page.addInitScript(()=>{Math.random=()=>{const n=Number(sessionStorage.getItem('test-seed-draws')??0);sessionStorage.setItem('test-seed-draws',String(n+1));return [0,2,5][n%3]/4294967295;};});
  const ready=()=>page.waitForFunction(()=>!document.getElementById('save').disabled);
  await page.goto(origin);await ready();assert.equal(await page.locator('#seed').inputValue(),'1');

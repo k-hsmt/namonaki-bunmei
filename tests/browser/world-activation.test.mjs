@@ -4,7 +4,7 @@ const original=createNewWorld(6),session=generatedSession(advanceGeneratedBridge
 test.before(async()=>{server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:'5307'},stdio:['ignore','pipe','inherit']});await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});});
 test.after(async()=>{await browser?.close();server?.kill();});
 async function pageFor(t,{corrupt=false,quota=false,block=false}={}){
- const page=await browser.newPage();t.after(()=>page.close());const errors=[];page.on('pageerror',e=>errors.push(e.message));t.after(()=>assert.deepEqual(errors,[]));
+ const page=await browser.newPage({reducedMotion:'reduce'});t.after(()=>page.close());const errors=[];page.on('pageerror',e=>errors.push(e.message));t.after(()=>assert.deepEqual(errors,[]));
  await page.addInitScript(({encoded,old,corrupt,quota})=>{const write=Storage.prototype.setItem;write.call(localStorage,'namonaki-story-v5',corrupt?'broken-v5':encoded);write.call(localStorage,'namonaki-story-v4',old);
   if(quota)Storage.prototype.setItem=function(key,value){if(key==='namonaki-story-v5')throw new DOMException('controlled quota','QuotaExceededError');return write.call(this,key,value);};
  },{encoded,old,corrupt,quota});
@@ -39,7 +39,7 @@ test('a corrupt cold-start v5 stops fallback and a valid file recovers without a
  assert.match(await p.locator('#year').textContent(),/2,000/);assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v5')),'broken-v5');assert.equal(await p.evaluate(()=>localStorage.getItem('namonaki-story-v4')),old);
 });
 test('saved organic v2 can opt into cross-river growth without moving the present or changing its saved history',async t=>{
- const oldSession=createNewWorld(42,'terrain-placement-v2'),oldSave=saveWorldSession(oldSession),oldWire=serializeWorldSave(oldSave),context=await browser.newContext(),p=await context.newPage();t.after(()=>context.close());
+ const oldSession=createNewWorld(42,'terrain-placement-v2'),oldSave=saveWorldSession(oldSession),oldWire=serializeWorldSave(oldSave),context=await browser.newContext({reducedMotion:'reduce'}),p=await context.newPage();t.after(()=>context.close());
  const errors=[];p.on('pageerror',e=>errors.push(e.message));
  await p.addInitScript(wire=>localStorage.setItem('namonaki-story-v5',wire),oldWire);await p.goto(origin);await feedback(p,'保存された歴史を開きました');const before=await png(p);
  await p.locator('#improve-growth').click();await feedback(p,'今後の建設');assert.equal(await png(p),before);assert.equal(await p.locator('#improve-growth').isVisible(),false);

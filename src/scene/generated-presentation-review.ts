@@ -13,6 +13,7 @@ export function generatedSceneWalkContext(o:GeneratedSceneObservation):GroundRev
    ...(s.publicSpaces??[]).map(p=>({id:p.id,plot:p.footprint,entrance:southEntrance(p.footprint)})),...g.bridges.flatMap(bridgeOccupancy)],
   crossings:g.bridges.filter(b=>s.objects.some(x=>x.id===b.bridgeId&&x.condition==='intact')).map(bridgeCrossing)};
 }
+export function presentationPeopleCount(population:number,epidemic:boolean):number {return population<=0?0:epidemic?1:Math.min(9,Math.max(1,2+Math.floor(Math.log2(Math.max(1,population)/1800))));}
 export function projectGeneratedPresentation(o:GeneratedSceneObservation){
  const {ground:g,snapshot:s,composition:c}=o,r=decodeRecordPhysics(g.terrain.sites[g.site].physics),ctx=generatedSceneWalkContext(o),windows=groundContextWindows(r,ctx),distance=groundDistances(windows,g.primaryRoot);
  const hash=(label:string,x:number,y:number,phase=0)=>terrainHash([label,g.terrain.source.seed,g.site,phase,x,y]);
@@ -35,7 +36,7 @@ export function projectGeneratedPresentation(o:GeneratedSceneObservation){
   let clear=true;for(let dy=0;dy<4;dy++)for(let dx=0;dx<10;dx++){const i=(y+dy)*320+x+dx;if(r.surface[i]!==1||r.bearing[i]!==0||r.grade[i]!>1)clear=false;}
   if(clear){cart=p;break;}
  }
- const count=c.population<=0?0:s.scars.includes('epidemic')?1:Math.min(9,Math.max(1,2+Math.floor(Math.log2(Math.max(1,c.population)/1800)))),people:RecordPoint[]=[];
+ const count=presentationPeopleCount(c.population,s.scars.includes('epidemic')),people:RecordPoint[]=[];
  for(const candidate of candidates){if(people.length>=count)break;
   const [x,y]=candidate.point;if(cart&&x<cart.x+cart.width&&x+2>cart.x&&y<cart.y+cart.depth&&y+2>cart.y)continue;
   if(people.every(p=>Math.abs(p[0]-x)+Math.abs(p[1]-y)>=6))people.push(candidate.point);}
