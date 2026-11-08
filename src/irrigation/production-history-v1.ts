@@ -70,3 +70,5 @@ export function projectProductionEnvironment(world:GeneratedBridgeReview,year:nu
  validateProductionWorld(world);const view=productionChannelAt(world,year,site),state=stateAt(world,year),source=sourceAt(world),system=view.geometry?{id:view.channel!.id,geometry:kernelGeometry(view.geometry)}:undefined,effects=irrigationEffects(system,view.channel,view.channel?.status==='active'?source.at(year):undefined);
  return environmentProjection(world.environment!,world.vegetation as CoupledVegetation,world.review,year,site,{state,moisture:effects.moisture,disturbances:world.irrigation!.events.filter(e=>e.year<=year&&(e.kind==='built'||e.kind==='backfilled')).flatMap(e=>world.irrigation!.systems.find(s=>s.id===e.systemId)!.geometry.cells.map(point=>({year:e.year,point})))});
 }
+
+export function productionEnvironmentStateAt(world:GeneratedBridgeReview,year:number):EnvironmentState {validateProductionWorld(world);if(!Number.isSafeInteger(year)||year<0||year>world.environment!.confirmedThrough)throw Error('Unconfirmed production environment');return stateAt(world,year);}

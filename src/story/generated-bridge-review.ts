@@ -1,3 +1,4 @@
+import type {EconomyObserver} from './economy-observer.js';
 import {validateProductionWorld} from '../irrigation/production-history-v1.js';
 import {advanceProductionEnvironment} from '../irrigation/production-progression-v1.js';
 import type {ProductionIrrigation} from '../irrigation/production-types-v1.js';
@@ -32,9 +33,9 @@ function finish(result:GeneratedBridgeReview):GeneratedBridgeReview {
 export function advanceGeneratedBridgeReview(input:GeneratedBridgeReview,years:number,choices:'stop'|'automatic'='stop',options:GeneratedAdvanceOptions={}):GeneratedBridgeReview {
  check(input);const result={...input,review:productionLand(input,advanceGeneratedFacilityReview(input.review,years,choices,generatedPublicSpaceExtension,options))};return finish(result);
 }
-export function chooseGeneratedBridgeReview(input:GeneratedBridgeReview,index:number):GeneratedBridgeReview {
- check(input);const result={...input,review:productionLand(input,chooseGeneratedFacilityReview(input.review,index,'manual',generatedPublicSpaceExtension))};return finish(result);
+export function chooseGeneratedBridgeReview(input:GeneratedBridgeReview,index:number,observeEconomy?:EconomyObserver):GeneratedBridgeReview {
+ check(input);const result={...input,review:productionLand(input,chooseGeneratedFacilityReview(input.review,index,'manual',generatedPublicSpaceExtension,observeEconomy))};return finish(result);
 }
-export function chooseAutomaticallyGeneratedBridgeReview(input:GeneratedBridgeReview):GeneratedBridgeReview {
- check(input);const result={...input,review:productionLand(input,chooseAutomaticallyGeneratedFacilityReview(input.review,generatedPublicSpaceExtension))};return finish(result);
+export function chooseAutomaticallyGeneratedBridgeReview(input:GeneratedBridgeReview,observeEconomy?:EconomyObserver):GeneratedBridgeReview {
+ check(input);const result={...input,review:productionLand(input,chooseAutomaticallyGeneratedFacilityReview(input.review,generatedPublicSpaceExtension,observeEconomy))};return finish(result);
 }

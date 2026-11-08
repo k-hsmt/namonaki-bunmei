@@ -1,3 +1,4 @@
+import {hash01} from '../engine/rng.js';
 import { regions, settlements } from './population.js';
 
 const places = [
@@ -42,13 +43,15 @@ export interface EconomyRecord {
   relatedIds?: string[];
 }
 
-interface AnnualConditions {
+export interface AnnualConditions {
   harvestFactors: number[];
   blockedRegions: ReadonlySet<string>;
   disruptionId?: string;
   granaries?: readonly boolean[];
 }
 
+export interface AnnualEconomyTotals {harvest:number[];imports:number[];traded:number[];discarded:number[];moves:{from:number;to:number;amount:number}[]}
+export function regionalHarvestFactors(year:number,seed:number,drought:number):number[]{return regions.map((_,i)=>Math.max(.30,.77+hash01(year,i,seed)*.48-Math.min(drought,.5)*.2));}
 export function createRegionalEconomy(): RegionalEconomy {
   return {
     districts: places.map(() => ({ reserve: 0, coverage: [], importShare: 0, shortageRecord: null, shortageYears: 0 })),
@@ -77,12 +80,14 @@ export function updateRegionalEconomy(
   conditions: AnnualConditions,
   record: (event: EconomyRecord) => string,
   legacyYear?: number,
-): void {
+): AnnualEconomyTotals {
+  const harvests:number[]=[];
   const population = people.slice(0, places.length);
   const balances = economy.districts.map((district, i) => {
     const place = places[i]!;
     const demand = population[i]!;
     const harvest = Math.floor(Math.min(demand, place.land) * place.yield * conditions.harvestFactors[i]!);
+    harvests.push(harvest);
     return district.reserve + harvest - demand;
   });
   const exportable = balances.map(balance => Math.floor(Math.max(0, balance) * .20));
@@ -217,9 +222,12 @@ export function updateRegionalEconomy(
       route.missedMaintenance = 0;
     }
   });
+  const discarded:number[]=[];
   economy.districts.forEach((district, i) => {
     district.reserve = Math.min(Math.max(0, balances[i]!), Math.floor(people[i]! * (conditions.granaries?.[i] ? .25 : .15)));
+    discarded.push(Math.max(0,balances[i]!-district.reserve));
   });
+  return {harvest:harvests,imports,traded,discarded,moves};
 }
 
 export function tradeYearsFor(economy: RegionalEconomy, regionId: string): number {

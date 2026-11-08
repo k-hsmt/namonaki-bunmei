@@ -1,3 +1,4 @@
+import {frozenEconomyCapture,type EconomyObserver} from './economy-observer.js';
 import {publicSpacesAt,overlapsPublicSpace,appendConfirmedPublicSpace,appendConfirmedPublicSpaceUse} from './public-space-history.js';
 import {proposePublicSpaceProgression} from './public-space-progression.js';
 import type {PublicSpaceHistory} from './public-space-history.js';
@@ -11,7 +12,7 @@ import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, type ObservationLedger } from './observations.js';
-import { createRegionalEconomy, tradeYearsFor, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
+import { createRegionalEconomy, regionalHarvestFactors, tradeYearsFor, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
 import { createSociety, practiceNames, updateSociety, type Society } from './society.js';
 import { createSettlementHistory, updateSettlements, siteAt } from './settlement-history.js';
 export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'森林の採集';
@@ -28,7 +29,7 @@ export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHis
  * Omitted by every existing game/legacy caller. Never inferred from a save version.
  */
 export interface ReviewLandProgression {
- readonly mode:'generated-review-only';
+ readonly mode:'generated-review-only';readonly observeEconomy?:EconomyObserver;
  placeFacility:(state:CivilizationState,siteIndex:number,candidate:Readonly<import('./settlement-history.js').Building>)=>
   {status:'clear';x:number;y:number}|{status:'hold'};
  afterFacilities:(state:CivilizationState)=>void;
@@ -74,15 +75,16 @@ function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
  if(s.year===ledger.legacy?.year)return; // A choice already pending in the old save.
  const floodYear=s.lastKind.flood??-Infinity;
  const flood=s.year-floodYear<3?s.history.find(event=>event.year===floodYear&&event.kind==='flood'):undefined;
- const harvestFactors=regions.map((_,i)=>{
-  const weather=hash01(s.year,i,s.seed);
-  return Math.max(.30,.77+weather*.48-Math.min(s.drought,.5)*.2);
- });
+ const harvestFactors=regionalHarvestFactors(s.year,s.seed,s.drought);
  s.economy??=createRegionalEconomy();
- updateRegionalEconomy(s.economy,ledger.people,s.year,{
+ const observer=land?.observeEconomy;if(observer!==undefined&&typeof observer!=='function')throw Error('Invalid economy observer');
+ const before=observer?structuredClone({economy:s.economy,people:ledger.people}):undefined,records:import('./economy-observer.js').EconomyCapture['records'][number][]=[];
+ const conditions={
   harvestFactors,blockedRegions:new Set(flood?['river']:[]),disruptionId:flood?.id,
   granaries:s.society?.sites.map(site=>site.practices.some(p=>p.kind==='granary'&&p.active)),
- },event=>entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds),ledger.legacy?.year);
+ };
+ const totals=updateRegionalEconomy(s.economy,ledger.people,s.year,conditions,event=>{const id=entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds);if(observer)records.push({id,event});return id;},ledger.legacy?.year);
+ if(observer)observer(frozenEconomyCapture({year:s.year,drought:s.drought,before:before!,conditions:{...conditions,blockedRegions:[...conditions.blockedRegions]},after:{economy:s.economy,people:ledger.people},records,totals}));
  const yearRecords:RecordEntry[]=[];
  for(let i=s.history.length-1;i>=0&&s.history[i]!.year===s.year;i--)yearRecords.push(s.history[i]!);
  const sources:Partial<Record<keyof typeof practiceNames,string>>={};
