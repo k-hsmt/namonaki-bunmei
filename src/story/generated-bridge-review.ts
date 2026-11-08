@@ -24,15 +24,17 @@ function check(input:GeneratedBridgeReview){
  if(input.irrigation){validateProductionWorld(input);}else if(input.environment){if(input.vegetation?.schemaVersion!==2)throw Error('Missing coupled vegetation');validateEnvironment(input.environment,validateCoupledVegetation(input.vegetation,input.review),input.review);}else if(input.vegetation)validateVegetationHistory(input.vegetation,input.review);
  validateGeneratedBridgeLedger(input.review);validateGeneratedPublicSpaceLedger(input.review,lastObservedYear(input.review.state));
 }
+/** Validated production inputs own immutable plans/hydrology; land advancement only appends bridges and placements. */
+function productionLand(input:GeneratedBridgeReview,next:GeneratedFacilityReview):GeneratedFacilityReview {return input.irrigation?{...next,plans:input.review.plans,bridgeReview:{...next.bridgeReview!,hydrology:input.review.bridgeReview!.hydrology}}:next;}
 function finish(result:GeneratedBridgeReview):GeneratedBridgeReview {
  const next=result.irrigation?advanceProductionEnvironment(result):result.environment?{...result,...advanceEnvironment(result.environment,result.vegetation as CoupledVegetation,result.review)}:result.vegetation?{...result,vegetation:syncVegetationHistory(result.vegetation as VegetationHistory,result.review)}:result;check(next);return next;
 }
 export function advanceGeneratedBridgeReview(input:GeneratedBridgeReview,years:number,choices:'stop'|'automatic'='stop',options:GeneratedAdvanceOptions={}):GeneratedBridgeReview {
- check(input);const result={...input,review:advanceGeneratedFacilityReview(input.review,years,choices,generatedPublicSpaceExtension,options)};return finish(result);
+ check(input);const result={...input,review:productionLand(input,advanceGeneratedFacilityReview(input.review,years,choices,generatedPublicSpaceExtension,options))};return finish(result);
 }
 export function chooseGeneratedBridgeReview(input:GeneratedBridgeReview,index:number):GeneratedBridgeReview {
- check(input);const result={...input,review:chooseGeneratedFacilityReview(input.review,index,'manual',generatedPublicSpaceExtension)};return finish(result);
+ check(input);const result={...input,review:productionLand(input,chooseGeneratedFacilityReview(input.review,index,'manual',generatedPublicSpaceExtension))};return finish(result);
 }
 export function chooseAutomaticallyGeneratedBridgeReview(input:GeneratedBridgeReview):GeneratedBridgeReview {
- check(input);const result={...input,review:chooseAutomaticallyGeneratedFacilityReview(input.review,generatedPublicSpaceExtension)};return finish(result);
+ check(input);const result={...input,review:productionLand(input,chooseAutomaticallyGeneratedFacilityReview(input.review,generatedPublicSpaceExtension))};return finish(result);
 }
