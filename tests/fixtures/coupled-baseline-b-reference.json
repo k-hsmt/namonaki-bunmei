@@ -1,0 +1,31 @@
+{
+  "sourceSHA": "9fe364bd5bb80127551ded67fa7163c26c75613d",
+  "scope": "Unmodified B v6 full canonical save, before extracting the annual driver.",
+  "cases": [
+    {
+      "seed": 1,
+      "years": 10000,
+      "saveHash": "1ba9737d527fb5fd3a2fad0e4305bdf130a9db86aee0be8cc96c8efcdc7bb53b"
+    },
+    {
+      "seed": 21,
+      "years": 10000,
+      "saveHash": "051c0aa2e3c59f490ca511bdd0e03b1db776d51a07e407537e6e7c98c0173970"
+    },
+    {
+      "seed": 29,
+      "years": 10000,
+      "saveHash": "184acd3019c9e898df0367da3f49e26d51a9c044d7af397ae776e286b9617936"
+    },
+    {
+      "seed": 42,
+      "years": 10000,
+      "saveHash": "094100aa3f5279661b73fa260cbba49f7b8e3c9fc44ec6a17c29c004d9de1f63"
+    },
+    {
+      "seed": 198,
+      "years": 10000,
+      "saveHash": "dfdadc202cc1b54d6f597bcb87eabbfb4787c8e63ca117798fdceb493e76d33a"
+    }
+  ]
+}
