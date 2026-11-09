@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, 'feat/issue31-*']
+    branches: [main, 'feat/issue31-*', 'feat/issue34-*']
 
 permissions:
   contents: read
@@ -683,4 +683,74 @@ jobs:
           name: environment34-irrigation-economy
           retention-days: 14
           path: artifacts/environment34-irrigation-economy/*
+          if-no-files-found: error
+
+  coupled-comparison:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Measure complete C2 branches with one warm-up and five isolated samples
+        run: node scripts/benchmark-coupled.mjs
+      - name: Compare twenty independent 10000-year histories and complete gzip continuation
+        run: node scripts/review-coupled.mjs
+      - name: Keep artificial economic inputs separate from natural histories
+        run: node scripts/review-coupled-fixtures.mjs
+      - name: Verify interactive graphs, recorded scenes, downloads and mobile layout
+        run: node scripts/check-coupled-review.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-comparison
+          retention-days: 14
+          path: |
+            artifacts/environment34-irrigation-coupled-comparison/*.json
+            artifacts/environment34-irrigation-coupled-comparison/*.html
+            artifacts/environment34-irrigation-coupled-comparison/*.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-seed1
+          retention-days: 14
+          path: artifacts/environment34-irrigation-coupled-comparison/seed1/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-seed21
+          retention-days: 14
+          path: artifacts/environment34-irrigation-coupled-comparison/seed21/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-seed29
+          retention-days: 14
+          path: artifacts/environment34-irrigation-coupled-comparison/seed29/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-seed42
+          retention-days: 14
+          path: artifacts/environment34-irrigation-coupled-comparison/seed42/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-seed198
+          retention-days: 14
+          path: artifacts/environment34-irrigation-coupled-comparison/seed198/**
           if-no-files-found: error
