@@ -1,3 +1,6 @@
+import type {EconomicProductionSave} from '../irrigation/economic-production-wire-v1.js';
+import {knownEconomicProductionPacketInternal} from '../irrigation/economic-production-owned-internal.js';
+import {validateEconomicProductionSave} from '../irrigation/economic-production-history-v1.js';
 import {assertProductionBoundary} from './trial-boundary.js';
 import {validateCoupledVegetation,validateEnvironment,type CoupledVegetation,type EnvironmentHistory} from '../environment/history-v1.js';
 import {validateProductionWorld,validateProductionWorldAsync,ownProductionWorld} from '../irrigation/production-history-v1.js';
@@ -9,6 +12,7 @@ import {migrateLegacySave,validateLegacySaveDraft,type LegacySaveDraft} from './
 import type {GeneratedBridgeReview} from './generated-bridge-review.js';
 import {wireObject,assertJsonWire} from './generated-state-review.js';
 import {groundReviewLimits} from '../terrain/ground-access-review.js';
+export const ECONOMIC_WORLD_SAVE_KEY='namonaki-story-v7';
 export const WORLD_SAVE_KEY='namonaki-story-v5';
 export const IRRIGATED_WORLD_SAVE_KEY='namonaki-story-v6';
 export const compactPlacementPolicy=Object.freeze({id:'terrain-placement-v1' as const,reservationMode:'field-only' as const,limits:groundReviewLimits});
@@ -18,8 +22,8 @@ export type GeneratedWorldSave=Omit<GeneratedSaveDraftReview,'format'|'status'|'
  readonly version:5|6;readonly format:'namonaki-world-save';readonly progressionPolicy:typeof productionPlacementPolicy|typeof organicPlacementPolicy|typeof compactPlacementPolicy;readonly rendererId:'generated-scene-v1'|'generated-scene-v2'|'generated-scene-v3'|'generated-scene-v4'|'generated-scene-v5'|'generated-scene-v6';readonly vegetation?:VegetationHistory|CoupledVegetation;readonly environment?:EnvironmentHistory;readonly irrigation?:ProductionIrrigation;readonly environmentAppearance?:'landscape-v2'|'landscape-v3';
 };
 export type LegacyWorldSave=Omit<LegacySaveDraft,'format'|'status'>&{readonly format:'namonaki-world-save'};
-export type WorldSave=GeneratedWorldSave|LegacyWorldSave;
-export function generatedWorld(save:WorldSave):save is GeneratedWorldSave{return save.initialTerrain.mode==='generated';}
+export type WorldSave=GeneratedWorldSave|LegacyWorldSave|EconomicProductionSave;
+export function generatedWorld(save:WorldSave):save is GeneratedWorldSave|EconomicProductionSave{return save.initialTerrain.mode==='generated';}
 function promoteGenerated(d:GeneratedSaveDraftReview):GeneratedWorldSave {
  const {format:_,status:__,progressionPolicy:___,rendererId:____,...payload}=d;
  return {...payload,format:'namonaki-world-save',progressionPolicy:d.progressionPolicy.id==='generated-land-review-v3'?productionPlacementPolicy:d.progressionPolicy.id==='generated-land-review-v2'?organicPlacementPolicy:compactPlacementPolicy,rendererId:'generated-scene-v1'};
@@ -32,7 +36,9 @@ function ownEnvironmentSave(save:GeneratedWorldSave,source:GeneratedBridgeReview
  const parts=structuredClone({...source.review,terrain:null,state:null}),template:GeneratedBridgeReview={...source,review:{...parts,terrain:source.review.terrain,state:save.state as GeneratedBridgeReview['review']['state']}};
  freezeVegetation(template);freezeVegetation(save);environmentSaves.set(save,template);return save;
 }
-export function validateWorldSave(raw:unknown):WorldSave {assertProductionBoundary(raw);
+export function validateWorldSave(raw:unknown):WorldSave {
+ if(raw&&typeof raw==='object'&&'version'in raw&&raw.version===7){if(knownEconomicProductionPacketInternal(raw))return raw as EconomicProductionSave;throw Error('External v7 saves require the asynchronous reader');}
+ assertProductionBoundary(raw);
  if(raw&&typeof raw==='object'&&environmentSaves.has(raw))return raw as GeneratedWorldSave;
  if(raw&&typeof raw==='object'&&'version' in raw&&raw.version===6){const c=productionCandidate(raw);return ownEnvironmentSave(c.save,validateProductionWorld(c.world));}
  const d=wireObject(raw,['format','version','schemaVersion','initialTerrain','progressionPolicy','state'],['rendererId','landHistory','origin','vegetation','environment']);
@@ -62,6 +68,7 @@ export function createGeneratedWorldSave(review:GeneratedBridgeReview):Generated
  if(review.review.reservationMode!=='field-only')throw Error('Unapproved production reservation mode');const base=promoteGenerated(createGeneratedSaveDraft(review));if(review.environment){const v=validateCoupledVegetation(review.vegetation,review.review);const e=validateEnvironment(review.environment,v,review.review);return ownEnvironmentSave({...base,rendererId:review.environmentAppearance==='landscape-v3'?'generated-scene-v5':review.environmentAppearance==='landscape-v2'?'generated-scene-v4':'generated-scene-v3',vegetation:v,environment:e},{...review,vegetation:v,environment:e});}return review.vegetation?{...base,rendererId:'generated-scene-v2',vegetation:validateVegetationHistory(review.vegetation,review.review)}:base;
 }
 export function restoreGeneratedWorld(save:GeneratedWorldSave):GeneratedBridgeReview {
+ assertProductionBoundary(save);
  const valid=validateWorldSave(save) as GeneratedWorldSave,cached=environmentSaves.get(valid);if(cached){const result={...cached,review:{...cached.review,state:structuredClone(cached.review.state)}};return result.irrigation?ownProductionWorld(result):result;}
  const {vegetation,environment,...payload}=valid;
  const restored=restoreGeneratedSaveDraft({...payload,format:'namonaki-generated-save-draft',status:'review-only',rendererId:'generated-scene-review-v1',progressionPolicy:{...valid.progressionPolicy,id:valid.progressionPolicy.id==='terrain-placement-v3'?'generated-land-review-v3':valid.progressionPolicy.id==='terrain-placement-v2'?'generated-land-review-v2':'generated-land-review-v1'}});
@@ -79,6 +86,7 @@ function productionCandidate(raw:unknown):{save:GeneratedWorldSave;world:Generat
 }
 export async function parseWorldSaveAsync(json:string):Promise<WorldSave>{
  if(typeof json!=='string'||new TextEncoder().encode(json).length>generatedDraftMaxBytes)throw Error('World save exceeds 16MiB');const raw:unknown=JSON.parse(json);
+ if(raw&&typeof raw==='object'&&'version'in raw&&raw.version===7)return validateEconomicProductionSave(raw);
  if(raw&&typeof raw==='object'&&'version' in raw&&raw.version===6){const candidate=productionCandidate(raw);await new Promise(resolve=>setTimeout(resolve,0));const world=await validateProductionWorldAsync(candidate.world);return ownEnvironmentSave(candidate.save,world);}return parseWorldSave(json);
 }
 export function migrateOldWorld(raw:unknown):LegacyWorldSave{return promoteLegacy(migrateLegacySave(raw));}
