@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict';import {mkdir,readFile,writeFile} from 'node:fs/promises';import {execFileSync} from 'node:child_process';import {chromium} from 'playwright';
+import {createNewIrrigatedWorld} from '../dist/story/new-world.js';import {createGeneratedWorldSave,restoreGeneratedWorld} from '../dist/story/world-save.js';import {advanceGeneratedBridgeReview} from '../dist/story/generated-bridge-review.js';
+import {createCoupledReview,advanceCoupledReview} from '../dist/irrigation/coupled-progression-v1.js';import {encodeCoupledReview,decodeCoupledReview,serializeCoupledReview} from '../dist/irrigation/coupled-storage-v1.js';import {coupledRows} from '../dist/irrigation/coupled-history-v1.js';import {economyPolicies} from '../dist/irrigation/economy-types-v1.js';
+import {updateRegionalEconomy,regionalHarvestFactors} from '../dist/story/regional-economy.js';import {regions} from '../dist/story/population.js';import {canonicalWire,reviewBaseHash} from '../dist/irrigation/wire-v1.js';
+import {coupledReviewServer} from './coupled-review-server.mjs';import {coupledCasePage,coupledIndexPage} from './coupled-review-page.mjs';
+const out='artifacts/environment34-irrigation-coupled-comparison',allSeeds=[1,21,29,42,198],arg=process.argv.indexOf('--seed'),seeds=arg<0?allSeeds:[Number(process.argv[arg+1])];assert.ok(seeds.every(s=>allSeeds.includes(s)));
+const sourceSHA=process.env.REVIEW_SOURCE_SHA??execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),reference=JSON.parse(await readFile('tests/fixtures/coupled-baseline-b-reference.json','utf8')),manifest={format:'coupled-natural-comparison-v1',sourceSHA,years:10000,policies:economyPolicies,seeds,scope:'Independent carried histories, automatic per branch. Synthetic inputs are separate. Production economics is unchanged.',cases:[]};
+await mkdir(out,{recursive:true});const server=await coupledReviewServer();let browser;
+function clean(value){if(Array.isArray(value))return value.map(clean);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>!/(recordids?|eventids?)$/i.test(k)).map(([k,v])=>[k,clean(v)]));return value;}
+function timeline(t,kind){const w=t.world,r=w.review,map=new Map(),add=(y,v)=>{const a=map.get(y)??[];a.push(canonicalWire(v));map.set(y,a);};
+ if(kind==='land'){
+  for(const p of r.placements)add(p.builtYear,{objectId:p.objectId,site:p.site,kind:p.kind,plot:p.plot,entrance:p.entrance});
+  for(const e of r.state.housing.events)add(e.year,{kind:'housing/'+e.kind,after:clean(e.after)});
+  for(const e of r.state.publicSpaces.events)add(e.year,{kind:'space/'+e.kind,after:clean(e.after)});
+  for(const [site,s]of r.state.observation.sites.entries()){for(const e of s.buildingChanges)add(e.year,{site,building:clean(e.building)});for(const e of s.changes)add(e.year,{site,view:e.view});}
+ }else if(kind==='water'){
+  for(const s of w.irrigation.systems)add(s.geometry.year,{id:s.id,geometry:clean(s.geometry)});
+  for(const e of w.irrigation.events)add(e.year,{kind:e.kind,systemId:e.systemId,status:e.after.status,lastMaintainedYear:e.after.lastMaintainedYear,abandonedYear:e.after.abandonedYear});
+ }else if(kind==='rng')for(const p of t.phases)add(p.year,{phase:p.phase,before:p.rngBefore,after:p.rngAfter,draws:p.draws});
+ else if(kind==='choice')for(const p of t.phases)if(p.choice)add(p.year,{phase:p.phase,...p.choice});
+ else {const records=new Map(r.state.history.map(e=>[e.id,e]));for(const e of r.state.history){if(kind==='disaster'&&!['flood','storm','earthquake','eruption','drought','famine','fire','disease'].includes(e.kind))continue;add(e.year,{year:e.year,tag:e.tag,kind:e.kind??null,title:e.title,body:e.body,buildingId:e.buildingId??null,publicSpaceId:e.publicSpaceId??null,causes:e.causes,related:(e.relatedIds??[]).map(id=>{const s=records.get(id);return s?{year:s.year,kind:s.kind??null,title:s.title,buildingId:s.buildingId??null}:id;})});}}
+ for(const [y,a]of map)map.set(y,a.sort().join('\n'));return map;
+}
+function firstTimeline(a,b,kind){const x=timeline(a,kind),y=timeline(b,kind);for(const year of [...new Set([...x.keys(),...y.keys()])].sort((a,b)=>a-b))if(x.get(year)!==y.get(year))return year;return null;}
+function series(t,rows){
+ const events=t.world.review.state.housing.events,water=t.world.irrigation.events,seen=new Set(),counts=[0,0,0],sites=['river-bank','hill-side','coast-inlet'];let h=0,waterCursor=0,channel=null;
+ const initial=t.world.review.state.observation.blocks[0].population;const result=[[0,0,0,0,0,0,0,1,1,1,...initial,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]];
+ for(const r of rows){while(h<events.length&&events[h].year<=r.year){const e=events[h++];if(e.kind==='built'&&!seen.has(e.blockId)){seen.add(e.blockId);counts[sites.indexOf(e.after.siteId)]++;}}
+  while(waterCursor<water.length&&water[waterCursor].year<=r.year)channel=water[waterCursor++].after;
+  result.push([r.year,...r.harvest,...r.reserve,...r.coverage,...r.people,...r.imports,...r.traded,r.moves.reduce((n,m)=>n+m.amount,0),...r.discarded,r.gainBp,r.costBp,r.effect.requestedCostBp,...counts,channel?.status==='active'?1:0]);
+ }return result;
+}
+function c1Series(t){let before=structuredClone(t.initialEconomy);const result=[[0,0,0,0]];for(const r of t.receipts){const values=[];for(const policy of economyPolicies){const economy=structuredClone(before),people=[...r.input[0]],f=regionalHarvestFactors(r.year,t.world.review.state.seed,r.input[1]),gain=['yield-only','combined'].includes(policy)?r.effect.gainBp:0,cost=['cost-only','combined'].includes(policy)?r.effect.costBp:0;f[0]*=1+(gain-cost)/10000;let n=0;const totals=updateRegionalEconomy(economy,people,r.year,{harvestFactors:f,blockedRegions:new Set(r.input[2]?['river']:[]),...(r.input[4]?{disruptionId:r.input[4]}:{}),...(r.input[3]>=0?{granaries:regions.map((_,i)=>!!(r.input[3]&(1<<i)))}:{})},()=>policy==='baseline'?r.input[5][n++]:`c1/${r.year}/${n++}`);values.push(totals.harvest[0]);if(policy==='baseline'){assert.deepEqual(totals.harvest,r.harvest);var next=economy;}}
+ result.push(values.map(v=>v-values[0]));before=next;}assert.deepEqual(before,t.world.review.state.economy);return result;}
+try{
+ browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});const page=await browser.newPage();await page.goto(server.url+'/capture');
+ for(const seed of seeds){
+  console.log(JSON.stringify({seed,phase:'four-complete-histories'}));const dir=out+'/seed'+seed;await mkdir(dir,{recursive:true});const save=createGeneratedWorldSave(createNewIrrigatedWorld(seed).review),b=advanceGeneratedBridgeReview(restoreGeneratedWorld(save),10000,'automatic');assert.equal(await reviewBaseHash(createGeneratedWorldSave(b)),reference.cases.find(c=>c.seed===seed).saveHash);
+  const trials=[],data={sourceSHA,seed,years:10000,originHash:null,policies:[],c1:null,first:[],snapshotYears:[]};
+  for(const policy of economyPolicies){
+   const init=await createCoupledReview(save,policy),t=advanceCoupledReview(init,10000),stored=await encodeCoupledReview(t),plain=await serializeCoupledReview(t);let start=performance.now();const loaded=await decodeCoupledReview(stored),coldReadMs=performance.now()-start;assert.equal(await serializeCoupledReview(loaded),plain);
+   const partial=await decodeCoupledReview(await encodeCoupledReview(advanceCoupledReview(init,9900))),continued=advanceCoupledReview(partial,100);assert.equal(await serializeCoupledReview(continued),plain);
+   assert.ok(Buffer.byteLength(plain)<=16*1024*1024&&Buffer.byteLength(stored)<=4*1024*1024);await writeFile(dir+'/'+policy+'.json',stored);if(data.originHash===null)data.originHash=t.originHash;assert.equal(t.originHash,data.originHash);
+   if(policy==='baseline'){const {trialBoundary,...review}=t.world.review;assert.deepEqual({...t.world,format:'generated-bridge-review',review},b);data.c1=c1Series(t);}
+   const rows=coupledRows(t),s=series(t,rows),last=s.at(-1),sum=rows.reduce((n,r)=>n+r.harvest[0],0),allHarvest=rows.reduce((n,r)=>n+r.harvest.reduce((a,b)=>a+b,0),0),totalMoves=rows.reduce((n,r)=>n+r.moves.reduce((a,m)=>a+m.amount,0),0),cityYears=t.world.review.state.observation.sites.map(s=>s.changes.find(c=>c.view.scale===3)?.year??null);
+   data.policies.push({policy,series:s,summary:{riverHarvest:sum,allHarvest,totalMoves,finalPeople:last.slice(10,14),finalReserve:last.slice(4,7),cityYears,systems:t.world.irrigation.systems.length,finalChannel:t.world.environment.current.channel?.status??'none',cappedCostYears:rows.filter(r=>r.effect.requestedCostBp>r.effect.costBp).length,zeroPopulationWorkYears:t.receipts.filter(r=>r.input[0][0]===0&&r.effect.workEventIds.length).length,unpricedTail:t.world.irrigation.events.filter(e=>e.year===10000&&['built','maintained','repaired','backfilled'].includes(e.kind)).map(e=>({kind:e.kind,effectYear:10001})),plainBytes:Buffer.byteLength(plain),storedBytes:Buffer.byteLength(stored),coldReadMs}});trials.push(t);
+  }
+  const base=trials[0];for(let i=1;i<trials.length;i++){
+   const t=trials[i],a=data.policies[0].series,c=data.policies[i].series,firstColumn=cols=>{for(let y=1;y<=10000;y++)if(cols.some(k=>a[y][k]!==c[y][k]))return y;return null;};
+   assert.deepEqual(t.world.environment.targets,base.world.environment.targets);data.first.push({policy:t.policy,harvest:firstColumn([1,2,3]),population:firstColumn([10,11,12]),land:firstTimeline(base,t,'land'),water:firstTimeline(base,t,'water'),chronicle:firstTimeline(base,t,'chronicle'),choice:firstTimeline(base,t,'choice'),rng:firstTimeline(base,t,'rng'),disaster:firstTimeline(base,t,'disaster'),globalPopulationExact:a.every((r,y)=>r.slice(10,14).reduce((a,b)=>a+b,0)===c[y].slice(10,14).reduce((a,b)=>a+b,0))});
+  }
+  const combined=data.first.find(r=>r.policy==='combined'),focus=combined.land??combined.population??combined.harvest,years=[...new Set([0,100,300,1000,2000,10000,...(focus===null?[]:[Math.max(0,focus-1),focus,Math.min(10000,focus+1)])])].sort((a,b)=>a-b);data.snapshotYears=years;
+  console.log(JSON.stringify({seed,phase:'recorded-scenes',years}));for(const policy of economyPolicies){
+   await page.evaluate(async url=>{const {decodeCoupledReview}=await import('/dist/irrigation/coupled-storage-v1.js');window.trial=await decodeCoupledReview(await (await fetch(url)).text());},server.url+'/'+dir+'/'+policy+'.json');
+   for(const year of years)for(let site=0;site<3;site++){
+    const png=await page.evaluate(async({year,site})=>{const {observeCoupledScene}=await import('/dist/scene/coupled-scene-v1.js'),{drawGeneratedSceneReview}=await import('/dist/scene/draw-generated-review.js');const c=document.getElementById('scene');drawGeneratedSceneReview(c,observeCoupledScene(window.trial,year,site));return c.toDataURL('image/png').split(',')[1];},{year,site});await writeFile(dir+`/${policy}-y${year}-s${site}.png`,Buffer.from(png,'base64'));
+   }
+  }
+  const totals=data.policies.map((p,i)=>({...p.summary,policy:p.policy,riverDelta:p.summary.riverHarvest-data.policies[0].summary.riverHarvest,allDelta:p.summary.allHarvest-data.policies[0].summary.allHarvest,c1RiverDelta:data.c1.reduce((n,r)=>n+r[i],0)}));manifest.cases.push({seed,originHash:data.originHash,first:data.first,totals,snapshotYears:years});
+  await writeFile(dir+'/data.json',JSON.stringify(data)+'\n');await writeFile(dir+'/index.html',coupledCasePage(data));await writeFile(dir+'/audit.json',JSON.stringify({sourceSHA,seed,originHash:data.originHash,baselineExact:true,coldExact:true,resumeExact:true,first:data.first,totals},null,2)+'\n');console.log(JSON.stringify({seed,first:data.first,totals}));
+ }
+ await writeFile(out+'/manifest.json',JSON.stringify(manifest,null,2)+'\n');await writeFile(out+'/index.html',coupledIndexPage(manifest));
+}finally{await browser?.close();await server.close();}
