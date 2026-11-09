@@ -1,3 +1,4 @@
+import {assertProductionBoundary} from './trial-boundary.js';
 /** D4-B v5 generated envelope proposal. No localStorage or game activation. */
 import type {CivilizationState} from './engine.js';
 import {lastObservedYear} from './engine.js';
@@ -101,7 +102,7 @@ export function validateGeneratedSaveDraft(raw:unknown):ValidatedGeneratedSaveDr
  reviewFromParts(terrain,hydrology,plans,policy.reservationMode as ReservationReviewMode,state,d.landHistory,policy.id==='generated-land-review-v3'?'organic-v3':policy.id==='generated-land-review-v2'?'organic-v2':undefined);
  return freeze({...d,initialTerrain:{schemaVersion:1,mode:'generated',record:terrain,hydrology,plans},state}) as unknown as ValidatedGeneratedSaveDraft;
 }
-export function createGeneratedSaveDraft(input:GeneratedBridgeReview):ValidatedGeneratedSaveDraft {
+export function createGeneratedSaveDraft(input:GeneratedBridgeReview):ValidatedGeneratedSaveDraft {assertProductionBoundary(input);
  if(input.format!=='generated-bridge-review'||input.status!=='review-only'||!input.review.bridgeReview)throw Error('Missing generated draft source');assertJsonWire(input.review);const r=structuredClone(input.review);
  if(r.growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(r.growthPattern))throw Error('Unknown growth pattern');
  const terrain=validateTerrainRecord(r.terrain),state=validateGeneratedState(r.state,terrain.source.seed),plans=validatePlans(r.plans,terrain),hydrology=validateRiverReaches(r.bridgeReview!.hydrology,terrain);

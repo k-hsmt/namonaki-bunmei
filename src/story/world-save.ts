@@ -1,3 +1,4 @@
+import {assertProductionBoundary} from './trial-boundary.js';
 import {validateCoupledVegetation,validateEnvironment,type CoupledVegetation,type EnvironmentHistory} from '../environment/history-v1.js';
 import {validateProductionWorld,validateProductionWorldAsync,ownProductionWorld} from '../irrigation/production-history-v1.js';
 import type {ProductionIrrigation} from '../irrigation/production-types-v1.js';
@@ -27,11 +28,11 @@ function promoteLegacy(d:LegacySaveDraft):LegacyWorldSave {const {format:_,statu
 // Only fully validated, deeply frozen environmental saves can reuse a restore template.
 // Each session receives a fresh mutable civilization; source worlds are never frozen here.
 const environmentSaves=new WeakMap<object,GeneratedBridgeReview>();
-function ownEnvironmentSave(save:GeneratedWorldSave,source:GeneratedBridgeReview):GeneratedWorldSave {
+function ownEnvironmentSave(save:GeneratedWorldSave,source:GeneratedBridgeReview):GeneratedWorldSave {assertProductionBoundary(source);
  const parts=structuredClone({...source.review,terrain:null,state:null}),template:GeneratedBridgeReview={...source,review:{...parts,terrain:source.review.terrain,state:save.state as GeneratedBridgeReview['review']['state']}};
  freezeVegetation(template);freezeVegetation(save);environmentSaves.set(save,template);return save;
 }
-export function validateWorldSave(raw:unknown):WorldSave {
+export function validateWorldSave(raw:unknown):WorldSave {assertProductionBoundary(raw);
  if(raw&&typeof raw==='object'&&environmentSaves.has(raw))return raw as GeneratedWorldSave;
  if(raw&&typeof raw==='object'&&'version' in raw&&raw.version===6){const c=productionCandidate(raw);return ownEnvironmentSave(c.save,validateProductionWorld(c.world));}
  const d=wireObject(raw,['format','version','schemaVersion','initialTerrain','progressionPolicy','state'],['rendererId','landHistory','origin','vegetation','environment']);
@@ -55,7 +56,7 @@ export function validateWorldSave(raw:unknown):WorldSave {
  }
  throw Error('Unknown world terrain mode');
 }
-export function createGeneratedWorldSave(review:GeneratedBridgeReview):GeneratedWorldSave {
+export function createGeneratedWorldSave(review:GeneratedBridgeReview):GeneratedWorldSave {assertProductionBoundary(review);
  if(review.irrigation){validateProductionWorld(review);const base=promoteGenerated(createGeneratedSaveDraft(review));return ownEnvironmentSave({...base,version:6,rendererId:'generated-scene-v6',vegetation:review.vegetation,environment:review.environment,irrigation:review.irrigation,...(review.environmentAppearance?{environmentAppearance:review.environmentAppearance}:{})},review);}
  if(review.environmentAppearance!==undefined&&(!['landscape-v2','landscape-v3'].includes(review.environmentAppearance)||!review.environment))throw Error('Invalid environment appearance');
  if(review.review.reservationMode!=='field-only')throw Error('Unapproved production reservation mode');const base=promoteGenerated(createGeneratedSaveDraft(review));if(review.environment){const v=validateCoupledVegetation(review.vegetation,review.review);const e=validateEnvironment(review.environment,v,review.review);return ownEnvironmentSave({...base,rendererId:review.environmentAppearance==='landscape-v3'?'generated-scene-v5':review.environmentAppearance==='landscape-v2'?'generated-scene-v4':'generated-scene-v3',vegetation:v,environment:e},{...review,vegetation:v,environment:e});}return review.vegetation?{...base,rendererId:'generated-scene-v2',vegetation:validateVegetationHistory(review.vegetation,review.review)}:base;

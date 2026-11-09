@@ -64,7 +64,9 @@ function runEnvironment(v:CoupledVegetation,r:GeneratedFacilityReview,uses:reado
  for(const e of v.events){if(e.year<from.year||e.year===from.year&&from.year!==0)continue;const a=disturbances.get(e.year)??[];a.push({site:e.site,indices:covered(e.plot)});disturbances.set(e.year,a);}
  if(from.year===0)for(const {site,indices}of disturbances.get(0)??[])for(const i of indices){const p=patches[site][i];if(p){p[0]=0;p[1]=0;}}
  const buffers=Object.fromEntries(vegetationSites.map(site=>[site,waterBuffers(r,site)])) as Record<RecordSite,readonly number[]>;let year=from.year,humidity=from.humidity,temperature=from.temperature,appended=from.year;
- return {append(nextUses:readonly LandUseEvent[],events:readonly VegetationEvent[]){
+ return {climate(){return {humidity,temperature};},patchAt(site:RecordSite,index:number):PatchState|null {
+  if(!Number.isSafeInteger(index)||index<0||index>=440)throw Error('Invalid current patch');const p=patches[site][index];return p?[...p] as unknown as PatchState:null;
+ },append(nextUses:readonly LandUseEvent[],events:readonly VegetationEvent[]){
   if(appended===year+1||useYears.has(year+1)||disturbances.has(year+1)||nextUses.some(e=>e.year!==year+1)||events.some(e=>e.year!==year+1))throw Error('Invalid annual environment delta');
   const changes=nextUses.map(e=>({e:{...e,plot:{...e.plot}},indices:covered(e.plot)})),disturbed=events.map(e=>({site:e.site,indices:covered(e.plot)}));
   if(changes.length)useYears.set(year+1,changes);if(disturbed.length)disturbances.set(year+1,disturbed);appended=year+1;
