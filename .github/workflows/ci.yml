@@ -63,7 +63,7 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
       - name: Capture D7-C natural public-space review
         run: node scripts/review-public-spaces.mjs
