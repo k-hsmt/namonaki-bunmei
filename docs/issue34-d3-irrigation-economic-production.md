@@ -178,3 +178,13 @@ v7の `economicCoupling.storageEncoding` は `economic-production-tuples-v1` と
 `tests/fixtures/economic-production-c2-reference.json` はPR #90のCIが生成した、変更前の5世界のcombined完全保存から固定したworld・receipt・phaseのhashである。world header・所有印・非永続診断・checkpoint参照だけを正規化する。新しい本番と変更後のC2が同じ共通コードを使うことだけで一致を主張しない。`audit-economic-production.mjs` で固定参照、全保存と9900年からのgzip再開、16MiB／4MiBを確認し、`benchmark-economic-production.mjs` でhashを含む保存準備とgzipまでの正式性能を測る。C3-1の検証結果は実装PRとCI artifactに記録し、C3全体・D3の完了とは数えない。
 
 C3-1の初回CIでは、新キーの不在を表していなかった旧テスト2件と、seed21/2000年の中立B比1.114が失敗した。旧テストはv7→v6→v5の発見順を明示し、破損時に停止する意味は維持した。凍結処理ではdescriptor表の一括複製を避け、kernelが自ら構築したdata recordだけを子まで凍結して再利用する。外部readerは引き続き完全な再帰処理を使い、浅いfreezeや値が変わるgetterを検査する。単独の1準備＋5回測定で同ケースの中立比は約0.980となった。基準は緩めず、最新CIで全ケースを再検証する。
+
+## 12. C3-2：通常session・明示導入・観測
+
+通常sessionはBとC3の所有rootを識別して進行・選択・過去観測へdispatchする。`prepareWorldSessionSave` がv7の非同期保存準備を行い、通常画面の保存/exportもこれをawaitする。v5/v6の同期保存は従来どおりである。`enableWorldEconomicCoupling` は確定したv6を入口とし、同じ本番ruleの再導入では変更しない。通常画面の導入はbusyと元sessionのidentity／操作番号を確認してから採用し、観測していた年と地区を維持する。pendingと10000年では導入を無効にして理由を表示する。
+
+C3の過去観測は共通の地形・水路・環境の記録投影と同じrendererを使う。C3専用の不変な中立viewをworldごとに再利用し、動く景観の準備でも同じ入口を使う。Bの所有cacheへは登録しない。
+
+既存の明示的な「環境の景観を詳しくする」「これからの気候をゆったりした巡りにする」も保持する。C3 readerでは本番に限り、導入元からlandscape-v3への明示的な景観更新と、旧気候からv2へ経済導入年より後の100年境界で切り替わる設定を許容し、全環境・経済の再生は引き続き照合する。景観更新は従来どおり描画の変更で、モデルの過去は変えない。気候の切替前のモデルも保つ。逆向きのrule変更・過去への切替は受理しない。C2は従来の固定rule・固定renderer比較のままである。
+
+この段階では新規の既定はv6を保持する。v7の明示導入・保存再開と、モバイル表示、容量不足、破損時の停止・明示import復旧、描画中の状態不変を検証する。新規既定切替と全自然比較によるD3の区切りはC3-3で行う。

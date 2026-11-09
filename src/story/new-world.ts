@@ -7,8 +7,8 @@ import {generateWorldPrototype} from '../terrain/world-prototype.js';
 import {captureTerrainRecord} from '../terrain/capture-terrain-record.js';
 import {captureRiverReaches} from '../terrain/river-reaches-review.js';
 import {createGeneratedBridgeReview} from './generated-bridge-review.js';
-import {generatedSession,observeWorldSession,type WorldSession} from './world-session.js';
-export function createNewWorld(seed:number,policy?:'terrain-placement-v1'|'terrain-placement-v2'|'terrain-placement-v3',vegetation=policy===undefined,environment=policy===undefined&&vegetation):WorldSession {
+import {generatedSession,observeWorldSession,type BaselineGeneratedSession} from './world-session.js';
+export function createNewWorld(seed:number,policy?:'terrain-placement-v1'|'terrain-placement-v2'|'terrain-placement-v3',vegetation=policy===undefined,environment=policy===undefined&&vegetation):BaselineGeneratedSession {
  if(!Number.isSafeInteger(seed)||seed<1||seed>0xffffffff)throw Error('Invalid world seed');
  policy??='terrain-placement-v3';
  if(!['terrain-placement-v1','terrain-placement-v2','terrain-placement-v3'].includes(policy))throw Error('Unknown new-world policy');
@@ -21,4 +21,4 @@ export function createNewWorld(seed:number,policy?:'terrain-placement-v1'|'terra
 }
 
 /** Current production default; createNewWorld remains the versioned D2 producer for comparison. */
-export function createNewIrrigatedWorld(seed:number):WorldSession {const world=createNewWorld(seed);if(world.mode!=='generated')throw Error('Generated world required');return generatedSession(introduceProductionIrrigation(world.review));}
+export function createNewIrrigatedWorld(seed:number):BaselineGeneratedSession {const world=createNewWorld(seed);if(world.mode!=='generated')throw Error('Generated world required');return generatedSession(introduceProductionIrrigation(world.review));}

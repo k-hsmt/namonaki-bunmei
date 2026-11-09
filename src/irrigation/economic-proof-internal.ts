@@ -54,9 +54,12 @@ function phaseProof(t:RecordedEconomicHistory,origin:GeneratedWorldSave){
 }
 export async function verifyRecordedEconomyInternal(t:RecordedEconomicHistory,origin:GeneratedWorldSave):Promise<void>{
  compare(t.initialEconomy,origin.state.economy??createRegionalEconomy(),'Coupled initial economy differs');
- for(const key of ['schemaVersion','ruleId','climateRule','climateStart','introducedYear','seed'] as const)compare(t.world.environment![key],origin.environment![key],'Coupled climate policy changed');
+ for(const key of ['schemaVersion','ruleId','introducedYear','seed'] as const)compare(t.world.environment![key],origin.environment![key],'Coupled climate policy changed');
+ const oldClimate=origin.environment!,nextClimate=t.world.environment!,production=t.choiceProtocol==='production-mixed-v1';
+ const climateUpgrade=production&&oldClimate.climateRule==='environment-coupled-v1'&&nextClimate.climateRule==='environment-coupled-v2'&&nat(nextClimate.climateStart)&&nextClimate.climateStart>t.introducedYear&&nextClimate.climateStart%100===0;
+ if(!climateUpgrade){compare(nextClimate.climateRule,oldClimate.climateRule,'Coupled climate policy changed');compare(nextClimate.climateStart,oldClimate.climateStart,'Coupled climate policy changed');}
  for(const key of ['schemaVersion','ruleId','introducedYear','preIntroductionRendererId'] as const)compare(t.world.irrigation![key],origin.irrigation![key],'Coupled water policy changed');
- compare(t.world.environmentAppearance,origin.environmentAppearance,'Coupled renderer policy changed');
+ if(!(production&&t.world.environmentAppearance==='landscape-v3'&&origin.environmentAppearance!=='landscape-v3'))compare(t.world.environmentAppearance,origin.environmentAppearance,'Coupled renderer policy changed');
  const {commitPhases,droughts}=phaseProof(t,origin),world=t.world,source=irrigationSourcesFromWorld(world),records=new Map(t.world.review.state.history.map(r=>[r.id,r])),populations=new Map<number,number[]>(),granaries=new Int8Array(t.confirmedThrough+1),floods=new Map<number,string>();
  for(const block of world.review.state.observation!.blocks){let p=[...block.population];populations.set(block.year,p);for(const [i,d]of block.changes.entries()){p=p.map((n,j)=>n+d[j]!);populations.set(block.year+i+1,p);}}
  for(const [index,s]of world.review.state.observation!.sites!.entries()){let n=0,active=false;for(let y=2;y<=t.confirmedThrough;y++){while(n<s.practiceChanges.length&&s.practiceChanges[n]!.year<=y-1){active=s.practiceChanges[n++]!.practices.some(p=>p.kind==='granary'&&p.active);}if(active)granaries[y]!|=1<<index;}}if(t.confirmedThrough>=1)granaries[1]=-1;

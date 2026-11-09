@@ -44,3 +44,8 @@ export function chooseEconomicProductionWorld(input:EconomicProductionWorld,inde
  known(input);if(!input.review.state.pending||binding!==undefined&&binding!==coupledChoiceBinding(input.review.state))throw Error('Missing or stale economic production choice');
  return progress(input,(batch,commit)=>batch.choose(index,commit));
 }
+
+/** Existing explicit appearance upgrade changes painting only, never economic receipts. */
+export function improveEconomicProductionEnvironment(input:EconomicProductionWorld):EconomicProductionWorld{known(input);return input.environmentAppearance==='landscape-v3'?input:own({...input,environmentAppearance:'landscape-v3'});}
+/** The recorded cutover is future-only, matching B's existing climate upgrade. */
+export function slowEconomicProductionClimate(input:EconomicProductionWorld):EconomicProductionWorld{known(input);const e=input.environment!;if(e.climateRule==='environment-coupled-v2')return input;return own({...input,environment:{...e,climateRule:'environment-coupled-v2',climateStart:(Math.floor(e.confirmedThrough/100)+1)*100}});}
