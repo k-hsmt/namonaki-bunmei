@@ -1,8 +1,8 @@
 /** Neutral annual ecology foundation. Still B, not an economic C2 trial/save. */
 import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
-import {createGeneratedFacilityBatch,createCoupledFacilityBatch} from '../story/generated-facility-batch-internal.js';
+import {createGeneratedFacilityBatch,createCoupledFacilityBatch,createEconomicProductionFacilityBatch} from '../story/generated-facility-batch-internal.js';
 import {coupledAnnualModifier,type CoupledAnnualModifier} from '../story/coupled-economy-policy-internal.js';
-import {coupledTrialBoundary} from '../story/trial-boundary.js';
+import {coupledTrialBoundary,economicProductionBoundary} from '../story/trial-boundary.js';
 import type {EconomyCapture} from '../story/economy-observer.js';
 import {economyEffectCalculator} from './economy-effect-core-v1.js';
 import type {EconomyEffect,EconomyPolicy} from './economy-types-v1.js';
@@ -25,16 +25,17 @@ import type {BaselinePhaseReceipt} from './coupled-baseline-audit-v1.js';
 export interface AnnualReceipt extends BaselinePhaseReceipt {readonly ecologyBefore:number;readonly ecologyAfter:number}
 export interface PreparedCoupledEffect {readonly effect:EconomyEffect;readonly modifier:CoupledAnnualModifier}
 export interface CoupledKernelHooks {
+ readonly mode?:'trial'|'production';
  readonly introducedYear:number;readonly policy:EconomyPolicy;readonly prepared:PreparedCoupledEffect|null;
  readonly capture:(capture:EconomyCapture,prepared:PreparedCoupledEffect)=>void;
  readonly checkpoint?:(year:number,review:GeneratedBridgeReview['review'],phaseCount:number)=>void;
 }
 
 export function runAnnualKernel(input:GeneratedBridgeReview,run:(batch:ReturnType<typeof createGeneratedFacilityBatch>,commit:(p:import('../story/generated-land-batch-internal.js').LandPhaseReceipt)=>void)=>void,options:GeneratedAdvanceOptions={},trial?:CoupledKernelHooks){
- if(trial){if(input.review.trialBoundary!==coupledTrialBoundary)throw Error('Missing annual trial boundary');}else validateProductionWorld(input);
+ if(trial?.mode==='production'){if(input.review.economicPolicyBoundary!==economicProductionBoundary||input.review.trialBoundary!==undefined||trial.policy!=='combined')throw Error('Missing annual production boundary');}else if(trial){if(input.review.trialBoundary!==coupledTrialBoundary)throw Error('Missing annual trial boundary');}else validateProductionWorld(input);
  validateGeneratedBridgeLedger(input.review);validateGeneratedPublicSpaceLedger(input.review,lastObservedYear(input.review.state));
  let prepare:()=>CoupledAnnualModifier=()=>{throw Error('Annual prefix not initialized');},prepared=trial?.prepared??null;
- const batch=trial?createCoupledFacilityBatch(input.review,generatedPublicSpaceExtension,()=>prepare(),capture=>{if(!prepared)throw Error('Missing prepared economy effect');trial.capture(capture,prepared);}):createGeneratedFacilityBatch(input.review,generatedPublicSpaceExtension,options.observeEconomy);
+ const batch=trial?(trial.mode==='production'?createEconomicProductionFacilityBatch:createCoupledFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture=>{if(!prepared)throw Error('Missing prepared economy effect');trial.capture(capture,prepared);}):createGeneratedFacilityBatch(input.review,generatedPublicSpaceExtension,options.observeEconomy);
  const world={...input,review:{...batch.review,plans:input.review.plans,bridgeReview:{...batch.review.bridgeReview!,hydrology:input.review.bridgeReview!.hydrology}}};
  const e=input.environment!,i=input.irrigation!,v=input.vegetation as CoupledVegetation;
  const cursor=annualLandSources(world.review),prefix=cursor.take(),index=incrementalIrrigationSources(world);index.append(prefix);

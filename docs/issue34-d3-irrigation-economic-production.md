@@ -166,3 +166,13 @@ C2との照合は全自動列と、質問・選択肢のbindingが一致する�
 C2は比較まで完了した。C3は本番化の採用案と実装・互換・景観受け入れが揃った時に完了を判断する。D3の区切りには、combinedと定数、既存世界の明示導入、機会費用近似・労働や債務の未モデル化、影響が小さい世界もあることを記録する。
 
 この区切りでD4を実装したり、issue #34全体を閉じたりしない。次のD4では恒久地形改変の別設計として、地形revision・占有・水理・橋・歩行・過去観測と変更前後の原子性を検討する。切り土や段々畑を景観の上塗りだけで追加しない。
+
+## 11. C3-1実装の区切り
+
+本番の所有rootとB/C2を分け、`introduceEconomicProduction`、`advanceEconomicProductionWorld`、`chooseEconomicProductionWorld` を追加する。元の年次kernelと独立した経済証拠の再生・origin prefix・tupleを中立部品へ抽出する。C2の公開writer/readerや所有cacheを本番化の入口として使わない。
+
+v7の `economicCoupling.storageEncoding` は `economic-production-tuples-v1` とする。receiptの15要素は `[systemId, status, wetCells, fieldCells, moisture, fieldCount, potentialGainBp, requestedCostBp, potentialCostBp, workEventIds, appliedGainBp, appliedCostBp, input, harvest, discarded]`。inputは `[people4, drought, blockedMask, granaryMask, disruptionId, issuedRecordIds]`。年は導入年と位置から復元する。phaseの12要素は `[kind, year, confirmedBefore, confirmedAfter, rngBefore, rngAfter, pending, draws, ecologyBefore, ecologyAfter, choiceIndex, choiceBinding]`、kindはstep=0・自動=1・手動=2とする。実際の経済checkpointとpreparedはfield名付きで保持する。読込は固定長・上限・全fieldを検証する。
+
+保存準備は `prepareEconomicProductionSave`、外部readerは `validateEconomicProductionSave`、検証済みpacketからの復元は `restoreEconomicProductionSave` とする。v7の外部読込・gzip・新キーへの保存は共通storageへ接続するが、通常sessionと導入UIはC3-2へ残す。C3-1時点では通常sessionによるv7採用を明示的に拒否し、v6の新規既定を保持する。
+
+`tests/fixtures/economic-production-c2-reference.json` はPR #90のCIが生成した、変更前の5世界のcombined完全保存から固定したworld・receipt・phaseのhashである。world header・所有印・非永続診断・checkpoint参照だけを正規化する。新しい本番と変更後のC2が同じ共通コードを使うことだけで一致を主張しない。`audit-economic-production.mjs` で固定参照、全保存と9900年からのgzip再開、16MiB／4MiBを確認し、`benchmark-economic-production.mjs` でhashを含む保存準備とgzipまでの正式性能を測る。C3-1の検証結果は実装PRとCI artifactに記録し、C3全体・D3の完了とは数えない。

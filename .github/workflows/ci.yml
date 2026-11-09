@@ -754,3 +754,32 @@ jobs:
           retention-days: 14
           path: artifacts/environment34-irrigation-coupled-comparison/seed198/**
           if-no-files-found: error
+
+  economic-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - name: Measure production economics including snapshot, hash and gzip
+        run: node scripts/benchmark-economic-production.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify five complete v7 histories against fixed pre-C3 C2 results
+        run: node scripts/audit-economic-production.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-economic-production
+          retention-days: 14
+          path: artifacts/environment34-irrigation-economic-production/**
+          if-no-files-found: error
