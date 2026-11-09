@@ -1,3 +1,5 @@
+import {introduceEconomicProduction} from '../irrigation/economic-production-progression-v1.js';
+import {economicProductionSession,type EconomicGeneratedSession} from './world-session.js';
 import {introduceProductionIrrigation} from '../irrigation/production-progression-v1.js';
 import {coupleVegetation,createEnvironment} from '../environment/progression-v1.js';
 /** This producer is loaded only when explicitly creating a new generated world. */
@@ -20,5 +22,10 @@ export function createNewWorld(seed:number,policy?:'terrain-placement-v1'|'terra
  for(let i=0;i<3;i++)observeWorldSession(session,0,i);return session;
 }
 
-/** Current production default; createNewWorld remains the versioned D2 producer for comparison. */
+/** Versioned B producer; retained for old saves, fixtures and independent comparisons. */
 export function createNewIrrigatedWorld(seed:number):BaselineGeneratedSession {const world=createNewWorld(seed);if(world.mode!=='generated')throw Error('Generated world required');return generatedSession(introduceProductionIrrigation(world.review));}
+
+/** Current default: generate the B origin once, then bind future economic effects at year zero. */
+export async function createNewEconomicWorld(seed:number):Promise<EconomicGeneratedSession>{
+ const source=createNewIrrigatedWorld(seed);return economicProductionSession(await introduceEconomicProduction(source.review));
+}

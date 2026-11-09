@@ -757,7 +757,7 @@ jobs:
 
   economic-production:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
         with:
@@ -768,6 +768,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
       - name: Measure production economics including snapshot, hash and gzip
         run: node scripts/benchmark-economic-production.mjs
         env:
@@ -776,10 +777,59 @@ jobs:
         run: node scripts/audit-economic-production.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Compare independent B and v7 years, native scenery and first divergences
+        run: node scripts/review-economic-production.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Measure cold read, observation, preparation and native frames on desktop and CPU4x
+        run: node scripts/benchmark-economic-observation.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify final comparison controls, mobile layout, complete downloads and offline pages
+        run: node scripts/check-economic-production-review.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: environment34-irrigation-economic-production
           retention-days: 14
-          path: artifacts/environment34-irrigation-economic-production/**
+          path: |
+            artifacts/environment34-irrigation-economic-production/*.json
+            artifacts/environment34-irrigation-economic-production/*.html
+            artifacts/environment34-irrigation-economic-production/*.png
+            artifacts/environment34-irrigation-economic-production/*.webm
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-economic-production-seed1
+          retention-days: 14
+          path: artifacts/environment34-irrigation-economic-production/seed1/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-economic-production-seed21
+          retention-days: 14
+          path: artifacts/environment34-irrigation-economic-production/seed21/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-economic-production-seed29
+          retention-days: 14
+          path: artifacts/environment34-irrigation-economic-production/seed29/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-economic-production-seed42
+          retention-days: 14
+          path: artifacts/environment34-irrigation-economic-production/seed42/**
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-economic-production-seed198
+          retention-days: 14
+          path: artifacts/environment34-irrigation-economic-production/seed198/**
           if-no-files-found: error
