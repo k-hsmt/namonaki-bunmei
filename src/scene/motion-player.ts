@@ -1,7 +1,7 @@
 /** Wall-clock paint only. The world, its RNG and its persisted history are read-only. */
 import type {WorldSession} from '../story/world-session.js';
-import {drawWorldSession} from '../story/world-session.js';
-import {observeGeneratedSceneReview,type GeneratedSceneObservation} from './generated-scene-review.js';
+import {drawWorldSession,observeGeneratedWorldSession} from '../story/world-session.js';
+import {type GeneratedSceneObservation} from './generated-scene-review.js';
 import {drawGeneratedSceneReview} from './draw-generated-review.js';
 import {prepareSceneMotion,drawSceneMotion,sceneMotionVisualKey,type PreparedSceneMotion} from './motion-frame.js';
 import type {SiteSnapshot} from './model.js';
@@ -36,7 +36,7 @@ export class SceneMotionPlayer {
  show(world:WorldSession,year:number,site:number):SiteSnapshot {
   if(this.disposed)throw Error('Disposed scene player');if(this.world===world&&this.year===year&&this.site===site)return this.snapshot!;
   if(world.mode==='generated'){
-   const observation=observeGeneratedSceneReview(world.review,year,site),key=sceneMotionVisualKey(observation);
+   const observation=observeGeneratedWorldSession(world,year,site),key=sceneMotionVisualKey(observation);
    if(this.terrain!==observation.ground.terrain||this.visualKey!==key){this.stopClock();this.prepared=null;}
    this.terrain=observation.ground.terrain;this.visualKey=key;this.observation=observation;this.snapshot=observation.snapshot;
   }else{this.stopClock();this.prepared=null;this.visualKey=null;this.terrain=null;this.observation=null;this.snapshot=drawWorldSession(this.canvas,world,year,site);}

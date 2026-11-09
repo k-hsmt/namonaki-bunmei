@@ -2,7 +2,7 @@ import {environmentLabel} from './environment/presentation-v1.js';
 import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave} from './story/world-storage.js';
-import {restoreWorldSession,saveWorldSession,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
+import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
 import {serializeWorldSave} from './story/world-save.js';
 import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
@@ -27,6 +27,7 @@ const speedDelays:Record<string,number>={slow:2100,normal:850,fast:250,rapid:75}
 let world=initial;
 let state=world.state;
 let busy=false;
+let operation=0;
 let active:RecordEntry=state.history[0]!;
 let timer:ReturnType<typeof setInterval>|null=null;
 let expanded=false;
@@ -69,6 +70,10 @@ function format(v:number){return new Intl.NumberFormat('ja-JP').format(Math.roun
 function label(v:number,good:string,bad:string){return v>=55?good:v>=30?'揺らいでいる':bad;}
 function inspect(year:number,record?:RecordEntry){stop();viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
 function render(){
+ const economicButton=el('enable-economic') as HTMLButtonElement,economicNote=el('economic-note');
+ const economicEligible=world.mode==='generated'&&world.review.format==='generated-bridge-review'&&Boolean(world.review.irrigation)&&world.review.review.growthPattern==='organic-v3';
+ economicButton.hidden=!economicEligible;economicButton.disabled=busy||Boolean(state.pending)||lastObservedYear(state)>=10000;
+ economicNote.hidden=!economicEligible||(!state.pending&&lastObservedYear(state)<10000);economicNote.textContent=lastObservedYear(state)>=10000?'この文明は観測上限に達しています。':'現在の選択を終えると導入できます。';
  const irrigationButton=el('enable-irrigation') as HTMLButtonElement;irrigationButton.hidden=world.mode!=='generated'||!world.review.environment||world.review.review.growthPattern!=='organic-v3'||Boolean(world.review.irrigation);irrigationButton.disabled=busy;
  const environmentButton=el('improve-environment') as HTMLButtonElement;environmentButton.hidden=world.mode!=='generated'||!world.review.environment||world.review.environmentAppearance==='landscape-v3';environmentButton.disabled=busy;
  const climateButton=el('slow-climate') as HTMLButtonElement;climateButton.hidden=world.mode!=='generated'||!world.review.environment||(world.review.environment.ruleId==='environment-coupled-v2'||world.review.environment.climateRule==='environment-coupled-v2');climateButton.disabled=busy;
@@ -158,7 +163,7 @@ el('play').addEventListener('click',()=>{if(busy)return;if(viewedYear!==null){vi
 el('return-now').addEventListener('click',()=>{viewedYear=null;render();});
 scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===state.year?null:y;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
-function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation'])(el(id) as HTMLButtonElement).disabled=value;}
+function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic'])(el(id) as HTMLButtonElement).disabled=value;}
 function adopt(candidate:WorldSession,keepObservation=false){const previousYear=viewedYear;verifyWorldCandidate(candidate);world=candidate;state=world.state;viewedYear=keepObservation?previousYear:null;expanded=false;input.value=String(state.seed);render();}
 async function restart(seed:number){
  if(busy)return;stop();setBusy(true);el('feedback').textContent='新しい土地を探しています。';
@@ -168,6 +173,12 @@ async function restart(seed:number){
 }
 el('enable-irrigation').addEventListener('click',async()=>{
  if(busy||world.mode!=='generated')return;stop();setBusy(true);el('feedback').textContent='水路の記録を準備しています。';await paintFeedback();try{adopt(enableWorldIrrigation(world),true);el('feedback').textContent='これまでの風景を保ち、これからの水路を記録します。「この歴史を保存」で変更を残せます。';}catch{el('feedback').textContent='水路の記録を始められませんでした。現在の歴史と保存はそのままです。';}finally{setBusy(false);render();}
+});
+el('enable-economic').addEventListener('click',async()=>{
+ if(busy||world.mode!=='generated'||state.pending)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='水路と暮らしの記録を準備しています。';
+ try{await paintFeedback();const candidate=await enableWorldEconomicCoupling(source);if(ticket!==operation||world!==source)return;adopt(candidate,true);el('feedback').textContent='これからの収穫と維持の負担に、水路の状態を反映します。過去の歴史は変わりません。「この歴史を保存」で変更を残せます。';}
+ catch{if(ticket===operation)el('feedback').textContent='水路を暮らしに反映できませんでした。現在の歴史と保存はそのままです。';}
+ finally{if(ticket===operation){setBusy(false);render();}}
 });
 el('slow-climate').addEventListener('click',()=>{
  if(busy||world.mode!=='generated'||!world.review.environment)return;stop();adopt(slowWorldClimate(world),true);el('feedback').textContent='これからの気候をゆったりした巡りにしました。過去の歴史と景観はそのままです。「この歴史を保存」で設定を残せます。';
@@ -183,7 +194,7 @@ el('random').addEventListener('click',()=>void restart(Math.floor(Math.random()*
 function download(json:string){const blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`namonaki-${state.seed}-${state.year}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 el('save').addEventListener('click',async()=>{
  if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を保存しています。';
- try{const result=await storeWorldSave(localStorage,saveWorldSession(world));
+ try{const result=await storeWorldSave(localStorage,await prepareWorldSessionSave(world));
   if(result.status==='saved')el('feedback').textContent='この文明の歴史をブラウザに保存しました。';
   else{el('feedback').textContent='ブラウザに保存できませんでした。現在の歴史と以前の保存は保持しています。JSONを書き出して保存できます。';}
  }catch{el('feedback').textContent='保存できませんでした。現在の歴史と以前の保存はそのままです。';}
@@ -196,8 +207,8 @@ el('load').addEventListener('click',async()=>{
  }catch{el('feedback').textContent='この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
  finally{setBusy(false);render();}
 });
-el('export').addEventListener('click',()=>{
- if(busy)return;stop();setBusy(true);try{download(serializeWorldSave(saveWorldSession(world)));el('feedback').textContent='歴史のJSONを書き出しました。';}
+el('export').addEventListener('click',async()=>{
+ if(busy)return;stop();setBusy(true);try{download(serializeWorldSave(await prepareWorldSessionSave(world)));el('feedback').textContent='歴史のJSONを書き出しました。';}
  catch{el('feedback').textContent='歴史を書き出せませんでした。現在の歴史はそのままです。';}finally{setBusy(false);render();}
 });
 const file=el('import-file') as HTMLInputElement;
@@ -211,7 +222,7 @@ file.addEventListener('change',async()=>{
 });
 input.value=String(state.seed);render();
 }
-const bootControls=['scene-motion','step','play','save','load','export','import','restart','random','improve-growth','improve-environment','slow-climate','enable-irrigation'];
+const bootControls=['scene-motion','step','play','save','load','export','import','restart','random','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic'];
 let bootBusy=false;
 function startWorld(world:WorldSession){
  verifyWorldCandidate(world);
