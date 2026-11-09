@@ -1,0 +1,436 @@
+{
+  "sourceSHA": "f88671605d16b418fa56a6e4d3a1cf540aec2537",
+  "description": "Pre-workspace BFS ordered paths and exact shared-budget receipts",
+  "cases": [
+    {
+      "edges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        []
+      ],
+      "limit": 0,
+      "paths": [],
+      "budget": {
+        "used": 0,
+        "limit": 0,
+        "exhausted": true
+      }
+    },
+    {
+      "edges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        []
+      ],
+      "limit": 1,
+      "paths": [],
+      "budget": {
+        "used": 1,
+        "limit": 1,
+        "exhausted": true
+      }
+    },
+    {
+      "edges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        []
+      ],
+      "limit": 6,
+      "paths": [
+        [
+          0,
+          1,
+          3,
+          5
+        ]
+      ],
+      "budget": {
+        "used": 6,
+        "limit": 6,
+        "exhausted": true
+      }
+    },
+    {
+      "edges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        []
+      ],
+      "limit": 20,
+      "paths": [
+        [
+          0,
+          1,
+          3,
+          5
+        ]
+      ],
+      "budget": {
+        "used": 20,
+        "limit": 20,
+        "exhausted": true
+      }
+    },
+    {
+      "edges": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          1,
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        []
+      ],
+      "limit": 1000,
+      "paths": [
+        [
+          0,
+          1,
+          3,
+          5
+        ],
+        [
+          0,
+          2,
+          3,
+          5
+        ],
+        [
+          0,
+          2,
+          4,
+          5
+        ],
+        [
+          0,
+          1,
+          2,
+          3,
+          5
+        ],
+        [
+          0,
+          1,
+          2,
+          4,
+          5
+        ],
+        [
+          0,
+          1,
+          3,
+          4,
+          5
+        ],
+        [
+          0,
+          2,
+          1,
+          3,
+          5
+        ],
+        [
+          0,
+          2,
+          3,
+          4,
+          5
+        ],
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        [
+          0,
+          2,
+          1,
+          3,
+          4,
+          5
+        ]
+      ],
+      "budget": {
+        "used": 83,
+        "limit": 1000,
+        "exhausted": false
+      }
+    },
+    {
+      "edges": [
+        []
+      ],
+      "limit": 0,
+      "paths": [],
+      "budget": {
+        "used": 0,
+        "limit": 0,
+        "exhausted": true
+      }
+    },
+    {
+      "edges": [
+        []
+      ],
+      "limit": 1,
+      "paths": [
+        [
+          0
+        ]
+      ],
+      "budget": {
+        "used": 1,
+        "limit": 1,
+        "exhausted": false
+      }
+    },
+    {
+      "edges": [
+        []
+      ],
+      "limit": 6,
+      "paths": [
+        [
+          0
+        ]
+      ],
+      "budget": {
+        "used": 1,
+        "limit": 6,
+        "exhausted": false
+      }
+    },
+    {
+      "edges": [
+        []
+      ],
+      "limit": 20,
+      "paths": [
+        [
+          0
+        ]
+      ],
+      "budget": {
+        "used": 1,
+        "limit": 20,
+        "exhausted": false
+      }
+    },
+    {
+      "edges": [
+        []
+      ],
+      "limit": 1000,
+      "paths": [
+        [
+          0
+        ]
+      ],
+      "budget": {
+        "used": 1,
+        "limit": 1000,
+        "exhausted": false
+      }
+    },
+    {
+      "edges": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          1
+        ],
+        []
+      ],
+      "limit": 0,
+      "paths": [],
+      "budget": {
+        "used": 0,
+        "limit": 0,
+        "exhausted": true
+      }
+    },
+    {
+      "edges": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          1
+        ],
+        []
+      ],
+      "limit": 1,
+      "paths": [],
+      "budget": {
+        "used": 1,
+        "limit": 1,
+        "exhausted": true
+      }
+    },
+    {
+      "edges": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          1
+        ],
+        []
+      ],
+      "limit": 6,
+      "paths": [],
+      "budget": {
+        "used": 3,
+        "limit": 6,
+        "exhausted": false
+      }
+    },
+    {
+      "edges": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          1
+        ],
+        []
+      ],
+      "limit": 20,
+      "paths": [],
+      "budget": {
+        "used": 3,
+        "limit": 20,
+        "exhausted": false
+      }
+    },
+    {
+      "edges": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          1
+        ],
+        []
+      ],
+      "limit": 1000,
+      "paths": [],
+      "budget": {
+        "used": 3,
+        "limit": 1000,
+        "exhausted": false
+      }
+    }
+  ]
+}

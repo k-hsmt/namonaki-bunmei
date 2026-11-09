@@ -2,6 +2,8 @@ import {proposeBridgeGeometry,bridgeCrossing,bridgeOccupancy} from '../dist/terr
 import test from 'node:test';import assert from 'node:assert/strict';
 import {proposeIrrigation,validateIrrigationGeometry,irrigationLimits} from '../dist/irrigation/geometry-v1.js';
 import {shortestSimpleRoutes} from '../dist/irrigation/route-search-v1.js';
+import {readFile} from 'node:fs/promises';
+
 import {fixture,plot,land} from './helpers/irrigation-fixture.mjs';
 import {decodeRecordPhysics} from '../dist/terrain/terrain-record-raster-v1.js';
 const at=p=>p[1]*320+p[0];
@@ -63,3 +65,12 @@ test('a stored canal cannot acquire additional river contacts along its conveyan
  for(const p of result.geometry.cells){if(first.has(at(p)))continue;for(const delta of [-320,-1,1,320])assert.notEqual(r.surface[at(p)+delta],2);}
 });
 test('static reuse never conceals changed occupation or mutable river ownership',()=>{const ctx=fixture(),first=proposeIrrigation(ctx);assert.equal(first.status,'proposed');ctx.ground.reservations=[{id:'new-wall',plot:plot(142,96,8,84)}];assert.equal(proposeIrrigation(ctx).reason,'occupied');ctx.ground.reservations=[];assert.deepEqual(proposeIrrigation(ctx).geometry,first.geometry);const mutable=structuredClone(ctx.hydrology);Object.freeze(mutable);const c={...ctx,hydrology:mutable};assert.equal(proposeIrrigation(c).status,'proposed');mutable.reaches[0].streamId='invented';assert.throws(()=>proposeIrrigation(c));});
+
+test('reused search scratch preserves pre-fix paths and budgets, including interleaved generators',async()=>{
+ const {cases}=JSON.parse(await readFile('tests/fixtures/irrigation-route-reference.json','utf8'));
+ const compare=(a,b)=>{if(a.length!==b.length)return a.length-b.length;for(let i=0;i<a.length;i++)if(a[i]!==b[i])return a[i]-b[i];return 0;};
+ for(const c of cases){const graph={size:c.edges.length,source:0,sink:c.edges.length-1,neighbors:n=>c.edges[n]},budget={used:0,limit:c.limit,exhausted:false};assert.deepEqual([...shortestSimpleRoutes(graph,budget,compare)],c.paths);assert.deepEqual(budget,c.budget);}
+ const c=cases.find(c=>c.edges.length===6&&c.limit===1000),graph={size:6,source:0,sink:5,neighbors:n=>c.edges[n]},budgets=[0,1].map(()=>({used:0,limit:1000,exhausted:false})),iterators=budgets.map(b=>shortestSimpleRoutes(graph,b,compare)),paths=[[],[]];let active=true;
+ while(active){active=false;for(let i=0;i<2;i++){const next=iterators[i].next();if(!next.done){active=true;paths[i].push(next.value);}}}
+ for(let i=0;i<2;i++){assert.deepEqual(paths[i],c.paths);assert.deepEqual(budgets[i],c.budget);}
+});
