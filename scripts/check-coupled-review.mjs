@@ -25,7 +25,7 @@ try {
     await page.waitForFunction(()=>[...document.querySelectorAll('.scene')].every(i=>i.complete&&i.naturalWidth===320));
    }
   }
-  for(const metric of ['harvest','reserve','coverage','people','total','imports','trade','moves','discarded','housing','water']){
+  for(const metric of ['harvest','reserve','coverage','people','total','imports','trade','moves','discarded','housing','water','unlocated','scale','delivery','requested','cost']){
    await page.locator('#metric').selectOption(metric);
    assert.doesNotMatch(await page.locator('#values').innerText(),/NaN|undefined/);
   }
@@ -44,6 +44,6 @@ try {
  await page.waitForFunction(()=>document.documentElement.dataset.ready==='true');
  await page.waitForFunction(()=>[...document.querySelectorAll('.scene')].every(i=>i.complete&&i.naturalWidth===320));
  assert.deepEqual(errors,[]);
- await writeFile(out+'/browser-check.json',JSON.stringify({seeds:manifest.seeds,passed:true,checks:['four branches','three sites','six fixed scene years','eleven metrics','year window','4x zoom','twenty download links','mobile width','offline file page','no page errors']},null,2));
+ await writeFile(out+'/browser-check.json',JSON.stringify({seeds:manifest.seeds,passed:true,checks:['four branches','three sites','six fixed scene years','sixteen metrics','year window','4x zoom','twenty download links','mobile width','offline file page','no page errors']},null,2));
  console.log('C2 comparison controls, recorded scenery, downloads, mobile layout and offline pages passed.');
 } finally {await browser?.close();await server.close();}
