@@ -1,3 +1,6 @@
+import type {ChannelState,ChannelSystem,ChannelEvent} from './review-types-v1.js';
+import type {PatchState} from '../environment/model-v1.js';
+export type RecordedPrefixObserver=(year:number,prefix:{channel:ChannelState|null;systems:readonly ChannelSystem[];events:readonly ChannelEvent[];humidity:number;patchAt:(index:number)=>PatchState|null})=>void;
 import {assertProductionBoundary} from '../story/trial-boundary.js';
 /** Production reader and deterministic replay. No writer, proposal search or climate generator. */
 import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
@@ -21,24 +24,26 @@ function sourceAt(world:GeneratedBridgeReview){let source=sources.get(world);if(
 const plainState=(s:EnvironmentState):EnvironmentState=>{const {channel:_,...state}=s;return state;};
 const emptyEffects=():IrrigationPatchEffects=>({moisture:Array(440).fill(0),occupiedPatches:[],disturbedPatches:[]});
 /** Generator lets cold-load verification yield between years without weakening replay. */
-export function* replayProduction(world:GeneratedBridgeReview,decide:NewChannelDecision,previous?:{irrigation:ProductionIrrigation;environment:EnvironmentHistory}):Generator<void,{irrigation:ProductionIrrigation;environment:EnvironmentHistory}> {
+export function* replayProduction(world:GeneratedBridgeReview,decide:NewChannelDecision,previous?:{irrigation:ProductionIrrigation;environment:EnvironmentHistory},observe?:RecordedPrefixObserver):Generator<void,{irrigation:ProductionIrrigation;environment:EnvironmentHistory}> {
  const input=world.irrigation!,e=world.environment!,v=world.vegetation as CoupledVegetation,source=irrigationSourcesFromWorld(world),start=previous?.environment.current;
  const lifecycle=channelLifecycle(source,{systems:(previous?.irrigation.systems??[]).map(s=>({...s,geometry:kernelGeometry(s.geometry)})),events:previous?.irrigation.events??[],attempts:previous?.irrigation.attempts??[],channel:start?.channel??null},[],decide);
  const checkpoints=previous?[...previous.environment.checkpoints]:[];let state:EnvironmentState;
  if(start)state=plainState(start);
  else {const prefix=environmentRunner(v,world.review,e.uses,initialEnvironment(v));state=prefix.snapshot();checkpoints.push({...state,channel:null});for(let y=1;y<=input.introducedYear;y++){prefix.step(e.targets[Math.floor(y/100)]!,climateRule(e)==='environment-coupled-v2'&&y>=e.climateStart!);if(y%100===0||y===input.introducedYear){state=prefix.snapshot();checkpoints.push({...state,channel:null});}yield;}}
  let effects=emptyEffects(),cached=effects,key='';const runner=irrigationEnvironmentRunner(v,world.review,e.uses,state,()=>effects);
+ observe?.(state.year,{channel:lifecycle.channel,systems:lifecycle.systems,events:[],humidity:runner.climate().humidity,patchAt:i=>runner.patchAt('river-bank',i)});
  for(let year=state.year+1;year<=e.confirmedThrough;year++){
   const next=lifecycle.step(year),nextKey=[next.channel?.id,next.channel?.status,next.channel?.status==='active'?source.keyAt(year):0].join('/');
   if(key!==nextKey){cached=irrigationEffects(next.system,next.channel,next.channel?.status==='active'?next.frame:undefined);key=nextKey;}
   effects={...cached,disturbedPatches:[...new Set(next.events.filter(ev=>ev.kind==='built'||ev.kind==='backfilled').flatMap(ev=>channelPatches(lifecycle.systems.find(s=>s.id===ev.systemId)!)))].sort((a,b)=>a-b)};
   runner.step(e.targets[Math.floor(year/100)]!,climateRule(e)==='environment-coupled-v2'&&year>=e.climateStart!);
-  if((year-input.introducedYear)%100===0)checkpoints.push({...runner.snapshot(),channel:next.channel});yield;
+  if((year-input.introducedYear)%100===0)checkpoints.push({...runner.snapshot(),channel:next.channel});
+  observe?.(year,{channel:next.channel,systems:lifecycle.systems,events:next.events,humidity:runner.climate().humidity,patchAt:i=>runner.patchAt('river-bank',i)});yield;
  }
  const current={...runner.snapshot(),channel:lifecycle.channel};
  return {irrigation:{...input,confirmedThrough:e.confirmedThrough,systems:lifecycle.systems.map(s=>({...s,geometry:productionGeometry(s.geometry)})),events:lifecycle.events,attempts:lifecycle.attempts},environment:{...e,checkpoints,current}};
 }
-function* verification(world:GeneratedBridgeReview):Generator<void,GeneratedBridgeReview> {
+export function* verifyRecordedEnvironmentInternal(world:GeneratedBridgeReview,observe?:RecordedPrefixObserver):Generator<void,void> {
  const end=lastObservedYear(world.review.state),i=wireObject(world.irrigation,['schemaVersion','ruleId','introducedYear','confirmedThrough','preIntroductionRendererId','systems','events','attempts']),e=wireObject(world.environment,['schemaVersion','ruleId','climateRule','introducedYear','confirmedThrough','seed','targets','uses','checkpoints','current'],['climateStart']);
  if(i.schemaVersion!==1||i.ruleId!=='irrigation-production-v1'||!Number.isSafeInteger(i.introducedYear)||Number(i.introducedYear)<0||Number(i.introducedYear)>end||i.confirmedThrough!==end||end>10000||!['generated-scene-v3','generated-scene-v4','generated-scene-v5'].includes(i.preIntroductionRendererId as string)||world.review.growthPattern!=='organic-v3')throw Error('Invalid production irrigation boundary');
  if(e.schemaVersion!==2||e.ruleId!=='environment-irrigated-v1'||!['environment-coupled-v1','environment-coupled-v2'].includes(e.climateRule as string)||e.introducedYear!==0||e.confirmedThrough!==end||e.seed!==world.review.state.seed||world.vegetation?.schemaVersion!==2||world.vegetation.confirmedThrough!==end)throw Error('Invalid integrated environment');
@@ -49,10 +54,10 @@ function* verification(world:GeneratedBridgeReview):Generator<void,GeneratedBrid
  if(!sameWire(e.uses,landUseEvents(world.review)))throw Error('Integrated land use differs');
  const systems=world.irrigation!.systems,ids=new Set<string>();for(const s of systems){wireObject(s,['id','geometry']);if(typeof s.id!=='string'||ids.has(s.id))throw Error('Duplicate production system');ids.add(s.id);const g=wireObject(s.geometry,['schemaVersion','ruleId','waterContract','site','source','year','causeRecordId','field','intake','path','cells']);if(g.ruleId!=='irrigation-geometry-v1')throw Error('Unknown production geometry');}
  const receipts=new Map(world.irrigation!.attempts.map(a=>{checkAttempt(a);return [a.recordId,a] as const;}));if(receipts.size!==world.irrigation!.attempts.length)throw Error('Duplicate production receipt');
- const replay=yield* replayProduction(world,ctx=>{const a=receipts.get(ctx.cause.recordId);if(!a||a.year!==ctx.ground.year||!a.metrics)throw Error('Missing production decision');if(a.outcome==='built'){const s=systems.find(s=>s.id===a.systemId);if(!s||a.reason!==null||a.metrics.candidates<1||a.metrics.accessChecks<1||a.metrics.fields<1)throw Error('Invalid production construction');return {status:'proposed',geometry:validateIrrigationGeometry(kernelGeometry(s.geometry),ctx),metrics:a.metrics,diagnostics:a.diagnostics};}if(a.outcome!=='hold'||a.systemId!==null||!a.reason||a.reason==='awaiting-backfill')throw Error('Invalid production hold');return {status:'hold',reason:a.reason,metrics:a.metrics,diagnostics:a.diagnostics};});
+ const replay=yield* replayProduction(world,ctx=>{const a=receipts.get(ctx.cause.recordId);if(!a||a.year!==ctx.ground.year||!a.metrics)throw Error('Missing production decision');if(a.outcome==='built'){const s=systems.find(s=>s.id===a.systemId);if(!s||a.reason!==null||a.metrics.candidates<1||a.metrics.accessChecks<1||a.metrics.fields<1)throw Error('Invalid production construction');return {status:'proposed',geometry:validateIrrigationGeometry(kernelGeometry(s.geometry),ctx),metrics:a.metrics,diagnostics:a.diagnostics};}if(a.outcome!=='hold'||a.systemId!==null||!a.reason||a.reason==='awaiting-backfill')throw Error('Invalid production hold');return {status:'hold',reason:a.reason,metrics:a.metrics,diagnostics:a.diagnostics};},undefined,observe);
  if(!sameWire(replay.irrigation,world.irrigation)||!sameWire(replay.environment,world.environment))throw Error('Production history differs from replay');
- return ownProductionWorld(world);
-}
+ }
+function* verification(world:GeneratedBridgeReview):Generator<void,GeneratedBridgeReview>{yield* verifyRecordedEnvironmentInternal(world);return ownProductionWorld(world);}
 export function validateProductionWorld(world:GeneratedBridgeReview):GeneratedBridgeReview {assertProductionBoundary(world);if(owned.has(world))return world;const task=verification(world);for(;;){const r=task.next();if(r.done)return r.value;}}
 export async function validateProductionWorldAsync(world:GeneratedBridgeReview):Promise<GeneratedBridgeReview>{assertProductionBoundary(world);if(owned.has(world))return world;const task=verification(world);let mark=performance.now();for(;;){const r=task.next();if(r.done)return r.value;if(performance.now()-mark>=8){await new Promise(resolve=>setTimeout(resolve,0));mark=performance.now();}}}
 export function productionChannelAt(world:GeneratedBridgeReview,year:number,site:RecordSite='river-bank'):ChannelView {
@@ -60,16 +65,20 @@ export function productionChannelAt(world:GeneratedBridgeReview,year:number,site
  const introduced=year>i.introducedYear,channel=site==='river-bank'&&introduced?channelStateAt(i.events,year):null,geometry=channel&&channel.status!=='retired'?i.systems.find(s=>s.id===channel.id)!.geometry:null;
  return {introduced,channel,geometry,key:JSON.stringify([introduced,site,channel?.id,channel?.status,geometry?.year])};
 }
-function stateAt(world:GeneratedBridgeReview,year:number):EnvironmentState {
- const e=world.environment!,cache=past.get(world)??new Map<number,EnvironmentState>();past.set(world,cache);if(year===e.confirmedThrough)return e.current;const old=cache.get(year);if(old)return old;
+function stateAt(world:GeneratedBridgeReview,year:number,forceReplay=false):EnvironmentState {
+ const e=world.environment!,cache=past.get(world)??new Map<number,EnvironmentState>();past.set(world,cache);if(year===e.confirmedThrough&&!forceReplay)return e.current;const old=cache.get(year);if(old)return old;
  let lo=0,hi=e.checkpoints.length;while(lo+1<hi){const m=(lo+hi)>>1;if(e.checkpoints[m]!.year<=year)lo=m;else hi=m;}const checkpoint=e.checkpoints[lo]!;if(checkpoint.year===year)return checkpoint;
  let effectKey='',cachedEffects=emptyEffects();const source=sourceAt(world),i=world.irrigation!,systems=i.systems.map(s=>({...s,geometry:kernelGeometry(s.geometry)})),effectsAt=(y:number)=>{const c=channelStateAt(i.events,y),s=systems.find(s=>s.id===c?.id),key=[c?.id,c?.status,c?.status==='active'?source.keyAt(y):0].join('/');if(key!==effectKey){cachedEffects=irrigationEffects(s,c,c?.status==='active'?source.at(y):undefined);effectKey=key;}return {...cachedEffects,disturbedPatches:[...new Set(i.events.filter(ev=>ev.year===y&&(ev.kind==='built'||ev.kind==='backfilled')).flatMap(ev=>channelPatches(systems.find(s=>s.id===ev.systemId)!)))].sort((a,b)=>a-b)};};
  const runner=irrigationEnvironmentRunner(world.vegetation as CoupledVegetation,world.review,e.uses,plainState(checkpoint),effectsAt);for(let y=checkpoint.year+1;y<=year;y++)runner.step(e.targets[Math.floor(y/100)]!,climateRule(e)==='environment-coupled-v2'&&y>=e.climateStart!);
  const state=freezeReview(runner.snapshot());if(cache.size>=16)cache.delete(cache.keys().next().value!);cache.set(year,state);return state;
 }
-export function projectProductionEnvironment(world:GeneratedBridgeReview,year:number,site:RecordSite){
- validateProductionWorld(world);const view=productionChannelAt(world,year,site),state=stateAt(world,year),source=sourceAt(world),system=view.geometry?{id:view.channel!.id,geometry:kernelGeometry(view.geometry)}:undefined,effects=irrigationEffects(system,view.channel,view.channel?.status==='active'?source.at(year):undefined);
+export function projectProductionEnvironment(world:GeneratedBridgeReview,year:number,site:RecordSite){validateProductionWorld(world);return projectRecordedEnvironmentInternal(world,year,site);}
+export function projectRecordedEnvironmentInternal(world:GeneratedBridgeReview,year:number,site:RecordSite){
+ const view=productionChannelAt(world,year,site),state=stateAt(world,year),source=sourceAt(world),system=view.geometry?{id:view.channel!.id,geometry:kernelGeometry(view.geometry)}:undefined,effects=irrigationEffects(system,view.channel,view.channel?.status==='active'?source.at(year):undefined);
  return environmentProjection(world.environment!,world.vegetation as CoupledVegetation,world.review,year,site,{state,moisture:effects.moisture,disturbances:world.irrigation!.events.filter(e=>e.year<=year&&(e.kind==='built'||e.kind==='backfilled')).flatMap(e=>world.irrigation!.systems.find(s=>s.id===e.systemId)!.geometry.cells.map(point=>({year:e.year,point})))});
 }
 
 export function productionEnvironmentStateAt(world:GeneratedBridgeReview,year:number):EnvironmentState {validateProductionWorld(world);if(!Number.isSafeInteger(year)||year<0||year>world.environment!.confirmedThrough)throw Error('Unconfirmed production environment');return stateAt(world,year);}
+
+/** Internal neutral read. Caller validates the exact tagged root before exposing observations. */
+export function recordedEnvironmentStateInternal(world:GeneratedBridgeReview,year:number,forceReplay=false):EnvironmentState{return stateAt(world,year,forceReplay);}

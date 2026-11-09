@@ -12,12 +12,8 @@ export interface BaselinePhaseReceipt extends LandPhaseReceipt {readonly draws:n
  * limit is 64 draws; an automatic choice always consumes exactly one.
  * This is not a counter for arbitrary streams or multiple full RNG cycles.
  */
-export function boundedRngDraws(before:number,after:number,limit:number):number {
- if(!Number.isInteger(before)||before<0||before>0xffffffff||!Number.isInteger(after)||after<0||after>0xffffffff||!Number.isSafeInteger(limit)||limit<0||limit>4096)throw Error('Invalid bounded RNG phase');
- const draws=Math.imul((after-before)>>>0,0xdc58aa5d)>>>0;
- if(draws>limit)throw Error('RNG phase exceeds diagnostic kernel bound');
- return draws;
-}
+export {boundedRngDraws} from '../story/rng-phase-diagnostics.js';
+import {boundedRngDraws} from '../story/rng-phase-diagnostics.js';
 
 /** Shares B's clone-once land driver and existing batch ecology finalizer.
  * Ecology is still replayed at batch end here: this audit does not yet supply
