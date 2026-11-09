@@ -19,3 +19,8 @@ test('saving before first construction and after backfill preserves split advanc
  const {advanceIrrigationReview}=await import('../dist/irrigation/progression-v1.js'),{encodeIrrigationReview,decodeIrrigationReview}=await import('../dist/irrigation/storage-v1.js'),initial=await createIrrigationReview(createNewWorld(42).review,0),whole=await advanceIrrigationReview(initial,700);
  for(const year of [574,675]){const part=await advanceIrrigationReview(initial,year),loaded=await decodeIrrigationReview(await encodeIrrigationReview(part));assert.deepEqual(await advanceIrrigationReview(loaded,700-year),whole,'split '+year);}
 });
+
+test('recursive freeze never caches an accessor graph whose returned child can change',async()=>{
+ const{freezeReview}=await import('../dist/irrigation/wire-v1.js');let child={value:1};const root={get child(){return child;}};
+ freezeReview(root);assert.ok(Object.isFrozen(child));child={value:2};freezeReview(root);assert.ok(Object.isFrozen(child));assert.throws(()=>child.value=3);
+});
