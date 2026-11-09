@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {chromium} from 'playwright';
-import {createNewIrrigatedWorld as createNewWorld} from '../../dist/story/new-world.js';
-import {saveWorldSession} from '../../dist/story/world-session.js';
+import {createNewEconomicWorld as createNewWorld} from '../../dist/story/new-world.js';
+import {prepareWorldSessionSave} from '../../dist/story/world-session.js';
 import {decodeWorldSave} from '../../dist/story/world-storage.js';
 import {createCivilization,step,chooseAutomatically} from '../../dist/story/engine.js';
 const port=process.env.H2B_TEST_PORT??'5198',origin='http://127.0.0.1:'+port;
-const KEY='namonaki-story-v6',OLD='namonaki-story-v3';
+const KEY='namonaki-story-v7',BASELINE_KEY='namonaki-story-v6',OLD='namonaki-story-v3';
 let server,browser;
 test.before(async()=>{
  server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:port},stdio:['ignore','pipe','inherit']});
@@ -22,13 +22,13 @@ const pageFor=async t=>{
  t.after(()=>assert.deepEqual(errors,[]));
  await page.goto(origin);return page;
 };
-test('新規ゲームは生成v6とknownの住宅記録を保存し、再読込でも同一',async t=>{
+test('新規ゲームは生成v7とknownの住宅記録を保存し、再読込でも同一',async t=>{
  const page=await pageFor(t);
  await page.locator('#save').click();
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
  const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));
- assert.equal(saved.version,6);assert.equal(saved.initialTerrain.mode,'generated');
- assert.deepEqual(saved,saveWorldSession(createNewWorld(Number(await page.locator('#seed').inputValue()))),'browser and Node produce the same complete seeded world');
+ assert.equal(saved.version,7);assert.equal(saved.initialTerrain.mode,'generated');
+ assert.deepEqual(saved,await prepareWorldSessionSave(await createNewWorld(Number(await page.locator('#seed').inputValue()))),'browser and Node produce the same complete seeded world');
  assert.deepEqual(saved.state.housing,{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
  const pixels=await page.locator('#scene').evaluate(e=>e.toDataURL());
  await page.reload();
@@ -51,7 +51,7 @@ test('旧v3読み込みは元キー不変、明示保存して初めてlegacy-fi
  assert.equal(await page.evaluate(k=>localStorage.getItem(k),KEY),null);
  await page.locator('#save').click();
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
- const envelope=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));assert.equal(envelope.initialTerrain.mode,'legacy-fixed');const migrated=envelope.state;
+ const envelope=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),BASELINE_KEY));assert.equal(envelope.initialTerrain.mode,'legacy-fixed');const migrated=envelope.state;
  assert.equal(migrated.version,4);
  assert.equal(migrated.housing.legacyUntracked,true);
  assert.equal(migrated.housing.introducedYear,old.observation.lastYear+1);
@@ -85,7 +85,7 @@ test('fresh starts choose a new random seed, while explicit seeds and saved worl
  await page.locator('#random').click();await ready();assert.equal(await page.locator('#seed').inputValue(),'6');
  await page.locator('#seed').fill('42');await page.locator('#restart').click();await ready();assert.equal(await page.locator('#seed').inputValue(),'42','the explicitly labelled same-seed restart stays available');
  await page.locator('#save').click();await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
- const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));assert.deepEqual(saved,saveWorldSession(createNewWorld(42)));
+ const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));assert.deepEqual(saved,await prepareWorldSessionSave(await createNewWorld(42)));
  await page.reload();await ready();assert.equal(await page.locator('#seed').inputValue(),'42','a saved history takes priority over random creation');
  assert.deepEqual(await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY)),saved);
 });

@@ -166,10 +166,10 @@ el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
 function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic'])(el(id) as HTMLButtonElement).disabled=value;}
 function adopt(candidate:WorldSession,keepObservation=false){const previousYear=viewedYear;verifyWorldCandidate(candidate);world=candidate;state=world.state;viewedYear=keepObservation?previousYear:null;expanded=false;input.value=String(state.seed);render();}
 async function restart(seed:number){
- if(busy)return;stop();setBusy(true);el('feedback').textContent='新しい土地を探しています。';
- try{const {createNewIrrigatedWorld:createNewWorld}=await import('./story/new-world.js');const candidate=createNewWorld(seed);adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
- catch{el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
- finally{setBusy(false);render();}
+ if(busy)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='新しい土地を探しています。';
+ try{const {createNewEconomicWorld:createNewWorld}=await import('./story/new-world.js');const candidate=await createNewWorld(seed);if(ticket!==operation||world!==source)return;adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
+ catch{if(ticket===operation)el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
+ finally{if(ticket===operation){setBusy(false);render();}}
 }
 el('enable-irrigation').addEventListener('click',async()=>{
  if(busy||world.mode!=='generated')return;stop();setBusy(true);el('feedback').textContent='水路の記録を準備しています。';await paintFeedback();try{adopt(enableWorldIrrigation(world),true);el('feedback').textContent='これまでの風景を保ち、これからの水路を記録します。「この歴史を保存」で変更を残せます。';}catch{el('feedback').textContent='水路の記録を始められませんでした。現在の歴史と保存はそのままです。';}finally{setBusy(false);render();}
@@ -235,7 +235,7 @@ async function boot(){
  el('feedback').textContent='文明の記録を準備しています。';
  try{
   await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));
-  const world=saved?restoreWorldSession(saved):(await import('./story/new-world.js')).createNewIrrigatedWorld(randomSeed());
+  const world=saved?restoreWorldSession(saved):await (await import('./story/new-world.js')).createNewEconomicWorld(randomSeed());
   startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
  }catch{
   el('feedback').textContent='記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
@@ -247,7 +247,7 @@ async function boot(){
    catch{el('feedback').textContent='文明を開けませんでした。保存値は保持しています。';for(const id of recovery)(el(id) as HTMLButtonElement).disabled=false;}
    finally{bootBusy=false;}
   };
-  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewIrrigatedWorld(seed));
+  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewEconomicWorld(seed));
   el('restart').onclick=()=>void fresh(Number((el('seed') as HTMLInputElement).value)||randomSeed());el('random').onclick=()=>void fresh(randomSeed());
   const file=el('import-file') as HTMLInputElement;el('import').onclick=()=>file.click();file.onchange=()=>{const f=file.files?.[0];if(!f)return;void recover(async()=>{if(f.size>16*1024*1024)throw Error('File too large');return restoreWorldSession(await decodeWorldSave(await f.text()));});file.value='';};
  }finally{bootBusy=false;}
