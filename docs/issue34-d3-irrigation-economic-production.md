@@ -176,3 +176,5 @@ v7の `economicCoupling.storageEncoding` は `economic-production-tuples-v1` と
 保存準備は `prepareEconomicProductionSave`、外部readerは `validateEconomicProductionSave`、検証済みpacketからの復元は `restoreEconomicProductionSave` とする。v7の外部読込・gzip・新キーへの保存は共通storageへ接続するが、通常sessionと導入UIはC3-2へ残す。C3-1時点では通常sessionによるv7採用を明示的に拒否し、v6の新規既定を保持する。
 
 `tests/fixtures/economic-production-c2-reference.json` はPR #90のCIが生成した、変更前の5世界のcombined完全保存から固定したworld・receipt・phaseのhashである。world header・所有印・非永続診断・checkpoint参照だけを正規化する。新しい本番と変更後のC2が同じ共通コードを使うことだけで一致を主張しない。`audit-economic-production.mjs` で固定参照、全保存と9900年からのgzip再開、16MiB／4MiBを確認し、`benchmark-economic-production.mjs` でhashを含む保存準備とgzipまでの正式性能を測る。C3-1の検証結果は実装PRとCI artifactに記録し、C3全体・D3の完了とは数えない。
+
+C3-1の初回CIでは、新キーの不在を表していなかった旧テスト2件と、seed21/2000年の中立B比1.114が失敗した。旧テストはv7→v6→v5の発見順を明示し、破損時に停止する意味は維持した。凍結処理ではdescriptor表の一括複製を避け、kernelが自ら構築したdata recordだけを子まで凍結して再利用する。外部readerは引き続き完全な再帰処理を使い、浅いfreezeや値が変わるgetterを検査する。単独の1準備＋5回測定で同ケースの中立比は約0.980となった。基準は緩めず、最新CIで全ケースを再検証する。

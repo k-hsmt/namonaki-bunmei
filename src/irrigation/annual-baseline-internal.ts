@@ -6,7 +6,7 @@ import {coupledTrialBoundary,economicProductionBoundary} from '../story/trial-bo
 import type {EconomyCapture} from '../story/economy-observer.js';
 import {economyEffectCalculator} from './economy-effect-core-v1.js';
 import type {EconomyEffect,EconomyPolicy} from './economy-types-v1.js';
-import {freezeReview} from './wire-v1.js';
+import {freezeReview,freezeReviewRecordInternal} from './wire-v1.js';
 import type {GeneratedAdvanceOptions} from '../story/generated-facility-review.js';
 import {generatedPublicSpaceExtension,validateGeneratedPublicSpaceLedger} from '../story/generated-public-space-review.js';
 import {validateGeneratedBridgeLedger} from '../story/generated-bridge-history-review.js';
@@ -47,7 +47,7 @@ export function runAnnualKernel(input:GeneratedBridgeReview,run:(batch:ReturnTyp
   const requirePrefix=(y:number)=>{if(y!==through)throw Error('Economy must read the previous confirmed prefix');};
   const calculate=economyEffectCalculator(world.review,index.source,{channelAt:y=>{requirePrefix(y);return lifecycle.channel;},system:id=>lifecycle.systems.find(s=>s.id===id),eventsAt:y=>{requirePrefix(y);return prefixChannelEvents;},environmentAt:y=>{requirePrefix(y);return {humidity:runner.climate().humidity,patchAt:i=>runner.patchAt('river-bank',i)};}},trial.introducedYear);
   prepare=()=>{
-   if(!prepared||prepared.effect.sourceYear!==through){const effect=calculate(through+1);prepared=freezeReview({effect,modifier:coupledAnnualModifier(through+1,trial.policy,effect)});}
+   if(!prepared||prepared.effect.sourceYear!==through){const effect=calculate(through+1);prepared=freezeReviewRecordInternal({effect:freezeReviewRecordInternal(effect),modifier:freezeReviewRecordInternal(coupledAnnualModifier(through+1,trial.policy,effect))});}
    if(prepared.modifier.year!==through+1||prepared.modifier.policy!==trial.policy)throw Error('Stale annual economy effect');return prepared.modifier;
   };
  }
@@ -55,7 +55,7 @@ export function runAnnualKernel(input:GeneratedBridgeReview,run:(batch:ReturnTyp
   const draws=boundedRngDraws(phase.rngBefore,phase.rngAfter,phase.phase==='step'?64:phase.phase==='manual-choice'?0:1);
   if(phase.phase==='step'?draws<6:phase.phase==='automatic-choice'?draws!==1:draws!==0)throw Error('Unexpected annual RNG consumption');
   totalDraws+=draws;if(totalDraws>1000000)throw Error('Annual RNG batch exceeds bound');
-  const ecologyBefore=through,record=()=>phases.push(Object.freeze({...phase,draws,ecologyBefore,ecologyAfter:through}));
+  const ecologyBefore=through,record=()=>phases.push(freezeReviewRecordInternal({...phase,draws,ecologyBefore,ecologyAfter:through}));
   if(phase.confirmedBefore!==through)throw Error('Ecology did not commit before next phase');
   if(phase.confirmedAfter===through){if(!phase.pending)throw Error('Missing annual commit');record();return;}
   const year=phase.confirmedAfter;if(year!==through+1||phase.pending||year>10000)throw Error('Invalid annual ecology boundary');

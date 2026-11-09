@@ -2,7 +2,25 @@
 import {assertJsonWire} from '../story/generated-state-review.js';
 const frozenValues=new WeakSet<object>();
 /** Reuse only graphs whose children were recursively frozen here, never a shallow-frozen input. */
-export function freezeReview<T>(value:T):T {if(value&&typeof value==='object'&&!frozenValues.has(value)){Object.values(value).forEach(freezeReview);Object.freeze(value);if(Object.values(Object.getOwnPropertyDescriptors(value)).every(d=>'value' in d&&(!d.value||typeof d.value!=='object'||frozenValues.has(d.value))))frozenValues.add(value);}return value;}
+export function freezeReview<T>(value:T):T {
+ if(value&&typeof value==='object'&&!frozenValues.has(value)){
+  let reusable=true;
+  for(const key of Reflect.ownKeys(value)){
+   const descriptor=Object.getOwnPropertyDescriptor(value,key)!;
+   const child='value'in descriptor?descriptor.value:Reflect.get(value,key);
+   freezeReview(child);
+   if(!('value'in descriptor)||child&&typeof child==='object'&&!frozenValues.has(child))reusable=false;
+  }
+  Object.freeze(value);if(reusable)frozenValues.add(value);
+ }
+ return value;
+}
+/** Trusted writer use only: a newly constructed data record, never an external object.
+ * Children still take the full recursive path; the writer already knows its own
+ * literal has no accessors. External readers must continue using freezeReview. */
+export function freezeReviewRecordInternal<T extends object>(record:T):T {
+ Object.values(record).forEach(freezeReview);Object.freeze(record);frozenValues.add(record);return record;
+}
 export function canonicalWire(value:unknown):string {assertJsonWire(value);return JSON.stringify(value,(_key,v:unknown)=>v&&!Array.isArray(v)&&typeof v==='object'?Object.fromEntries(Object.entries(v).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);}
 const hashes=new WeakMap<object,string>();
 export async function reviewBaseHash(base:object):Promise<string>{let hash=hashes.get(base);if(!hash){hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(canonicalWire(base))))].map(n=>n.toString(16).padStart(2,'0')).join('');if(Object.isFrozen(base))hashes.set(base,hash);}return hash;}

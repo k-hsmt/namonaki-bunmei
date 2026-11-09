@@ -9,7 +9,7 @@ import {regions} from '../story/population.js';
 import {coupledChoiceBinding} from '../story/coupled-choice-binding-internal.js';
 import {coupledTrialBoundary} from '../story/trial-boundary.js';
 import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
-import {freezeReview,reviewBaseHash} from './wire-v1.js';
+import {freezeReview,reviewBaseHash,freezeReviewRecordInternal} from './wire-v1.js';
 import {economyPolicies,irrigationEconomyRule,type EconomyPolicy} from './economy-types-v1.js';
 import {runAnnualKernel} from './annual-baseline-internal.js';
 import type {IrrigationCoupledReview,CoupledChoiceProtocol,CoupledEconomyReceipt,CoupledReviewWorld} from './coupled-types-v1.js';
@@ -32,7 +32,7 @@ function progress(input:IrrigationCoupledReview,run:Parameters<typeof runAnnualK
   if(c.year!==applied+1||p.modifier.year!==c.year||p.effect.sourceYear!==applied)throw Error('Duplicate or unconfirmed coupled economy application');
   const mask=(values:readonly boolean[])=>values.reduce((m,v,i)=>m|(v?1<<i:0),0);
   const blocked=mask(regions.map(region=>c.conditions.blockedRegions.includes(region.id)));
-  const receipt:CoupledEconomyReceipt={year:c.year,effect:p.effect,gainBp:p.modifier.gainBp,costBp:p.modifier.costBp,input:[[...c.before.people],c.drought,blocked,c.conditions.granaries?mask(c.conditions.granaries):-1,c.conditions.disruptionId??null,c.records.map(r=>r.id)],harvest:[...c.totals.harvest],discarded:[...c.totals.discarded]};
+  const receipt:CoupledEconomyReceipt=freezeReviewRecordInternal({year:c.year,effect:p.effect,gainBp:p.modifier.gainBp,costBp:p.modifier.costBp,input:[[...c.before.people],c.drought,blocked,c.conditions.granaries?mask(c.conditions.granaries):-1,c.conditions.disruptionId??null,c.records.map(r=>r.id)],harvest:[...c.totals.harvest],discarded:[...c.totals.discarded]});
   receipts.push(receipt);applied=c.year;
  },checkpoint(year,review,phaseCount){checkpoints.push({year,economy:structuredClone(review.state.economy!),people:[...review.state.observation!.people],phaseCount:input.phases.length+phaseCount,sourceCursors:coupledSourceCursors(review,year)});}});
  if(applied!==result.diagnostics.confirmedThrough)throw Error('Economy and ecology confirmation differ');
