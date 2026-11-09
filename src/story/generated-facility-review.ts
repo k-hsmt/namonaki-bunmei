@@ -1,3 +1,4 @@
+import type {EconomyObserver} from './economy-observer.js';
 /** D3-A independent ordinary-facility progression. Not a v5 save or live UI mode. */
 import {createHousingCivilization} from './housing-persistence.js';
 import {step,choose,chooseAutomatically,type CivilizationState,type ReviewLandProgression} from './engine.js';
@@ -29,7 +30,7 @@ export interface GeneratedLandReviewExtension {
  afterFacilities:(review:GeneratedFacilityReview,state:CivilizationState)=>void;
 }
 /** A UI batch may stop after its first new record while validating only once. */
-export interface GeneratedAdvanceOptions {readonly stopAtNewRecord?:boolean}
+export interface GeneratedAdvanceOptions {readonly stopAtNewRecord?:boolean;readonly observeEconomy?:EconomyObserver}
 export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,reservationMode:ReservationReviewMode,growthPattern?:GrowthPattern):GeneratedFacilityReview|{status:'hold';reason:string}{
  if(growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(growthPattern))throw Error('Unknown growth pattern');
  const plans={} as Record<RecordSite,ReviewFacilityPlan>;
@@ -49,12 +50,13 @@ function mutableCopy(input:GeneratedFacilityReview):GeneratedFacilityReview {
  if(input.growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(input.growthPattern))throw Error('Unknown growth pattern');
  const terrain=readOwnedTerrainRecord(input.terrain),next=structuredClone({...input,terrain:null});return {...next,terrain};
 }
-function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):ReviewLandProgression {
+function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension,observeEconomy?:EconomyObserver):ReviewLandProgression {
+ if(observeEconomy!==undefined&&typeof observeEconomy!=='function')throw Error('Invalid economy observer');
  const placements=review.placements as ReviewFacilityPlacement[],holds=review.diagnostics.holds as Record<string,number>;
  const pending=new Map<string,{site:RecordSite;kind:GroundPurpose;plot:GroundPlot;entrance:RecordPoint}>();
  const pendingBridges:SavedReviewBridge['geometry'][]=[];
  const hold=(site:RecordSite,kind:string,reason:string)=>{const key=site+':'+kind+':'+reason;holds[key]=(holds[key]??0)+1;return {status:'hold' as const};};
- return {mode:'generated-review-only',placeFacility(state,siteIndex,candidate){
+ return {mode:'generated-review-only',...(observeEconomy?{observeEconomy}:{}),placeFacility(state,siteIndex,candidate){
   const site=sites[siteIndex];if(!site)throw Error('Invalid generated site');
   if(candidate.kind==='bridge'&&(!review.bridgeReview||site!=='river-bank'))return hold(site,candidate.kind,'unsupported-bridge');
   const plan=review.plans[site],actual:TypedGroundOccupation[]=[...placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...(extension?.additionalOccupancy(review,state,site)??[])];
@@ -93,16 +95,17 @@ function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReview
 export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,years:number,choices:'stop'|'automatic'='stop',extension?:GeneratedLandReviewExtension,options:GeneratedAdvanceOptions={}):GeneratedFacilityReview {
  if(!Number.isSafeInteger(years)||years<0||years>10000||!['stop','automatic'].includes(choices))throw Error('Invalid generated review advance');
  if(options.stopAtNewRecord!==undefined&&typeof options.stopAtNewRecord!=='boolean')throw Error('Invalid generated record boundary');
- const next=mutableCopy(input),policy=policyFor(next,extension),target=next.state.year+years,historyLength=next.state.history.length;
+ if(options.observeEconomy!==undefined&&typeof options.observeEconomy!=='function')throw Error('Invalid economy observer');
+ const next=mutableCopy(input),policy=policyFor(next,extension,options.observeEconomy),target=next.state.year+years,historyLength=next.state.history.length;
  while(next.state.year<target){if(next.state.pending){if(choices==='stop')break;chooseAutomatically(next.state,policy);}else step(next.state,policy);
   if(options.stopAtNewRecord&&next.state.history.length>historyLength)break;
  }
  if(years>0&&next.state.pending&&choices==='automatic')chooseAutomatically(next.state,policy);
  return next;
 }
-export function chooseGeneratedFacilityReview(input:GeneratedFacilityReview,index:number,source:'manual'|'auto'='manual',extension?:GeneratedLandReviewExtension):GeneratedFacilityReview {
- const next=mutableCopy(input);choose(next.state,index,source,policyFor(next,extension));return next;
+export function chooseGeneratedFacilityReview(input:GeneratedFacilityReview,index:number,source:'manual'|'auto'='manual',extension?:GeneratedLandReviewExtension,observeEconomy?:EconomyObserver):GeneratedFacilityReview {
+ const next=mutableCopy(input);choose(next.state,index,source,policyFor(next,extension,observeEconomy));return next;
 }
-export function chooseAutomaticallyGeneratedFacilityReview(input:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension):GeneratedFacilityReview {
- const next=mutableCopy(input);chooseAutomatically(next.state,policyFor(next,extension));return next;
+export function chooseAutomaticallyGeneratedFacilityReview(input:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension,observeEconomy?:EconomyObserver):GeneratedFacilityReview {
+ const next=mutableCopy(input);chooseAutomatically(next.state,policyFor(next,extension,observeEconomy));return next;
 }

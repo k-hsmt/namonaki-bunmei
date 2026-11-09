@@ -562,3 +562,39 @@ jobs:
           retention-days: 14
           path: artifacts/environment34-irrigation-production/**
           if-no-files-found: error
+
+  irrigation-economy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Measure immutable economic capture and all four single-year comparisons
+        run: node scripts/benchmark-irrigation-economy.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit five 10,000-year unchanged B histories, annual baseline and C1 gzip continuation
+        run: node scripts/audit-irrigation-economy.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Generate four-condition natural comparisons and explicitly synthetic fixtures
+        run: node scripts/review-irrigation-economy.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify the actual interactive comparison in Chromium
+        run: node scripts/check-irrigation-economy-page.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-economy
+          retention-days: 14
+          path: artifacts/environment34-irrigation-economy/*
+          if-no-files-found: error
