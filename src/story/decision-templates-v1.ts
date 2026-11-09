@@ -1,0 +1,40 @@
+/** Versioned decision content, shared by generation and read-only binding checks. */
+export const decisionTemplatesV1=[
+ {question:'食糧の蓄えが乏しくなった。人々の間で、二つの考えが語られている。', options:[
+  {label:'蓄えを共同で分かち合う',description:'短期的な不足を皆で引き受ける。',impacts:{food:-7,cohesion:11},consequence:'蓄えを分ける決まりが生まれた。'},
+  {label:'各集落の判断に任せる',description:'地域の自律性を優先する。',impacts:{cohesion:-6,exchange:4},consequence:'集落ごとに異なる方法が試みられた。'},
+  {label:'新しい土地を探す',description:'一部の人々が移住する。',impacts:{population:-.055,food:9,exchange:7},consequence:'旅立つ人々が現れ、故郷に残る人々もいた。'}]},
+ {question:'遠方から、異なる習慣を持つ人々が訪れた。集落の長たちが話し合っている。',options:[
+  {label:'迎え入れて共に暮らす',description:'新しい文化との接触が増える。',impacts:{population:.04,culture:11,cohesion:-3},consequence:'異なる言葉が村の広場で聞かれるようになった。'},
+  {label:'交易のみを続ける',description:'往来は増やすが居住は分ける。',impacts:{exchange:10,culture:4},consequence:'交易所で人々の交流が続いた。'},
+  {label:'しばらく距離を置く',description:'共同体内部の習慣を守る。',impacts:{exchange:-7,cohesion:5},consequence:'訪問者は別の土地へ向かっていった。'}]},
+ {question:'共同の水路が傷み、修復には大勢の働き手が必要になった。',options:[
+  {label:'共同作業の日を定める',description:'労力はかかるが、水路を維持する。',impacts:{food:9,cohesion:6},consequence:'集落が力を合わせ、水路に水が戻った。'},
+  {label:'それぞれの畑を優先する',description:'すぐの暮らしを守る。',impacts:{food:-5,cohesion:-4},consequence:'水路の一部は使われなくなった。'},
+  {label:'新しい方法を試す',description:'成功は保証されない。',impacts:{knowledge:10,food:-3},consequence:'水の扱いを工夫する人々が現れた。'}]},
+ {question:'若者たちが、伝統とは異なる祭りの形を提案している。',options:[
+  {label:'新しい形を受け入れる',description:'習慣が少しずつ変わる。',impacts:{culture:11,cohesion:2},consequence:'古い歌に新しい節が加わった。'},
+  {label:'古い形式を守り続ける',description:'受け継がれた形を重んじる。',impacts:{culture:5,cohesion:5},consequence:'祭りは祖先の頃の順序で行われた。'},
+  {label:'集落ごとに任せる',description:'土地ごとの多様性が生まれる。',impacts:{culture:8,cohesion:-2},consequence:'祭りは村ごとに少しずつ違うものになった。'}]}
+ ,{question:'古い木を切り、新しい建物を建てる計画が持ち上がった。',options:[
+ {label:'木を残して別の場所を探す',description:'時間と土地を必要とする。',impacts:{culture:5,food:-2},consequence:'古い木は残され、広場の形は変わった。'},
+ {label:'材を使って建て直す',description:'新たな集会所ができる。',impacts:{knowledge:4,cohesion:3},consequence:'木は伐られ、記憶は新しい建物に引き継がれた。'}]},
+ {question:'川の魚が減り、漁をめぐって意見が分かれている。',options:[
+ {label:'数年だけ漁を制限する',description:'いまの食糧を犠牲にする。',impacts:{food:-5,cohesion:4},consequence:'漁を休む区間が定められた。'},
+ {label:'川の上流へ漁場を移す',description:'別の土地との摩擦があり得る。',impacts:{food:4,exchange:-3},consequence:'新しい漁場へ通う人々が増えた。'},
+ {label:'新しい網を試す',description:'技術を試すが資源は戻らない。',impacts:{knowledge:6,food:2},consequence:'網の工夫が広まった。'}]},
+ {question:'大雨で橋が流され、両岸の暮らしが離れてしまった。',options:[
+ {label:'共同で再建する',description:'労働力を集める。',impacts:{cohesion:7,food:-3},consequence:'両岸を結ぶ橋が再び架けられた。'},
+ {label:'渡し舟で行き来する',description:'新しい仕事が生まれる。',impacts:{exchange:6,knowledge:2},consequence:'舟を操る人々が増えた。'}]},
+ {question:'古い記録と語り継がれた記憶に食い違いが見つかった。',options:[
+ {label:'両方を残す',description:'ひとつに決めつけない。',impacts:{culture:7},consequence:'異なる記憶が併記されるようになった。'},
+ {label:'記録を正本として扱う',description:'統一した歴史が語られる。',impacts:{cohesion:3,knowledge:4},consequence:'一冊の年代記が編まれた。'},
+ {label:'語り継ぐ人々に委ねる',description:'口承の多様さを尊重する。',impacts:{culture:5,cohesion:-2},consequence:'村ごとに違う過去が語られ続けた。'}]},
+ {question:'人口が減った地域の住居をどう扱うか、議論が始まった。',options:[
+ {label:'建物を修繕して残す',description:'記憶を残すための労力が必要。',impacts:{food:-3,culture:6},consequence:'使われない家にも手入れが続けられた。'},
+ {label:'建材を別の土地へ運ぶ',description:'今ある暮らしに役立てる。',impacts:{knowledge:3,exchange:3},consequence:'古い家の石や木材が新しい家に使われた。'}]},
+ {question:'豊かな季節が続き、共同の余剰をどう使うかが話し合われた。',options:[
+ {label:'蓄えを増やす',description:'将来の不足に備える。',impacts:{food:9},consequence:'共同の倉に穀物が積み重なった。'},
+ {label:'祭りを開いて分かち合う',description:'人々が集まる機会を作る。',impacts:{food:-4,culture:7,cohesion:4},consequence:'広場で歌や踊りが続いた。'},
+ {label:'遠くの村へ贈る',description:'今は見返りを求めない。',impacts:{food:-5,exchange:8},consequence:'舟に食糧が積まれ、遠くへ運ばれた。'}]},
+];

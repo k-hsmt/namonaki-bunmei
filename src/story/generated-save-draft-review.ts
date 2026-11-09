@@ -35,7 +35,7 @@ function point(raw:unknown):RecordPoint {
  if(!Array.isArray(raw)||raw.length!==2||!raw.every(nat)||raw[0]>318||raw[1]<96||raw[1]>178)throw Error('Invalid generated portal');return raw as unknown as RecordPoint;
 }
 function freeze<T>(v:T):T{if(v&&typeof v==='object'&&!Object.isFrozen(v)){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
-function validatePlans(raw:unknown,terrain:ValidatedTerrainRecord):Readonly<Record<RecordSite,ReviewFacilityPlan>> {
+export function validatePlans(raw:unknown,terrain:ValidatedTerrainRecord):Readonly<Record<RecordSite,ReviewFacilityPlan>> {
  const plans=wireObject(raw,sites);
  for(const [index,site] of sites.entries()){
   const p=wireObject(plans[site],['status','site','placementPolicy','nucleus','primaryRoot','accessRoots','slots','metrics']);
@@ -61,7 +61,7 @@ function validatePlans(raw:unknown,terrain:ValidatedTerrainRecord):Readonly<Reco
  }
  return plans as unknown as Readonly<Record<RecordSite,ReviewFacilityPlan>>;
 }
-function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,plans:GeneratedFacilityReview['plans'],mode:ReservationReviewMode,state:CivilizationState,land:unknown,growthPattern?:GrowthPattern):GeneratedFacilityReview {
+export function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,plans:GeneratedFacilityReview['plans'],mode:ReservationReviewMode,state:CivilizationState,land:unknown,growthPattern?:GrowthPattern,trialBoundary?:GeneratedFacilityReview['trialBoundary']):GeneratedFacilityReview {
  const h=wireObject(land,['schemaVersion','events']);if(h.schemaVersion!==1||!Array.isArray(h.events)||h.events.length>10000)throw Error('Invalid land history');
  const placements:ReviewFacilityPlacement[]=[],bridges:SavedReviewBridge[]=[];
  for(const value of h.events){
@@ -75,7 +75,7 @@ function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiver
    if(e.purpose!=='housing'&&e.purpose!=='public-space')placements.push({objectId:e.objectId,site:e.site as RecordSite,kind:e.purpose as GroundPurpose,plot:f,entrance,builtYear:e.year as number,sourceRecordId:e.sourceRecordId});
   }
  }
- const review:GeneratedFacilityReview={format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode:mode,state,placements,bridgeReview:{schemaVersion:1,hydrology,bridges},diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{})};
+ const review:GeneratedFacilityReview={format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode:mode,state,placements,bridgeReview:{schemaVersion:1,hydrology,bridges},diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{}),...(trialBoundary?{trialBoundary}:{})};
  for(const [index,site] of sites.entries()){
   const buildings=siteAt(state.observation?.sites,index,lastObservedYear(state))!.buildings,placed=placements.filter(p=>p.site===site);
   if(buildings.length!==placed.length+(site==='river-bank'?bridges.length:0))throw Error('Facility birth ledger is incomplete');

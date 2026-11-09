@@ -20,12 +20,14 @@ import {kernelGeometry,productionGeometry} from './production-types-v1.js';
 import {proposeIrrigation} from './geometry-v1.js';
 import {irrigationEffects,channelPatches} from './ecology-v1.js';
 import {validateProductionWorld,ownProductionWorld,climateRule} from './production-history-v1.js';
-import {boundedRngDraws,type BaselinePhaseReceipt} from './coupled-baseline-audit-v1.js';
+import {boundedRngDraws} from '../story/rng-phase-diagnostics.js';
+import type {BaselinePhaseReceipt} from './coupled-baseline-audit-v1.js';
 export interface AnnualReceipt extends BaselinePhaseReceipt {readonly ecologyBefore:number;readonly ecologyAfter:number}
 export interface PreparedCoupledEffect {readonly effect:EconomyEffect;readonly modifier:CoupledAnnualModifier}
 export interface CoupledKernelHooks {
  readonly introducedYear:number;readonly policy:EconomyPolicy;readonly prepared:PreparedCoupledEffect|null;
  readonly capture:(capture:EconomyCapture,prepared:PreparedCoupledEffect)=>void;
+ readonly checkpoint?:(year:number,review:GeneratedBridgeReview['review'],phaseCount:number)=>void;
 }
 
 export function runAnnualKernel(input:GeneratedBridgeReview,run:(batch:ReturnType<typeof createGeneratedFacilityBatch>,commit:(p:import('../story/generated-land-batch-internal.js').LandPhaseReceipt)=>void)=>void,options:GeneratedAdvanceOptions={},trial?:CoupledKernelHooks){
@@ -66,6 +68,7 @@ export function runAnnualKernel(input:GeneratedBridgeReview,run:(batch:ReturnTyp
   runner.step(targets[Math.floor(year/100)]!,slow);through=year;ecologySteps++;
   if((year-i.introducedYear)%100===0)checkpoints.push({...runner.snapshot(),channel:next.channel});
   record();
+  if(trial&&(year-trial.introducedYear)%100===0)trial.checkpoint?.(year,world.review,phases.length);
  });
  const completed={...world,vegetation:{...v,confirmedThrough:through,events},environment:{...e,confirmedThrough:through,targets,uses,checkpoints,current:{...runner.snapshot(),channel:lifecycle.channel}},irrigation:{...i,confirmedThrough:through,systems:lifecycle.systems.map(s=>({...s,geometry:productionGeometry(s.geometry)})),events:lifecycle.events,attempts:lifecycle.attempts}},result=trial?freezeReview(completed):ownProductionWorld(completed);
  validateGeneratedBridgeLedger(result.review);validateGeneratedPublicSpaceLedger(result.review,through);

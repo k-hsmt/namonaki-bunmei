@@ -1,3 +1,6 @@
+import {coupledRuntimeRules} from './coupled-types-v1.js';
+import {ownCoupledReview as own,knownCoupledReview as known} from './coupled-owned-internal.js';
+import {captureCoupledOrigin,coupledSourceCursors} from './coupled-origin-v1.js';
 /** Independent carried economics. No production save, session, or owner cache. */
 import {validateWorldSave,restoreGeneratedWorld,type GeneratedWorldSave} from '../story/world-save.js';
 import {lastObservedYear} from '../story/engine.js';
@@ -11,9 +14,6 @@ import {economyPolicies,irrigationEconomyRule,type EconomyPolicy} from './econom
 import {runAnnualKernel} from './annual-baseline-internal.js';
 import type {IrrigationCoupledReview,CoupledChoiceProtocol,CoupledEconomyReceipt,CoupledReviewWorld} from './coupled-types-v1.js';
 
-const owned=new WeakSet<object>();
-function own(review:IrrigationCoupledReview):IrrigationCoupledReview {freezeReview(review);owned.add(review);return review;}
-function known(review:IrrigationCoupledReview):void {if(!owned.has(review))throw Error('Use an owned coupled review; trial codec is not implemented yet');}
 function trialWorld(world:GeneratedBridgeReview):CoupledReviewWorld {return {...world,format:'irrigation-coupled-review-world-v1',review:{...world.review,trialBoundary:coupledTrialBoundary}};}
 
 export async function createCoupledReview(input:GeneratedWorldSave,policy:EconomyPolicy,choiceProtocol:CoupledChoiceProtocol='automatic-per-branch-v1'):Promise<IrrigationCoupledReview>{
@@ -22,10 +22,10 @@ export async function createCoupledReview(input:GeneratedWorldSave,policy:Econom
  // Validated save/world are owned and frozen before native hash yields.
  const world=restoreGeneratedWorld(save as GeneratedWorldSave),originHash=await reviewBaseHash(save),year=lastObservedYear(world.review.state);
  if(world.review.state.year>10000)throw Error('Coupled origin exceeds the trial horizon');
- return own({format:coupledTrialBoundary,schemaVersion:1,status:'review-only',ruleId:'irrigation-economy-coupled-v1',formula:irrigationEconomyRule,policy,choiceProtocol,originHash,introducedYear:year,confirmedThrough:year,originPending:!!world.review.state.pending,originRngState:world.review.state.rngState,initialEconomy:structuredClone(world.review.state.economy??createRegionalEconomy()),world:trialWorld(world),receipts:[],phases:[],prepared:null});
+ return own({format:coupledTrialBoundary,schemaVersion:1,status:'review-only',ruleId:'irrigation-economy-coupled-v1',runtimeRules:coupledRuntimeRules,formula:irrigationEconomyRule,policy,choiceProtocol,originHash,introducedYear:year,confirmedThrough:year,originPending:!!world.review.state.pending,originRngState:world.review.state.rngState,initialEconomy:structuredClone(world.review.state.economy??createRegionalEconomy()),origin:captureCoupledOrigin(save as GeneratedWorldSave),checkpoints:[],world:trialWorld(world),receipts:[],phases:[],prepared:null});
 }
 function progress(input:IrrigationCoupledReview,run:Parameters<typeof runAnnualKernel>[1]):IrrigationCoupledReview {
- known(input);const receipts=[...input.receipts];let applied=input.confirmedThrough;
+ known(input);const receipts=[...input.receipts],checkpoints=[...input.checkpoints];let applied=input.confirmedThrough;
  // Internal geometry adapter keeps the land boundary. No production factory accepts it.
  const adapter={...input.world,format:'generated-bridge-review' as const};
  const result=runAnnualKernel(adapter,run,{}, {introducedYear:input.introducedYear,policy:input.policy,prepared:input.prepared,capture(c,p){
@@ -34,9 +34,9 @@ function progress(input:IrrigationCoupledReview,run:Parameters<typeof runAnnualK
   const blocked=mask(regions.map(region=>c.conditions.blockedRegions.includes(region.id)));
   const receipt:CoupledEconomyReceipt={year:c.year,effect:p.effect,gainBp:p.modifier.gainBp,costBp:p.modifier.costBp,input:[[...c.before.people],c.drought,blocked,c.conditions.granaries?mask(c.conditions.granaries):-1,c.conditions.disruptionId??null,c.records.map(r=>r.id)],harvest:[...c.totals.harvest],discarded:[...c.totals.discarded]};
   receipts.push(receipt);applied=c.year;
- }});
+ },checkpoint(year,review,phaseCount){checkpoints.push({year,economy:structuredClone(review.state.economy!),people:[...review.state.observation!.people],phaseCount:input.phases.length+phaseCount,sourceCursors:coupledSourceCursors(review,year)});}});
  if(applied!==result.diagnostics.confirmedThrough)throw Error('Economy and ecology confirmation differ');
- return own({...input,confirmedThrough:applied,world:trialWorld(result.world),receipts,phases:[...input.phases,...result.diagnostics.phases],prepared:result.prepared});
+ return own({...input,confirmedThrough:applied,world:trialWorld(result.world),receipts,checkpoints,phases:[...input.phases,...result.diagnostics.phases],prepared:result.prepared});
 }
 export function advanceCoupledReview(input:IrrigationCoupledReview,years:number,choices:'stop'|'automatic'='automatic'):IrrigationCoupledReview {
  known(input);if(!Number.isSafeInteger(years)||years<0||years>10000||input.world.review.state.year+years>10000||!['stop','automatic'].includes(choices)||years>0&&input.choiceProtocol==='common-explicit-v1'&&choices!=='stop')throw Error('Invalid coupled advance or choice protocol');

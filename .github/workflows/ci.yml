@@ -624,6 +624,31 @@ jobs:
           path: artifacts/environment34-irrigation-coupled/effects-audit.json
           if-no-files-found: error
 
+  coupled-storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - name: Audit five independent compact C2 saves, cold readers and gzip continuation
+        run: node scripts/audit-coupled-storage.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-storage
+          retention-days: 14
+          path: artifacts/environment34-irrigation-coupled-storage/*
+          if-no-files-found: error
+
   irrigation-economy:
     runs-on: ubuntu-latest
     timeout-minutes: 35
