@@ -2,10 +2,10 @@
 import type {IrrigationContext,IrrigationProposal} from './types-v1.js';
 import type {ChannelAttempt,ChannelCause,ChannelEvent,ChannelEventKind,ChannelState,ChannelStatus,ChannelSystem,IrrigationControl} from './review-types-v1.js';
 import {irrigationHistoryLimits as limits} from './review-types-v1.js';
-import {channelFitness,type IrrigationSources} from './sources-v1.js';
+import {channelFitness,type IrrigationSources,type IrrigationSourceIndex} from './sources-v1.js';
 export type NewChannelDecision=(ctx:IrrigationContext)=>IrrigationProposal;
 export interface LifecycleSeed {readonly systems:readonly ChannelSystem[];readonly events:readonly ChannelEvent[];readonly attempts:readonly ChannelAttempt[];readonly channel:ChannelState|null}
-export function channelLifecycle(source:IrrigationSources,seed:LifecycleSeed,controls:readonly IrrigationControl[],decide:NewChannelDecision){
+export function channelLifecycle(source:IrrigationSourceIndex,seed:LifecycleSeed,controls:readonly IrrigationControl[],decide:NewChannelDecision){
  const systems=[...seed.systems],events=[...seed.events],attempts=[...seed.attempts];let channel=seed.channel;const controlYears=new Map<number,IrrigationControl[]>();for(const c of controls){const list=controlYears.get(c.year)??[];list.push(c);controlYears.set(c.year,list);}
  function emit(year:number,kind:ChannelEventKind,cause:ChannelCause,status:ChannelStatus,id=channel?.id,maintained=false){
   if(!id)throw Error('Missing channel');const seq=events.length+1,eventId='waterway-event-'+seq,before=channel?.id===id?channel.status:null;

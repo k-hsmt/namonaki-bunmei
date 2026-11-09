@@ -2,7 +2,7 @@
 import {step,chooseAutomatically,lastObservedYear,type CivilizationState,type ReviewLandProgression} from './engine.js';
 
 export interface LandPhaseReceipt {
- readonly phase:'step'|'automatic-choice';readonly year:number;
+ readonly phase:'step'|'automatic-choice'|'manual-choice';readonly year:number;
  readonly confirmedBefore:number;readonly confirmedAfter:number;
  readonly rngBefore:number;readonly rngAfter:number;readonly pending:boolean;
 }
@@ -11,7 +11,7 @@ export type LandPhaseObserver=(receipt:Readonly<LandPhaseReceipt>)=>void;
 
 export function runGeneratedLandBatch(state:CivilizationState,policy:ReviewLandProgression,years:number,choices:'stop'|'automatic',stopAtNewRecord?:boolean,onPhase?:LandPhaseObserver):void {
  const target=state.year+years,historyLength=state.history.length;
- const run=(phase:LandPhaseReceipt['phase'])=>{
+ const run=(phase:'step'|'automatic-choice')=>{
   const confirmedBefore=onPhase?lastObservedYear(state):0,rngBefore=state.rngState;
   if(phase==='step')step(state,policy);else chooseAutomatically(state,policy);
   if(onPhase)onPhase(Object.freeze({phase,year:state.year,confirmedBefore,confirmedAfter:lastObservedYear(state),rngBefore,rngAfter:state.rngState,pending:!!state.pending}));

@@ -1,5 +1,5 @@
 /** Versioned integer ecology. No civilization RNG, scene clock or world generation. */
-import {vegetationSites,vegetationPatchPlot,vegetationOverlap,vegetationStage,type VegetationHistory,type VegetationStage} from '../vegetation/history-v1.js';
+import {vegetationSites,vegetationPatchPlot,vegetationOverlap,vegetationStage,type VegetationHistory,type VegetationStage,type VegetationEvent} from '../vegetation/history-v1.js';
 import type {GeneratedFacilityReview} from '../story/generated-facility-review.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
 import type {GroundPlot} from '../terrain/ground-access-review.js';
@@ -63,12 +63,17 @@ function runEnvironment(v:CoupledVegetation,r:GeneratedFacilityReview,uses:reado
  for(const e of uses){const indices=covered(e.plot);if(e.year<=from.year)apply(e,indices);else{const a=useYears.get(e.year)??[];a.push({e,indices});useYears.set(e.year,a);}}
  for(const e of v.events){if(e.year<from.year||e.year===from.year&&from.year!==0)continue;const a=disturbances.get(e.year)??[];a.push({site:e.site,indices:covered(e.plot)});disturbances.set(e.year,a);}
  if(from.year===0)for(const {site,indices}of disturbances.get(0)??[])for(const i of indices){const p=patches[site][i];if(p){p[0]=0;p[1]=0;}}
- const buffers=Object.fromEntries(vegetationSites.map(site=>[site,waterBuffers(r,site)])) as Record<RecordSite,readonly number[]>;let year=from.year,humidity=from.humidity,temperature=from.temperature;
- return {snapshot():EnvironmentState{return {year,humidity,temperature,patches:Object.fromEntries(vegetationSites.map(site=>[site,patches[site].map(p=>p?[...p] as unknown as PatchState:null)])) as unknown as EnvironmentState['patches']};},step(target:ClimateTarget,slow=false){
+ const buffers=Object.fromEntries(vegetationSites.map(site=>[site,waterBuffers(r,site)])) as Record<RecordSite,readonly number[]>;let year=from.year,humidity=from.humidity,temperature=from.temperature,appended=from.year;
+ return {append(nextUses:readonly LandUseEvent[],events:readonly VegetationEvent[]){
+  if(appended===year+1||useYears.has(year+1)||disturbances.has(year+1)||nextUses.some(e=>e.year!==year+1)||events.some(e=>e.year!==year+1))throw Error('Invalid annual environment delta');
+  const changes=nextUses.map(e=>({e:{...e,plot:{...e.plot}},indices:covered(e.plot)})),disturbed=events.map(e=>({site:e.site,indices:covered(e.plot)}));
+  if(changes.length)useYears.set(year+1,changes);if(disturbed.length)disturbances.set(year+1,disturbed);appended=year+1;
+ },snapshot():EnvironmentState{return {year,humidity,temperature,patches:Object.fromEntries(vegetationSites.map(site=>[site,patches[site].map(p=>p?[...p] as unknown as PatchState:null)])) as unknown as EnvironmentState['patches']};},step(target:ClimateTarget,slow=false){
   year++;if(!slow||year%2===0){humidity+=Math.sign(target.humidity-humidity);temperature+=Math.sign(target.temperature-temperature);}
   const changes=useYears.get(year),before=changes?Object.fromEntries(vegetationSites.map(s=>[s,farms[s].slice()])) as Record<RecordSite,Int16Array>:null;
   for(const {e,indices}of changes??[])apply(e,indices);
   for(const {site,indices}of disturbances.get(year)??[])for(const i of indices){const p=patches[site][i];if(p){p[0]=0;p[1]=0;}}
+  useYears.delete(year);disturbances.delete(year);
   const extra=effectsAt?.(year),channel=extra?new Set(extra.occupiedPatches):null;
   for(const i of extra?.disturbedPatches??[]){const p=patches['river-bank'][i];if(p){p[0]=0;p[1]=0;}}
   for(const site of vegetationSites)for(let i=0;i<440;i++){const p=patches[site][i],initial=v.initial[site][i];if(p&&initial)patches[site][i]=stepPatch(p as unknown as PatchState,humidity,temperature,buffers[site][i]!+(site==='river-bank'?(extra?.moisture[i]??0):0),initial[1],initial[2],occupied[site][i]!>0||site==='river-bank'&&Boolean(channel?.has(i)),farms[site][i]!>0,before!==null&&Boolean(before[site][i])!==Boolean(farms[site][i])) as unknown as number[];}
