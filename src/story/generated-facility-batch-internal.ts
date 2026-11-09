@@ -2,7 +2,7 @@ import {runGeneratedLandBatch,type LandPhaseObserver} from './generated-land-bat
 import type {EconomyObserver} from './economy-observer.js';
 /** D3-A independent ordinary-facility progression. Not a v5 save or live UI mode. */
 import {createHousingCivilization} from './housing-persistence.js';
-import {choose,chooseAutomatically,type CivilizationState,type ReviewLandProgression} from './engine.js';
+import {choose,chooseAutomatically,lastObservedYear,type CivilizationState,type ReviewLandProgression} from './engine.js';
 import {siteAt} from './settlement-history.js';
 import {readOwnedTerrainRecord,type ValidatedTerrainRecord} from '../terrain/terrain-record.js';
 import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
@@ -92,14 +92,26 @@ function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReview
   }pending.clear();extension?.afterFacilities(review,state);
  }};
 }
-/** Input remains untouched even if proposal or commit throws. years counts new years, not choices. */
-export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,years:number,choices:'stop'|'automatic'='stop',extension?:GeneratedLandReviewExtension,options:GeneratedAdvanceOptions={},onPhase?:LandPhaseObserver):GeneratedFacilityReview {
+function checkAdvance(years:number,choices:string,options:GeneratedAdvanceOptions){
  if(!Number.isSafeInteger(years)||years<0||years>10000||!['stop','automatic'].includes(choices))throw Error('Invalid generated review advance');
  if(options.stopAtNewRecord!==undefined&&typeof options.stopAtNewRecord!=='boolean')throw Error('Invalid generated record boundary');
  if(options.observeEconomy!==undefined&&typeof options.observeEconomy!=='function')throw Error('Invalid economy observer');
- const next=mutableCopy(input),policy=policyFor(next,extension,options.observeEconomy);
- runGeneratedLandBatch(next.state,policy,years,choices,options.stopAtNewRecord,onPhase);
- return next;
+}
+/** Caller owns this private batch. No live working reference crosses a public callback. */
+export function createGeneratedFacilityBatch(input:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension,observeEconomy?:EconomyObserver){
+ const review=mutableCopy(input),policy=policyFor(review,extension,observeEconomy);
+ return {review,advance(years:number,choices:'stop'|'automatic',stopAtNewRecord?:boolean,onPhase?:LandPhaseObserver){
+  checkAdvance(years,choices,{stopAtNewRecord});runGeneratedLandBatch(review.state,policy,years,choices,stopAtNewRecord,onPhase);
+ },choose(index:number|'random',onPhase?:LandPhaseObserver){
+  const s=review.state,before=s.rngState,confirmedBefore=lastObservedYear(s);
+  if(index==='random')chooseAutomatically(s,policy);else choose(s,index,'manual',policy);
+  if(onPhase)onPhase(Object.freeze({phase:index==='random'?'automatic-choice':'manual-choice',year:s.year,confirmedBefore,confirmedAfter:lastObservedYear(s),rngBefore:before,rngAfter:s.rngState,pending:!!s.pending}));
+ }};
+}
+/** Input remains untouched even if proposal or commit throws. years counts new years, not choices. */
+export function advanceGeneratedFacilityReview(input:GeneratedFacilityReview,years:number,choices:'stop'|'automatic'='stop',extension?:GeneratedLandReviewExtension,options:GeneratedAdvanceOptions={},onPhase?:LandPhaseObserver):GeneratedFacilityReview {
+ checkAdvance(years,choices,options);const batch=createGeneratedFacilityBatch(input,extension,options.observeEconomy);
+ batch.advance(years,choices,options.stopAtNewRecord,onPhase);return batch.review;
 }
 export function chooseGeneratedFacilityReview(input:GeneratedFacilityReview,index:number,source:'manual'|'auto'='manual',extension?:GeneratedLandReviewExtension,observeEconomy?:EconomyObserver):GeneratedFacilityReview {
  const next=mutableCopy(input);choose(next.state,index,source,policyFor(next,extension,observeEconomy));return next;

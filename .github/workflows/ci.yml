@@ -580,12 +580,23 @@ jobs:
         run: node scripts/audit-coupled-baseline.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Measure annual lifecycle and ecology against B with one warm-up and five runs
+        run: node scripts/benchmark-annual-baseline.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Audit five annual ecology worlds against complete original B saves
+        run: node scripts/audit-annual-baseline.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: environment34-irrigation-coupled-baseline
           retention-days: 14
-          path: artifacts/environment34-irrigation-coupled/baseline-audit.json
+          path: |
+            artifacts/environment34-irrigation-coupled/baseline-audit.json
+            artifacts/environment34-irrigation-coupled/annual-baseline-audit.json
+            artifacts/environment34-irrigation-coupled/annual-baseline-performance.json
           if-no-files-found: error
 
   irrigation-economy:
