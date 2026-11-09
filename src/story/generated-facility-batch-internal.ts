@@ -1,4 +1,7 @@
 import {runGeneratedLandBatch,type LandPhaseObserver} from './generated-land-batch-internal.js';
+import {assertProductionBoundary,coupledTrialBoundary} from './trial-boundary.js';
+import type {CoupledAnnualModifier} from './coupled-economy-policy-internal.js';
+import {coupledChoiceBinding} from './coupled-choice-binding-internal.js';
 import type {EconomyObserver} from './economy-observer.js';
 /** D3-A independent ordinary-facility progression. Not a v5 save or live UI mode. */
 import {createHousingCivilization} from './housing-persistence.js';
@@ -17,6 +20,7 @@ export interface ReviewFacilityPlacement {
  readonly plot:GroundPlot;readonly entrance:RecordPoint;readonly builtYear:number;readonly sourceRecordId:string;
 }
 export interface GeneratedFacilityReview {
+ readonly trialBoundary?:typeof coupledTrialBoundary;
  readonly format:'generated-facility-review';readonly status:'review-only';readonly placementPolicy:null;
  readonly terrain:ValidatedTerrainRecord;readonly plans:Readonly<Record<RecordSite,ReviewFacilityPlan>>;
  readonly reservationMode:ReservationReviewMode;readonly state:CivilizationState;
@@ -46,7 +50,8 @@ export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,res
  }
  return {format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode,state,placements,diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{})};
 }
-function mutableCopy(input:GeneratedFacilityReview):GeneratedFacilityReview {
+function mutableCopy(input:GeneratedFacilityReview,coupled=false):GeneratedFacilityReview {
+ if(coupled){if(input.trialBoundary!==coupledTrialBoundary)throw Error('Missing coupled land boundary');}else assertProductionBoundary(input);
  if(input.format!=='generated-facility-review'||input.status!=='review-only'||input.placementPolicy!==null||input.state.version!==4||input.state.seed!==input.terrain.source.seed)throw Error('Invalid generated review boundary');
  if(input.growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(input.growthPattern))throw Error('Unknown growth pattern');
  const terrain=readOwnedTerrainRecord(input.terrain),next=structuredClone({...input,terrain:null});return {...next,terrain};
@@ -93,6 +98,7 @@ function policyFor(review:GeneratedFacilityReview,extension?:GeneratedLandReview
  }};
 }
 function checkAdvance(years:number,choices:string,options:GeneratedAdvanceOptions){
+ if(Object.keys(options).some(k=>!['stopAtNewRecord','observeEconomy'].includes(k)))throw Error('Unknown generated advance option');
  if(!Number.isSafeInteger(years)||years<0||years>10000||!['stop','automatic'].includes(choices))throw Error('Invalid generated review advance');
  if(options.stopAtNewRecord!==undefined&&typeof options.stopAtNewRecord!=='boolean')throw Error('Invalid generated record boundary');
  if(options.observeEconomy!==undefined&&typeof options.observeEconomy!=='function')throw Error('Invalid economy observer');
@@ -100,12 +106,22 @@ function checkAdvance(years:number,choices:string,options:GeneratedAdvanceOption
 /** Caller owns this private batch. No live working reference crosses a public callback. */
 export function createGeneratedFacilityBatch(input:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension,observeEconomy?:EconomyObserver){
  const review=mutableCopy(input),policy=policyFor(review,extension,observeEconomy);
+ return batchFor(review,policy);
+}
+/** Only the coupled annual kernel owns this mode and its prepared coefficients. */
+export function createCoupledFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,observeEconomy:EconomyObserver){
+ const review=mutableCopy(input,true),base=policyFor(review,extension,observeEconomy);
+ return batchFor(review,{...base,mode:'irrigation-coupled-review-only',coupledEconomy:prepare},prepare);
+}
+function batchFor(review:GeneratedFacilityReview,policy:ReviewLandProgression,beforePhase?:()=>unknown){
  return {review,advance(years:number,choices:'stop'|'automatic',stopAtNewRecord?:boolean,onPhase?:LandPhaseObserver){
-  checkAdvance(years,choices,{stopAtNewRecord});runGeneratedLandBatch(review.state,policy,years,choices,stopAtNewRecord,onPhase);
+  checkAdvance(years,choices,{stopAtNewRecord});runGeneratedLandBatch(review.state,policy,years,choices,stopAtNewRecord,onPhase,beforePhase);
  },choose(index:number|'random',onPhase?:LandPhaseObserver){
+  beforePhase?.();
   const s=review.state,before=s.rngState,confirmedBefore=lastObservedYear(s);
-  if(index==='random')chooseAutomatically(s,policy);else choose(s,index,'manual',policy);
-  if(onPhase)onPhase(Object.freeze({phase:index==='random'?'automatic-choice':'manual-choice',year:s.year,confirmedBefore,confirmedAfter:lastObservedYear(s),rngBefore:before,rngAfter:s.rngState,pending:!!s.pending}));
+  const fingerprint=beforePhase?coupledChoiceBinding(s):undefined;let selected=index;
+  if(index==='random')selected=chooseAutomatically(s,policy);else choose(s,index,'manual',policy);
+  if(onPhase)onPhase(Object.freeze({phase:index==='random'?'automatic-choice':'manual-choice',year:s.year,confirmedBefore,confirmedAfter:lastObservedYear(s),rngBefore:before,rngAfter:s.rngState,pending:!!s.pending,...(fingerprint?{choice:Object.freeze({index:selected as number,fingerprint})}:{})}));
  }};
 }
 /** Input remains untouched even if proposal or commit throws. years counts new years, not choices. */

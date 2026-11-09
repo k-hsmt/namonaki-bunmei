@@ -1,3 +1,4 @@
+import {assertProductionBoundary} from '../story/trial-boundary.js';
 /** Production reader and deterministic replay. No writer, proposal search or climate generator. */
 import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
 import {lastObservedYear} from '../story/engine.js';
@@ -15,7 +16,7 @@ import {checkAttempt} from './history-v1.js';
 import {kernelGeometry,productionGeometry,type ProductionIrrigation,type ChannelView} from './production-types-v1.js';
 const owned=new WeakSet<object>(),sources=new WeakMap<object,IrrigationSources>(),past=new WeakMap<object,Map<number,EnvironmentState>>();
 export const climateRule=(e:EnvironmentHistory)=>e.ruleId==='environment-irrigated-v1'?e.climateRule!:e.ruleId;
-export function ownProductionWorld(world:GeneratedBridgeReview):GeneratedBridgeReview {freezeReview(world);owned.add(world);return world;}
+export function ownProductionWorld(world:GeneratedBridgeReview):GeneratedBridgeReview {assertProductionBoundary(world);freezeReview(world);owned.add(world);return world;}
 function sourceAt(world:GeneratedBridgeReview){let source=sources.get(world);if(!source){source=irrigationSourcesFromWorld(world);sources.set(world,source);}return source;}
 const plainState=(s:EnvironmentState):EnvironmentState=>{const {channel:_,...state}=s;return state;};
 const emptyEffects=():IrrigationPatchEffects=>({moisture:Array(440).fill(0),occupiedPatches:[],disturbedPatches:[]});
@@ -52,8 +53,8 @@ function* verification(world:GeneratedBridgeReview):Generator<void,GeneratedBrid
  if(!sameWire(replay.irrigation,world.irrigation)||!sameWire(replay.environment,world.environment))throw Error('Production history differs from replay');
  return ownProductionWorld(world);
 }
-export function validateProductionWorld(world:GeneratedBridgeReview):GeneratedBridgeReview {if(owned.has(world))return world;const task=verification(world);for(;;){const r=task.next();if(r.done)return r.value;}}
-export async function validateProductionWorldAsync(world:GeneratedBridgeReview):Promise<GeneratedBridgeReview>{if(owned.has(world))return world;const task=verification(world);let mark=performance.now();for(;;){const r=task.next();if(r.done)return r.value;if(performance.now()-mark>=8){await new Promise(resolve=>setTimeout(resolve,0));mark=performance.now();}}}
+export function validateProductionWorld(world:GeneratedBridgeReview):GeneratedBridgeReview {assertProductionBoundary(world);if(owned.has(world))return world;const task=verification(world);for(;;){const r=task.next();if(r.done)return r.value;}}
+export async function validateProductionWorldAsync(world:GeneratedBridgeReview):Promise<GeneratedBridgeReview>{assertProductionBoundary(world);if(owned.has(world))return world;const task=verification(world);let mark=performance.now();for(;;){const r=task.next();if(r.done)return r.value;if(performance.now()-mark>=8){await new Promise(resolve=>setTimeout(resolve,0));mark=performance.now();}}}
 export function productionChannelAt(world:GeneratedBridgeReview,year:number,site:RecordSite='river-bank'):ChannelView {
  const i=world.irrigation!;if(!Number.isSafeInteger(year)||year<0||year>i.confirmedThrough)throw Error('Unconfirmed production observation');
  const introduced=year>i.introducedYear,channel=site==='river-bank'&&introduced?channelStateAt(i.events,year):null,geometry=channel&&channel.status!=='retired'?i.systems.find(s=>s.id===channel.id)!.geometry:null;

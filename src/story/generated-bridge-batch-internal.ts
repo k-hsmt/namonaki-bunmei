@@ -1,3 +1,4 @@
+import {assertProductionBoundary} from './trial-boundary.js';
 import type {LandPhaseObserver} from './generated-land-batch-internal.js';
 import type {EconomyObserver} from './economy-observer.js';
 import {validateProductionWorld} from '../irrigation/production-history-v1.js';
@@ -20,7 +21,7 @@ export function createGeneratedBridgeReview(terrain:ValidatedTerrainRecord,hydro
  const saved=validateRiverReaches(hydrology,terrain),parent=createGeneratedPublicSpaceReview(terrain,mode,growthPattern);
  return parent.status==='hold'?parent:{format:'generated-bridge-review',status:'review-only',review:{...parent.review,bridgeReview:{schemaVersion:1,hydrology:saved,bridges:[]}}};
 }
-function check(input:GeneratedBridgeReview){
+function check(input:GeneratedBridgeReview){assertProductionBoundary(input);
  if(input.environmentAppearance!==undefined&&(!['landscape-v2','landscape-v3'].includes(input.environmentAppearance)||!input.environment))throw Error('Invalid environment appearance');
  if(input.format!=='generated-bridge-review'||input.status!=='review-only')throw Error('Invalid bridge review boundary');
  if(input.irrigation){validateProductionWorld(input);}else if(input.environment){if(input.vegetation?.schemaVersion!==2)throw Error('Missing coupled vegetation');validateEnvironment(input.environment,validateCoupledVegetation(input.vegetation,input.review),input.review);}else if(input.vegetation)validateVegetationHistory(input.vegetation,input.review);
