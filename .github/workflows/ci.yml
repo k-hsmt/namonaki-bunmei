@@ -563,6 +563,31 @@ jobs:
           path: artifacts/environment34-irrigation-production/**
           if-no-files-found: error
 
+  coupled-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - name: Compare five neutral annual-driver worlds with pre-refactor B saves
+        run: node scripts/audit-coupled-baseline.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-irrigation-coupled-baseline
+          retention-days: 14
+          path: artifacts/environment34-irrigation-coupled/baseline-audit.json
+          if-no-files-found: error
+
   irrigation-economy:
     runs-on: ubuntu-latest
     timeout-minutes: 35
