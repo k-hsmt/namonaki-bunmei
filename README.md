@@ -82,7 +82,11 @@ GainNodeで音量を調整します。読み込み中に停止した場合も、
 音色の合成や再作曲、音源の加工は行いません。
 
 `npm run build` は既存の `scripts/copy-assets.mjs` で音源を `dist/assets/audio/` にコピーし、
-Pagesワークフローは `dist` 全体を配信します。音源URLは相対パスなので `/namonaki-bunmei/` 配下でも利用できます。
+Pagesワークフローは `dist` 全体を配信します。ビルド時にHTML・全JSモジュール・CSS・音源から内容ハッシュを作り、
+画面は `releases/<hash>/` の同じ版のファイル一式を相対URLで参照します。`/namonaki-bunmei/` 配下にも対応します。
+更新後に旧CSSや旧JSがキャッシュに残っても、新HTMLと混ざりません。`dist/release.json` で現在の識別子を確認できます。
+ルートのJSは既存のモデルテストとの互換のため維持します。BGMはゲームと別のモジュール入口で読み込み、
+音楽モジュールの取得・初期化に失敗しても、文明の表示と進行を止めません。
 `node --test tests/browser/music.test.mjs`（ビルド後、PlaywrightのChromium/WebKitが必要）でPC・Pixel 7相当のChromium、PC・iPhone相当のWebKit、
 サブディレクトリ配信、実音源再生、音量、末尾からのループ、停止、再訪時無音、保存データの不変、
 保存拒否・読み込み失敗からの再試行を検証します。既存のブラウザCIにもこのテストが含まれます。

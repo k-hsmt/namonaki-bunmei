@@ -1,5 +1,3 @@
-import {mountMusic} from './music.js';
-mountMusic();
 import {environmentLabel} from './environment/presentation-v1.js';
 import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';

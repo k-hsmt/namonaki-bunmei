@@ -53,3 +53,22 @@ for(const engine of ['chromium','webkit']){
   await page.locator('#music-toggle').click();await page.waitForFunction(()=>window.audioTest.sources[0]?.started);
  });
 }
+
+for(const engine of ['chromium','webkit']){
+ test(`${engine}: stale unversioned CSS/modules cannot affect a new release`,async t=>{
+  const page=await browsers[engine].newPage(devices[engine==='webkit'?'iPhone 13':'Pixel 7']);t.after(()=>page.close());page.setDefaultTimeout(30000);
+  const staleRequests=[],releaseRequests=[];page.on('request',req=>{if(/\.(js|css|mp3)$/.test(new URL(req.url()).pathname))releaseRequests.push(req.url());});
+  // Model the incompatible old files still in a browser cache at stable URLs.
+  await page.route('**/*',async route=>{const url=new URL(route.request().url());if(url.pathname==='/namonaki-bunmei/assets/style.css'||/^\/namonaki-bunmei\/[^/]+\.js$/.test(url.pathname)){staleRequests.push(url.pathname);await route.fulfill({contentType:url.pathname.endsWith('.css')?'text/css':'text/javascript',body:url.pathname.endsWith('.css')?'input{width:110px}.scene-topline{display:flex}':'throw Error("stale cached module");'});}else await route.continue();});
+  await page.goto(origin);await page.waitForSelector('#headline:not(:empty)');await page.waitForSelector('#music-toggle[aria-label]');await page.locator('#music-toggle').click();await page.waitForFunction(()=>document.getElementById('music-status').textContent==='');
+  assert.equal(await page.locator('#music-toggle').getAttribute('aria-pressed'),'true');assert.deepEqual(staleRequests,[]);assert.ok(releaseRequests.length>10);
+  const versions=new Set(releaseRequests.map(url=>{const match=url.match(/\/releases\/([a-f0-9]{16})\//);assert.ok(match,url);return match[1];}));assert.equal(versions.size,1);
+  const layout=await page.evaluate(()=>{const frame=document.querySelector('.scene-topline').getBoundingClientRect(),controls=document.querySelector('.scene-controls').getBoundingClientRect(),checkbox=document.getElementById('scene-motion').getBoundingClientRect(),range=document.getElementById('music-volume').getBoundingClientRect(),label=document.querySelector('.music-control label').getBoundingClientRect();const canvas=document.getElementById('scene'),pixels=canvas.getContext('2d').getImageData(0,0,320,180).data;return {checkbox:checkbox.width,range:range.width,sameRow:Math.abs(range.y+range.height/2-(label.y+label.height/2))<3,within:controls.left>=frame.left&&controls.right<=frame.right+1,colors:new Set(Array.from({length:320*180},(_,i)=>`${pixels[i*4]},${pixels[i*4+1]},${pixels[i*4+2]}`)).size};});
+  assert.equal(layout.checkbox,17);assert.equal(layout.range,64);assert.equal(layout.sameRow,true);assert.equal(layout.within,true);assert.ok(layout.colors>20);
+  await page.setViewportSize({width:320,height:700});assert.equal(await page.locator('.scene-controls').evaluate(e=>e.scrollWidth<=e.clientWidth),true);
+ });
+ test(`${engine}: failed BGM module cannot prevent world startup or progression`,async t=>{
+  const page=await browsers[engine].newPage();t.after(()=>page.close());page.setDefaultTimeout(30000);await page.route('**/music.js',r=>r.abort());await page.goto(origin);await page.waitForSelector('#headline:not(:empty)');await page.waitForFunction(()=>document.getElementById('music-status').textContent.includes('準備できません'));
+  const before=await page.locator('#year').textContent();await page.locator('#step').click();await page.waitForFunction(year=>document.getElementById('year').textContent!==year,before);
+ });
+}
