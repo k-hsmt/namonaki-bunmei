@@ -3,7 +3,8 @@ const SETTINGS_KEY='namonaki-bunmei:music:v1';
 export function mountMusic(){
  const button=document.getElementById('music-toggle') as HTMLButtonElement;
  const volume=document.getElementById('music-volume') as HTMLInputElement;
- const status=document.getElementById('music-status')!;
+ const status=document.getElementById('music-status');
+ if(!button||!volume||!status)return;
  let level=30;
  try{const saved=JSON.parse(localStorage.getItem(SETTINGS_KEY)??'null');if(typeof saved?.volume==='number'&&Number.isFinite(saved.volume))level=Math.max(0,Math.min(100,saved.volume));}catch{/* Storage is optional. */}
  volume.value=String(level);

@@ -23,5 +23,14 @@
 
 .scene-motion-control{display:inline-flex;align-items:center;gap:.25rem;white-space:nowrap;font-size:.72rem}.scene-motion-control input{accent-color:#607b57;margin:0;width:17px;height:17px;padding:0}
 
-.scene-controls{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px}.scene-topline{flex-wrap:wrap}.scene-controls .scene-motion-control{min-height:44px}
-.music-control{display:inline-flex;align-items:center;gap:6px;color:#777c75;font-size:11px;letter-spacing:.03em}.music-control .textbutton{min-height:44px;min-width:56px;padding:6px}.music-control input{width:64px;min-height:44px;accent-color:#597c68}.music-control :focus-visible{outline:2px solid #597c68;outline-offset:3px}.music-status{color:#777c75;font-size:11px;margin:0 0 10px}.music-status:empty{display:none}@media(max-width:600px){.scene-controls{order:3;width:100%;justify-content:flex-start}.scene-topline{gap:4px 8px}}
+/* Keep each Safari native input in a fixed, non-shrinking control cell. */
+.scene-topline{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px 12px}
+.scene-topline>span{white-space:nowrap}.scene-topline>span:last-child{text-align:right}
+.scene-controls{display:flex;align-items:center;justify-content:flex-end;gap:12px;min-width:0}
+.scene-controls .scene-motion-control{display:inline-flex;align-items:center;flex:none;gap:4px;min-height:44px;white-space:nowrap}
+.scene-controls input[type=checkbox]{box-sizing:border-box;flex:none;width:17px;min-width:17px;max-width:17px;height:17px;margin:0;padding:0}
+.music-control{display:inline-flex;flex:none;align-items:center;gap:6px;color:#777c75;font-size:11px;letter-spacing:.03em;white-space:nowrap}
+.music-control .textbutton{flex:none;min-height:44px;min-width:56px;padding:6px}.music-control label{flex:none}
+.music-control input[type=range]{box-sizing:border-box;flex:none;width:64px;min-width:64px;max-width:64px;height:44px;min-height:0;margin:0;padding:0;accent-color:#597c68}
+.music-control :focus-visible{outline:2px solid #597c68;outline-offset:3px}.music-status{color:#777c75;font-size:11px;margin:0 0 10px}.music-status:empty{display:none}
+@media(max-width:600px){.scene-topline{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px}.scene-controls{grid-row:2;grid-column:1/-1;justify-content:flex-start}.scene-topline>span:last-child{grid-row:1;grid-column:2}}
