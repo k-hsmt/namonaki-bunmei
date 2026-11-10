@@ -1,0 +1,45 @@
+name: Issue 35 architecture D1 gallery
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/architecture/**'
+      - 'scripts/review-architecture35-d1.mjs'
+      - 'tests/architecture35-prototype.test.mjs'
+      - 'tests/browser/architecture35-prototype.test.mjs'
+      - 'docs/issue35-d1-visual-review.md'
+      - '.github/workflows/architecture35-d1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  architecture35-d1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: node --test tests/architecture35-prototype.test.mjs
+      - run: npx playwright install --with-deps chromium
+        timeout-minutes: 12
+      - run: node --test tests/browser/architecture35-prototype.test.mjs
+      - name: Capture 68 native and 4x controlled visual cases
+        run: node scripts/review-architecture35-d1.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: architecture35-d1-gallery
+          path: artifacts/architecture35-d1/
+          if-no-files-found: warn
