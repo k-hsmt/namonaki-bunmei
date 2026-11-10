@@ -781,6 +781,10 @@ jobs:
         run: node scripts/audit-terrain-revision.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify controlled cut commits, native before/after pixels and mirrored projection
+        run: node scripts/review-terrain-cut-fixtures.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Compare independent B and v7 years, native scenery and first divergences
         run: node scripts/review-economic-production.mjs
         env:
@@ -843,4 +847,11 @@ jobs:
           name: environment34-terrain-revision
           retention-days: 14
           path: artifacts/environment34-terrain-revision/audit.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-cut-fixtures
+          retention-days: 14
+          path: artifacts/environment34-terrain-cut-fixtures/*
           if-no-files-found: error
