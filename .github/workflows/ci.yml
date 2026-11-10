@@ -52,7 +52,9 @@ jobs:
           if-no-files-found: warn
 
   visual-browser:
-    runs-on: ubuntu-latest
+    # Keep Chromium/WebKit dependencies stable across ubuntu-latest image rollouts.
+    # The 26.04 rollout spent almost 13 minutes fetching packages in this job.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
