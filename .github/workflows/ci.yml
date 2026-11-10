@@ -4,12 +4,41 @@ on:
     branches: [main]
   pull_request:
     branches: [main, 'feat/issue31-*', 'feat/issue34-*']
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Validate CI scope classifier
+        run: node --test tests/ci-scope.test.mjs
+      - name: Select safe PR test scope
+        id: classify
+        run: node scripts/ci-scope.mjs
+        env:
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CI_FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+
   test:
+    needs: scope
+    if: needs.scope.outputs.mode != 'docs'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -21,31 +50,37 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - run: npm ci
+        if: needs.scope.outputs.mode == 'full'
       - run: npm test
+        if: needs.scope.outputs.mode == 'full'
+      - name: Validate independent Issue 35 prototype only
+        if: needs.scope.outputs.mode == 'prototype'
+        run: node --test tests/architecture-prototype.test.mjs
       - name: Audit 1,000 terrain result records
+        if: needs.scope.outputs.mode == 'full'
         run: node scripts/audit-terrain-record.mjs
         env:
           REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && needs.scope.outputs.mode == 'full' }}
         with:
           name: terrain-record-capacity
           path: artifacts/terrain31-record/capacity-audit.json
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && needs.scope.outputs.mode == 'full' }}
         with:
           name: h4d4-site-audit
           path: artifacts/h4d4-site-audit/report.json
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && needs.scope.outputs.mode == 'full' }}
         with:
           name: h4d7b-natural-audit
           path: artifacts/h4d7b-natural/audit.json
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && needs.scope.outputs.mode == 'full' }}
         with:
           name: h4d5-natural-placement
           path: artifacts/h4d5-siting/natural-placement.json
@@ -62,6 +97,8 @@ jobs:
           if-no-files-found: error
 
   visual-browser:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     # Keep Chromium/WebKit dependencies stable across ubuntu-latest image rollouts.
     # The 26.04 rollout spent almost 13 minutes fetching packages in this job.
     runs-on: ubuntu-24.04
@@ -164,6 +201,8 @@ jobs:
           if-no-files-found: warn
 
   h3-longrun:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -201,6 +240,8 @@ jobs:
           if-no-files-found: warn
 
   generated-housing:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -257,6 +298,8 @@ jobs:
           if-no-files-found: error
 
   generated-scenes:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -282,6 +325,8 @@ jobs:
           if-no-files-found: error
 
   generated-save:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -307,6 +352,8 @@ jobs:
           if-no-files-found: error
 
   generated-world-acceptance:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -341,6 +388,8 @@ jobs:
           if-no-files-found: error
 
   organic-growth:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -385,6 +434,8 @@ jobs:
           if-no-files-found: error
 
   environment:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -462,6 +513,8 @@ jobs:
           if-no-files-found: error
 
   scene-motion:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -492,6 +545,8 @@ jobs:
           if-no-files-found: error
 
   vegetation:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -526,6 +581,8 @@ jobs:
           if-no-files-found: error
 
   irrigation-acceptance:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -564,6 +621,8 @@ jobs:
           if-no-files-found: error
 
   irrigation-production:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -598,6 +657,8 @@ jobs:
           if-no-files-found: error
 
   coupled-baseline:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -634,6 +695,8 @@ jobs:
           if-no-files-found: error
 
   coupled-effects:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -659,6 +722,8 @@ jobs:
           if-no-files-found: error
 
   coupled-storage:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -684,6 +749,8 @@ jobs:
           if-no-files-found: error
 
   irrigation-economy:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -720,6 +787,8 @@ jobs:
           if-no-files-found: error
 
   coupled-comparison:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -790,6 +859,8 @@ jobs:
           if-no-files-found: error
 
   economic-production:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -891,6 +962,8 @@ jobs:
           if-no-files-found: error
 
   terrain-change-trial:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -968,6 +1041,8 @@ jobs:
           if-no-files-found: error
 
   terrain-production:
+    needs: scope
+    if: needs.scope.outputs.mode == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
