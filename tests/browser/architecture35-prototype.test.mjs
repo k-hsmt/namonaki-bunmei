@@ -19,7 +19,7 @@ test('Issue35 D1: native-scale, distinguishable culture and roof silhouettes, re
   const before=JSON.stringify(cases);
   const result=await page.evaluate(async cases=>{
    const {drawArchitectureD1Preview,paintArchitectureBuilding}=await import('/architecture/draw-prototype.js');
-   const imageHashes={},alphaMasks={},repeated=[];
+   const imageHashes={},alphaMasks={},casesByFamily={};
    for(const sample of cases){
     const canvas=document.createElement('canvas');
     drawArchitectureD1Preview(canvas,sample);
@@ -28,6 +28,7 @@ test('Issue35 D1: native-scale, distinguishable culture and roof silhouettes, re
     drawArchitectureD1Preview(canvas,sample);
     if(raw!==canvas.toDataURL())throw Error('non-deterministic pixels');
     (imageHashes[sample.family]??=[]).push(raw);
+    (casesByFamily[sample.family]??=[]).push({id:sample.id,raw});
     if(sample.family==='roof'){
      const transparent=document.createElement('canvas');transparent.width=140;transparent.height=126;
      paintArchitectureBuilding(transparent.getContext('2d'),sample.style,'house',70,105,'intact',1);
@@ -36,10 +37,14 @@ test('Issue35 D1: native-scale, distinguishable culture and roof silhouettes, re
      (alphaMasks.roof??=[]).push(mask);
     }
    }
-   return {distinct:Object.fromEntries(Object.entries(imageHashes).map(([k,v])=>[k,new Set(v).size])),roofMasks:new Set(alphaMasks.roof).size};
+   const duplicates=Object.fromEntries(Object.entries(casesByFamily).map(([family,records])=>{
+    const seen=new Map(),duplicates=[];for(const record of records){const old=seen.get(record.raw);if(old)duplicates.push([old,record.id]);else seen.set(record.raw,record.id);}
+    return [family,duplicates];
+   }));
+   return {distinct:Object.fromEntries(Object.entries(imageHashes).map(([k,v])=>[k,new Set(v).size])),duplicates,roofMasks:new Set(alphaMasks.roof).size};
   },cases);
   assert.equal(JSON.stringify(cases),before,'view-only code mutated comparison input');
-  for(const [family,n]of Object.entries(result.distinct))assert.equal(n,cases.filter(c=>c.family===family).length,'pixel identity in '+family);
+  for(const [family,n]of Object.entries(result.distinct))assert.equal(n,cases.filter(c=>c.family===family).length,'pixel identity in '+family+': '+JSON.stringify(result.duplicates[family]));
   assert.equal(result.roofMasks,8,'8 roofs must have distinct opaque silhouettes without colors');
  }finally{await browser?.close();server.kill();}
 });
