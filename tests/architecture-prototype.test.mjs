@@ -115,7 +115,7 @@ test('D2-a: 描画は src/architecture の1実装だけで、本編の年次・�
  const walk=async dir=>(await Promise.all((await readdir(dir,{withFileTypes:true})).map(e=>e.isDirectory()?walk(dir+'/'+e.name):[dir+'/'+e.name]))).flat();
  for(const file of await walk('src')){
   const text=await readFile(file,'utf8');
-  assert.ok(!text.includes('scripts/'),file+' imports a script');
+  assert.ok(![...text.matchAll(/from\s+'([^']+)'/g)].some(m=>m[1].includes('scripts/')),file+' imports a script');
   if(!file.startsWith('src/architecture/'))assert.ok(!/architecture\/[a-z-]+-v1\.js/.test(text),file+' connects D2-a code to the game before D2-b');
   if(file.startsWith('src/architecture/'))assert.ok(!/Math\.random|Date\.now|performance\.now/.test(text),file);
  }

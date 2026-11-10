@@ -95,12 +95,13 @@ test('D2-a/§6.2: 上空に収まらない場合は決まった順で代替し�
   const g=G.createWorldGrammar(seed);if(g.shared.eaves!=='deep')continue;
   const t=G.createRegionalTradition(g,'river-bank',flat),free=birth(g,t,'house','e',5);
   if(free.status!=='ok'||free.features.eaves!=='deep')continue;
-  found++;
   const width=free.envelope.left+free.envelope.right;
   const r=birth(g,t,'house','e',5);
   const narrow=G.deriveBirthStyle({grammar:g,tradition:t,use:'house',plot,ref:{kind:'facility',siteId:'river-bank',id:'e'},source:{kind:'built',year:5}},e=>e.left+e.right<width);
-  assert.equal(narrow.status,'ok');
+  // When something other than the roof sets the width (e.g. an E6 courtyard wall), no stage narrows it: HOLD is correct.
+  if(narrow.status==='hold'){assert.equal(narrow.reason,'envelope');continue;}
   assert.ok(narrow.envelopeStage>=2,'deep eaves dropped first');
+  found++;
   assert.equal(narrow.substitutions.find(s=>s.reason==='envelope').axis,'eaves');
   assert.equal(narrow.features.eaves,'normal');
   assert.ok(narrow.features.entrance!=='E3','deep-eave entrance is replaced with the eaves');
@@ -193,4 +194,30 @@ test('D2-a/§3.2: D2の制約は高度技術の部材を単体でも拒否する
   assert.ok(V.d2Inconsistencies({use:'hall',...bad}).length>0,JSON.stringify(bad));
  assert.deepEqual(V.d2Inconsistencies({use:'hall',structure:'S05',foundation:'F2'}),[]);
  assert.ok(V.d2Inconsistencies({use:'hall',structure:'S05',foundation:'F6'}).length>0);
+});
+
+test('D2-a/A02（案2）: 地形の値は固定した全世界の分布の中での位置に直す。下限の同値は0に留まる',async()=>{
+ const {sitePercentiles}=await import('../dist/architecture/adaptation-v1.js');
+ const {adaptationReference,ADAPTATION_REFERENCE_ID}=await import('../dist/architecture/adaptation-reference-v1.js');
+ assert.equal(G.architecturePolicy.adaptationReference,ADAPTATION_REFERENCE_ID);
+ for(const k of ['slope','water','rock','forest']){
+  const q=adaptationReference[k];assert.equal(q.length,101);
+  for(let i=1;i<q.length;i++)assert.ok(q[i]>=q[i-1],k+' quantiles must be sorted');
+  assert.ok(Object.isFrozen(q));
+ }
+ const none=sitePercentiles({slope:0,water:0,rock:0,forest:0});
+ assert.deepEqual(none,{slope:0,water:0,rock:0,forest:0});
+ const top=sitePercentiles({slope:1000,water:1000,rock:1000,forest:1000});
+ for(const v of Object.values(top))assert.ok(v>900);
+ const t=G.createRegionalTradition(G.createWorldGrammar(3),'river-bank',{slope:0,water:133,rock:0,forest:200});
+ assert.deepEqual(t.percentiles,sitePercentiles(t.inputs));
+});
+
+test('D2-a/A02（案3）: 同じ地形の値でも地区の種類が傾向を変える（決定はしない）',()=>{
+ const same={slope:100,water:100,rock:0,forest:200};
+ const share=(site,pred)=>{let n=0;for(let seed=1;seed<=300;seed++)if(pred(G.createRegionalTradition(G.createWorldGrammar(seed),site,same).choices))n++;return n;};
+ const stone=c=>['S04','S05'].includes(c.structure);
+ const hill=share('hill-side',stone),river=share('river-bank',stone);
+ assert.ok(hill>river,`stone on hills ${hill} vs river ${river}`);
+ assert.ok(hill<300&&river>0,'site kind shifts odds but never decides');
 });

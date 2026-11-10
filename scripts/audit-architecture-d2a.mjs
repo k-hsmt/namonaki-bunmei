@@ -28,6 +28,16 @@ const inputsBySite=Object.fromEntries(sites.map(s=>[s,Object.fromEntries(inputKe
 const spread=Object.fromEntries(inputKeys.map(k=>[k,[]]));
 const choices=Object.fromEntries(regionalAxes.concat('palette').map(a=>[a,Object.fromEntries(sites.map(s=>[s,tally()]))]));
 const shared={roofFamily:tally(),eaves:tally(),pitch:tally(),ornamentCount:tally()};
+// Conditional distributions (PR #113 review): terrain condition → choice tendency, not just "sites differ".
+const traits={
+ raised:c=>c.structure==='S07'||['F3','F5'].includes(c.foundation),
+ stone:c=>['S04','S05'].includes(c.structure)||['rubble','ashlar'].includes(c.wall),
+ timber:c=>['S01','S02'].includes(c.structure)||['log','plank'].includes(c.wall),
+ terraced:c=>['F2','F4'].includes(c.foundation),
+};
+const driver={raised:'water',stone:'slope',timber:'forest',terraced:'slope'};
+const conditional=Object.fromEntries(Object.keys(traits).map(k=>[k,{bySite:Object.fromEntries(sites.map(s=>[s,[0,0]])),byDriver:{low:[0,0],mid:[0,0],high:[0,0]}}]));
+const tercile=p=>p<334?'low':p<667?'mid':'high';
 const pairDifferences=[],identicalWorlds=[],births={total:0,hold:0,constraintSubstitutions:tally(),envelopeStage:tally(),adjustments:tally()};
 let skipped=0;
 const started=Date.now();
@@ -44,6 +54,8 @@ for(let seed=1,used=0;used<count;seed++){
   for(const k of inputKeys)inputsBySite[site][k].push(inputs[k]);
   const t=G.createRegionalTradition(grammar,site,inputs);
   for(const a of regionalAxes.concat('palette'))bump(choices[a][site],t.choices[a]);
+  for(const [k,f] of Object.entries(traits)){const hit=f(t.choices)?1:0,c=conditional[k];c.bySite[site][0]+=hit;c.bySite[site][1]++;
+   const b=c.byDriver[tercile(t.percentiles[driver[k]])];b[0]+=hit;b[1]++;}
   return t;
  });
  for(const k of inputKeys){const v=traditions.map(t=>t.inputs[k]);spread[k].push(Math.max(...v)-Math.min(...v));}
@@ -80,6 +92,9 @@ const report={status:'D2A_AUDIT_NOT_ACCEPTANCE',issue:35,stage:'D2-a',policy:G.a
  sharedChoices:shared,traditionChoices:choices,
  regionalFormAxesDifferingPerSitePair:{...stats(pairDifferences),histogram:pairDifferences.reduce((t,n)=>(bump(t,n),t),{})},
  worldsWithAnIdenticalSitePair:identicalWorlds.length,
+ conditionalShares:Object.fromEntries(Object.entries(conditional).map(([k,c])=>[k,{driver:driver[k],
+  bySite:Object.fromEntries(Object.entries(c.bySite).map(([s,[h,n]])=>[s,{share:n?Math.round(1000*h/n):null,n}])),
+  byDriverTercile:Object.fromEntries(Object.entries(c.byDriver).map(([s,[h,n]])=>[s,{share:n?Math.round(1000*h/n):null,n}]))}])),
  births,
  d1Reproduction:{matchingCells:cells.filter(c=>c==='match').length,totalCells:cells.length,detail:reproduction},
 };
@@ -87,4 +102,5 @@ await mkdir('artifacts/architecture35-d2a',{recursive:true});
 await writeFile('artifacts/architecture35-d2a/audit.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify({type:'architecture35-d2a-audit',worlds:count,skipped,seconds:report.seconds,
  pairDiff:report.regionalFormAxesDifferingPerSitePair,identicalPairWorlds:identicalWorlds.length,
- births:{total:births.total,hold:births.hold},d1Reproduction:`${report.d1Reproduction.matchingCells}/${cells.length}`}));
+ births:{total:births.total,hold:births.hold},d1Reproduction:`${report.d1Reproduction.matchingCells}/${cells.length}`,
+ conditional:Object.fromEntries(Object.entries(report.conditionalShares).map(([k,v])=>[k,{site:Object.values(v.bySite).map(x=>x.share),driver:Object.values(v.byDriverTercile).map(x=>x.share+'/'+x.n)}]))}));

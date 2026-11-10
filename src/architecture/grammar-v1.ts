@@ -10,10 +10,11 @@ import {d2Inconsistencies,eavesKinds,pitches,roofFamilies,ARCHITECTURE_VOCAB_ID,
  type ArchitectureSpec,type PartialSpec,type Use,type RoofFamily,type Eaves,type Pitch,type Structure,type WallMaterial,
  type Foundation,type RoofMaterial,type Window,type Entrance,type Ornament,type Palette} from './vocab-v1.js';
 import {measureArchitecture,type ArchitectureEnvelope} from './draw-v1.js';
-import type {SiteAdaptationInputs,PlotAdaptationInputs} from './adaptation-v1.js';
+import {sitePercentiles,type SiteAdaptationInputs,type PlotAdaptationInputs} from './adaptation-v1.js';
+import {ADAPTATION_REFERENCE_ID} from './adaptation-reference-v1.js';
 
 export const architecturePolicy=Object.freeze({id:'architecture-policy-v1',vocab:ARCHITECTURE_VOCAB_ID,constraints:ARCHITECTURE_CONSTRAINTS_ID,
- useRules:'architecture-use-rules-v1',envelope:'architecture-envelope-v1',adaptation:'architecture-adaptation-v1',introducedYear:0} as const);
+ useRules:'architecture-use-rules-v1',envelope:'architecture-envelope-v1',adaptation:'architecture-adaptation-v1',adaptationReference:ADAPTATION_REFERENCE_ID,introducedYear:0} as const);
 export type ArchitectureSite='river-bank'|'hill-side'|'coast-inlet';
 
 const H=(...parts:(string|number)[])=>terrainHash(parts);
@@ -67,6 +68,9 @@ export function createWorldGrammar(seed:number):WorldArchitecturalGrammar {
 }
 
 // ---- regional adaptation (per-mille multipliers on grammar weights) ----
+// Human decision on PR #113: options 2 + 3. Inputs are first converted to their position in the fixed
+// world-wide reference distribution (sitePercentiles), and the kind of site itself also counts.
+// The multiplier is 1000 + Σ k × percentile + 1000 × site-kind affinity; it shifts odds, never decides.
 type Measure=(i:SiteAdaptationInputs)=>number;
 const forest:Measure=i=>i.forest,open:Measure=i=>1000-i.forest,rock:Measure=i=>i.rock,slope:Measure=i=>i.slope,water:Measure=i=>i.water,dry:Measure=i=>1000-i.water;
 const adaptation:Partial<Record<RegionalAxis,Readonly<Record<string,readonly (readonly [Measure,number])[]>>>>={
@@ -78,11 +82,18 @@ const adaptation:Partial<Record<RegionalAxis,Readonly<Record<string,readonly (re
 /** Palette follows the site's materials (Human decision 4: palette is per site). Colour never counts as form. */
 const paletteAffinity:Readonly<Partial<Record<WallMaterial|RoofMaterial,Palette>>>={log:'P01',plank:'P01',shingle:'P01',earth:'P02',rammed:'P02',plaster:'P02',
  rubble:'P03',ashlar:'P03',slate:'P03',wattle:'P04',thatch:'P04',mixed:'P05',tile:'P02'};
-const adaptedWeight=(grammar:WorldArchitecturalGrammar,axis:RegionalAxis,value:string,inputs:SiteAdaptationInputs)=>
- (grammar.weights[axis][value]??0)*(1000+(adaptation[axis]?.[value]??[]).reduce((a,[m,k])=>a+k*m(inputs),0));
+/** Site kind as an input (option 3): river flats, hill slopes and the coastal inlet favour different builds. */
+const siteAffinity:Readonly<Record<ArchitectureSite,Partial<Record<RegionalAxis,Readonly<Record<string,number>>>>>>={
+ 'river-bank':{structure:{S01:1,S02:1,S07:1},foundation:{F3:1,F5:1},wall:{wattle:1,plank:1},roofMaterial:{thatch:1,shingle:1}},
+ 'hill-side':{structure:{S04:1,S05:1,S06:1},foundation:{F2:1,F4:1},wall:{rubble:1,ashlar:1,mixed:1},roofMaterial:{slate:1}},
+ 'coast-inlet':{structure:{S02:1,S07:1},foundation:{F3:1,F5:1},wall:{plank:1,log:1},roofMaterial:{tile:1,shingle:1}},
+};
+const adaptedWeight=(grammar:WorldArchitecturalGrammar,axis:RegionalAxis,value:string,percentiles:SiteAdaptationInputs,site:ArchitectureSite)=>
+ (grammar.weights[axis][value]??0)*(1000+(adaptation[axis]?.[value]??[]).reduce((a,[m,k])=>a+k*m(percentiles),0)+1000*(siteAffinity[site][axis]?.[value]??0));
 
 export interface RegionalArchitecturalTradition {
- readonly siteId:ArchitectureSite;readonly year:0;readonly inputs:SiteAdaptationInputs;
+ /** `inputs` are the recorded raw measures; `percentiles` their fixed world-wide position (derived, stored for audit). */
+ readonly siteId:ArchitectureSite;readonly year:0;readonly inputs:SiteAdaptationInputs;readonly percentiles:SiteAdaptationInputs;
  readonly choices:{readonly structure:Structure;readonly wall:WallMaterial;readonly foundation:Foundation;readonly roofMaterial:RoofMaterial;
   readonly window:Window;readonly entrance:Entrance;readonly palette:Palette};
  /** Second-choice values the tradition also allows for individual variation. */
@@ -95,8 +106,9 @@ const compatible=<T extends string>(base:PartialSpec,axis:keyof PartialSpec,list
 export function createRegionalTradition(grammar:WorldArchitecturalGrammar,siteId:ArchitectureSite,inputs:SiteAdaptationInputs):RegionalArchitecturalTradition {
  for(const v of Object.values(inputs))if(!Number.isSafeInteger(v)||v<0||v>1000)throw Error('architecture: adaptation inputs must be per-mille integers');
  const t=(...k:(string|number)[])=>H('architecture-tradition-v1',grammar.seed,siteId,...k);
- const spec:PartialSpec={use:'house',...sharedSpec(grammar)};
- const choose=<T extends string>(axis:RegionalAxis,list:readonly T[],salt='')=>pick(t(axis,salt),compatible(spec,axis as keyof PartialSpec,list).map(v=>[v,adaptedWeight(grammar,axis,v,inputs)] as const));
+ const spec:PartialSpec={use:'house',...sharedSpec(grammar)},pct=sitePercentiles(inputs);
+ const weigh=(axis:RegionalAxis,v:string)=>adaptedWeight(grammar,axis,v,pct,siteId);
+ const choose=<T extends string>(axis:RegionalAxis,list:readonly T[],salt='')=>pick(t(axis,salt),compatible(spec,axis as keyof PartialSpec,list).map(v=>[v,weigh(axis,v)] as const));
  spec.structure=choose('structure',regionalCandidates.structure);
  spec.wall=choose('wall',wallsFor[spec.structure as keyof typeof wallsFor]);
  spec.foundation=choose('foundation',regionalCandidates.foundation);
@@ -106,10 +118,10 @@ export function createRegionalTradition(grammar:WorldArchitecturalGrammar,siteId
  const palette=pick(t('palette'),regionalCandidates.palette.map(p=>[p,(grammar.weights.palette[p]??1)*((paletteAffinity[spec.wall!]===p?3:1)+(paletteAffinity[spec.roofMaterial!]===p?2:0))] as const));
  const otherWindows=regionalCandidates.window.filter(w=>w!==spec.window);
  const otherRoofs=compatible(spec,'roofMaterial',regionalCandidates.roofMaterial.filter(r=>r!==spec.roofMaterial));
- return {siteId,year:0,inputs:{...inputs},
+ return {siteId,year:0,inputs:{...inputs},percentiles:pct,
   choices:{structure:spec.structure,wall:spec.wall,foundation:spec.foundation,roofMaterial:spec.roofMaterial,window:spec.window,entrance:spec.entrance,palette},
-  alternates:{window:pick(t('alt-window'),otherWindows.map(v=>[v,adaptedWeight(grammar,'window',v,inputs)] as const)),
-   roofMaterial:otherRoofs.length?pick(t('alt-roof'),otherRoofs.map(v=>[v,adaptedWeight(grammar,'roofMaterial',v,inputs)] as const)):null}};
+  alternates:{window:pick(t('alt-window'),otherWindows.map(v=>[v,weigh('window',v)] as const)),
+   roofMaterial:otherRoofs.length?pick(t('alt-roof'),otherRoofs.map(v=>[v,weigh('roofMaterial',v)] as const)):null}};
 }
 
 // ---- use rules (architecture-use-rules-v1): functional differences, not culture ----

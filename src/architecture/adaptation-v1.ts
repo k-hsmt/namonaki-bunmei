@@ -5,6 +5,7 @@
  */
 import type {RecordRaster} from '../terrain/terrain-record-raster-v1.js';
 import {vegetationStage,type VegetationPatch} from '../vegetation/history-v1.js';
+import {adaptationReference} from './adaptation-reference-v1.js';
 
 /** Per-mille (0..1000) site measures taken from year-0 records. */
 export interface SiteAdaptationInputs {
@@ -22,6 +23,16 @@ export interface SiteAdaptationInputs {
  readonly forest:number;
 }
 const permille=(n:number,d:number)=>d?Math.round(1000*n/d):0;
+
+/**
+ * Position of each raw input in the fixed world-wide reference distribution (Human decision on
+ * PR #113: option 2). Per-mille share of reference quantiles strictly below the value, so a value at
+ * the common floor (e.g. no cliff at all) stays at 0 instead of the middle of a tie.
+ */
+export function sitePercentiles(i:SiteAdaptationInputs):SiteAdaptationInputs {
+ const rank=(v:number,q:readonly number[])=>Math.round(1000*q.filter(x=>x<v).length/q.length);
+ return {slope:rank(i.slope,adaptationReference.slope),water:rank(i.water,adaptationReference.water),rock:rank(i.rock,adaptationReference.rock),forest:rank(i.forest,adaptationReference.forest)};
+}
 const GROUND_TOP=96;
 
 export function measureSiteAdaptation(raster:RecordRaster,patches:readonly (VegetationPatch|null)[]):SiteAdaptationInputs {
