@@ -121,3 +121,36 @@ test('D2-b1/§5.3: 同じ年の建設は 地区→施設→住宅→ID→seq の
  const list=P.listConstructions(fake({placements:[house('coast-inlet','c'),house('river-bank','z'),house('river-bank','a')],events:[ev]}));
  assert.deepEqual(list.map(c=>c.ref.kind==='facility'?c.ref.id:c.ref.blockId),['a','z','a-block','c']);
 });
+
+// ---- PR #114 review ----
+const birthAt=(id,year,features={window:'W1'})=>({status:'ok',ref:{kind:'facility',siteId:'river-bank',id},source:{kind:'built',year},use:'house',traditionSite:'river-bank',features,adjustments:[],substitutions:[]});
+
+test('D2-b1/§5.3: 同じ年の途中に新しい建設が入っても、過去の記録が同一なら受け入れる',()=>{
+ const before=[birthAt('a',10),birthAt('c',10)],after=[birthAt('a',10),birthAt('b',10),birthAt('c',10),birthAt('d',11)];
+ assert.deepEqual(P.mergeBirths(before,after),after);
+});
+
+test('D2-b1/§5.3: 過去の記録の様式が変わる・消える・重複する場合は拒否する（様式まで照合）',()=>{
+ const before=[birthAt('a',10),birthAt('c',10)];
+ assert.throws(()=>P.mergeBirths(before,[birthAt('a',10,{window:'W2'}),birthAt('c',10)]),/birth style changed/);
+ assert.throws(()=>P.mergeBirths(before,[birthAt('a',10)]),/disappeared/);
+ assert.throws(()=>P.mergeBirths(before,[birthAt('a',10),birthAt('a',10),birthAt('c',10)]),/duplicate/);
+});
+
+test('D2-b1: 保留中の選択を解決しながら進めても、毎回の記録が全件再計算と一致する',async()=>{
+ let w=P.introduceArchitectureProduction(await fresh()),choices=0;
+ while(w.terrain.review.state.year<700){
+  w=w.terrain.review.state.pending?(choices++,await P.chooseArchitectureWorld(w,0)):await P.advanceArchitectureWorld(w,60,'stop');
+  assert.equal(JSON.stringify(w.architecture.births),JSON.stringify(P.expectedArchitectureLedger(w.terrain).births),'year '+w.terrain.review.state.year);
+ }
+ assert.ok(choices>0,'no pending choice was resolved');
+ await P.validateArchitectureSave(JSON.parse(JSON.stringify(await P.prepareArchitectureSave(w))));
+});
+
+test('D2-b1: 施設が置かれた地区と別の地区の台帳に載っていれば拒否する。住宅は地区と街区の組で数える',()=>{
+ const house={id:'river-bank-0',kind:'house',x:1,y:1,builtYear:0,condition:'intact'};
+ const place={objectId:'river-bank-0',site:'river-bank',kind:'house',plot,entrance:[1,1],builtYear:0,sourceRecordId:'0-0'};
+ assert.throws(()=>P.listConstructions(fake({placements:[place],buildingChanges:[[],[{year:0,building:house}],[]]})),/another site ledger/);
+ const ev=(site,count)=>({year:5,seq:0,kind:'built',blockId:'same',after:{...block('same',count),siteId:site}});
+ assert.equal(P.listConstructions(fake({events:[ev('river-bank',3),ev('hill-side',2)]})).length,2);
+});

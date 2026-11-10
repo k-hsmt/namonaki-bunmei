@@ -61,10 +61,17 @@ export interface Construction {readonly ref:BuildingRef;readonly source:BirthSou
 export function listConstructions(world:TerrainProductionWorld):Construction[] {
  const r=world.review,state=r.state,out:Construction[]=[];
  const observed=state.observation?.sites??fail('missing settlement ledger');
+ // The v8 settlement ledger is ordered like story/population.ts `settlements` (river-bank, hill-side,
+ // coast-inlet). Verify it from the ledger itself instead of assuming the index order.
+ if(observed.length!==sites.length)fail('settlement ledger must have three sites');
+ const ledgerSiteOf=(id:string)=>{const found=observed.map((l,i)=>l.buildingChanges.some(c=>c.building.id===id)?i:-1).filter(i=>i>=0);
+  if(found.length>1)fail('building '+id+' appears in more than one site ledger');return found[0];};
  for(const p of r.placements){
   if(p.kind==='field')continue;
   const use=facilityUse[p.kind]??fail('unknown facility kind '+p.kind);
   const siteIndex=sites.indexOf(p.site as ArchitectureSite);if(siteIndex<0)fail('unknown site '+p.site);
+  const ledger=ledgerSiteOf(p.objectId);
+  if(ledger!==undefined&&ledger!==siteIndex)fail('facility '+p.objectId+' is placed in '+p.site+' but recorded in another site ledger');
   const first=observed[siteIndex]!.buildingChanges.find(c=>c.building.id===p.objectId);
   if(first&&first.year!==p.builtYear)fail('facility '+p.objectId+' first recorded in '+first.year+', placed in '+p.builtYear);
   let civic:{style:'great-hall'|'courtyard-hall';constructionRecordId:string}|undefined;
@@ -75,12 +82,14 @@ export function listConstructions(world:TerrainProductionWorld):Construction[] {
   }
   out.push({ref:{kind:'facility',siteId:p.site as ArchitectureSite,id:p.objectId,...(civic?{civic}:{})},source:{kind:'built',year:p.builtYear,recordId:p.sourceRecordId},use,plot:p.plot});
  }
+ // Keyed by site and block so the check does not depend on block ids being unique across sites.
  const counts=new Map<string,number>();
  for(const e of state.housing?.events??[]){
   if(e.kind!=='built'&&e.kind!=='expanded'){continue;}
-  const before=counts.get(e.blockId)??0,after=e.after.housingCount;
+  if(e.after.blockId!==e.blockId)fail('housing event block mismatch '+e.blockId);
+  const blockKey=e.after.siteId+'\u0000'+e.blockId,before=counts.get(blockKey)??0,after=e.after.housingCount;
   if(e.kind==='built'&&before!==0||e.kind==='expanded'&&(before===0||after<=before))fail('housing parts out of order for '+e.blockId);
-  counts.set(e.blockId,after);
+  counts.set(blockKey,after);
   const use=housingUse[e.after.styleId]??fail('unknown housing style '+e.after.styleId);
   out.push({ref:{kind:'housing',siteId:e.after.siteId,blockId:e.blockId,parts:{from:before,to:after}},source:{kind:e.kind,year:e.year,seq:e.seq,...(e.causeRecordId?{recordId:e.causeRecordId}:{})},use,plot:e.after.footprint});
  }
@@ -122,15 +131,28 @@ export function introduceArchitectureProduction(terrain:TerrainProductionWorld):
  * Design §5.3 update boundary: take the next v8 world as an immutable candidate, append births for
  * every new construction, and publish one new root. Any failure throws and the caller keeps the old root.
  */
+/**
+ * Merges a full recomputation with the previous ledger. New constructions may sort between earlier
+ * ones of the same year (e.g. when resolving a pending choice adds a construction in that year), so
+ * the past is checked as a set: every earlier birth must reappear byte-identical, features included.
+ * A full recomputation costs a few milliseconds (D2-b1 audit), so nothing is appended blindly.
+ */
+export function mergeBirths(previous:readonly BirthFeatures[],recomputed:readonly BirthFeatures[]):readonly BirthFeatures[] {
+ const key=(b:BirthFeatures)=>JSON.stringify([b.ref,b.source]);
+ const now=new Map(recomputed.map(b=>[key(b),JSON.stringify(b)]));
+ if(now.size!==recomputed.length)fail('duplicate construction in the recorded history');
+ for(const b of previous){
+  const again=now.get(key(b));
+  if(again===undefined)fail('a recorded construction disappeared: '+key(b));
+  if(again!==JSON.stringify(b))fail('a recorded birth style changed: '+key(b));
+ }
+ return recomputed;
+}
 function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorld):ArchitectureProductionWorld {
  if(terrain===previous.terrain)return previous;
- const old=previous.architecture,all=listConstructions(terrain);
- if(all.length<old.births.length)fail('constructions disappeared from the recorded history');
- const {grammar,traditions}=old;
- const births=[...old.births,...all.slice(old.births.length).map(c=>birthOf(terrain,grammar,traditions,c))];
- // existing births must still describe the same constructions, in the same order (immutable past)
- for(let i=0;i<old.births.length;i++){const c=all[i]!,b=old.births[i]!;if(JSON.stringify([c.ref,c.source,c.use])!==JSON.stringify([b.ref,b.source,b.use]))fail('recorded construction changed at '+i);}
- return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births}});
+ const old=previous.architecture,{grammar,traditions}=old;
+ const recomputed=listConstructions(terrain).map(c=>birthOf(terrain,grammar,traditions,c));
+ return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births:mergeBirths(old.births,recomputed)}});
 }
 export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={}):Promise<ArchitectureProductionWorld>{
  knownArchitectureWorld(world);return next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options));
