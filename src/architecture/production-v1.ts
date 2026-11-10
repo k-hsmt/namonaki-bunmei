@@ -8,7 +8,11 @@
  *   (field excluded; civic halls are facilities with a civic attribute) and each housing `built` /
  *   `expanded` event. Births are derived from the recorded v8 history and the terrain of the
  *   construction year, then stored; the reader recomputes all of them and rejects any difference.
- * - The air-space envelope and its fallback chain are deferred to D2-b2 (Human decision A on D2-b).
+ * - D2-b2: every birth also records its air-space envelope (architecture-envelope-v1, from the D2-c
+ *   drawing geometry) and the fallback stage that made it fit. A construction is checked against the
+ *   envelopes of constructions from EARLIER YEARS in its site, never the same year, so a construction
+ *   added in an already recorded year (e.g. resolving a choice) cannot change an earlier record.
+ *   If even the last stage does not fit, the advance fails closed (HOLD) and the old root is kept.
  * - Not connected to the common world-save dispatch, browser keys or UI (D2-d, together with D3).
  */
 import type {TerrainProductionWorld} from '../terrain/terrain-production-types-v1.js';
@@ -21,18 +25,21 @@ import {terrainProductionMaxBytes} from '../terrain/terrain-production-contract-
 import {resolveTerrainAtYear,terrainSitePhysics} from '../terrain/terrain-revision-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {measureSiteAdaptation,measurePlotAdaptation} from './adaptation-v1.js';
-import {architecturePolicy,createWorldGrammar,createRegionalTradition,deriveBirthFeatures,
- type ArchitectureSite,type WorldArchitecturalGrammar,type RegionalArchitecturalTradition,type BirthFeatures,type BuildingRef,type BirthSource} from './grammar-v1.js';
+import {architecturePolicy,createWorldGrammar,createRegionalTradition,deriveBirthStyle,
+ type ArchitectureSite,type WorldArchitecturalGrammar,type RegionalArchitecturalTradition,type BirthStyle,type BuildingRef,type BirthSource} from './grammar-v1.js';
+import {ENVELOPE_ID,facilityAirspace,housingAirspace,airspaceConflict,type AirspaceRect} from './airspace-v1.js';
+import type {ResidentialBlock} from '../story/housing-history.js';
+export type RecordedBirth=BirthStyle<AirspaceRect>;
 import type {Use} from './vocab-v1.js';
 
 export const ARCHITECTURE_WORLD_FORMAT='architecture-production-world-v1';
 const sites:readonly ArchitectureSite[]=['river-bank','hill-side','coast-inlet'];
 export interface ArchitectureLedger {
- readonly format:'architecture-ledger-v1';readonly schemaVersion:1;readonly policy:typeof architecturePolicy;
- /** D2-b1 records no envelope. D2-b2 adds it with a new schema before any public release. */
- readonly envelope:'deferred-to-d2-b2';
+ readonly format:'architecture-ledger-v1';readonly schemaVersion:2;readonly policy:typeof architecturePolicy;
+ /** D2-b2: births carry their air-space envelope (schema 2; schema 1 of D2-b1 was never released). */
+ readonly envelope:typeof ENVELOPE_ID;
  readonly grammar:WorldArchitecturalGrammar;readonly traditions:readonly RegionalArchitecturalTradition[];
- readonly births:readonly BirthFeatures[];
+ readonly births:readonly RecordedBirth[];
 }
 export interface ArchitectureProductionWorld {
  readonly format:typeof ARCHITECTURE_WORLD_FORMAT;readonly status:'production';
@@ -53,7 +60,7 @@ export function knownArchitectureWorld(world:ArchitectureProductionWorld):void {
 const facilityUse:Readonly<Record<string,Use>>={house:'house',hall:'hall',granary:'granary',workshop:'workshop',market:'market',civic:'hall'};
 const housingUse:Readonly<Record<string,Use>>={low:'house',terraced:'rowhouse',courtyard:'courtyard'};
 type Plot={readonly x:number;readonly y:number;readonly width:number;readonly depth:number};
-export interface Construction {readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly plot:Plot}
+export interface Construction {readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly plot:Plot;readonly block?:ResidentialBlock}
 /**
  * Lists every construction in the recorded history, in the fixed processing order of design §5.3:
  * year → site → facility before housing → id → seq. Inconsistent records fail closed.
@@ -91,7 +98,7 @@ export function listConstructions(world:TerrainProductionWorld):Construction[] {
   if(e.kind==='built'&&before!==0||e.kind==='expanded'&&(before===0||after<=before))fail('housing parts out of order for '+e.blockId);
   counts.set(blockKey,after);
   const use=housingUse[e.after.styleId]??fail('unknown housing style '+e.after.styleId);
-  out.push({ref:{kind:'housing',siteId:e.after.siteId,blockId:e.blockId,parts:{from:before,to:after}},source:{kind:e.kind,year:e.year,seq:e.seq,...(e.causeRecordId?{recordId:e.causeRecordId}:{})},use,plot:e.after.footprint});
+  out.push({ref:{kind:'housing',siteId:e.after.siteId,blockId:e.blockId,parts:{from:before,to:after}},source:{kind:e.kind,year:e.year,seq:e.seq,...(e.causeRecordId?{recordId:e.causeRecordId}:{})},use,plot:e.after.footprint,block:e.after});
  }
  const key=(c:Construction)=>[c.source.year,sites.indexOf(c.ref.siteId),c.ref.kind==='facility'?0:1,c.ref.kind==='facility'?c.ref.id:c.ref.blockId,c.source.seq??0] as const;
  return out.sort((a,b)=>{const x=key(a),y=key(b);for(let i=0;i<x.length;i++){if(x[i]!==y[i])return x[i]!<y[i]!?-1:1;}return 0;});
@@ -103,20 +110,34 @@ function grammarAndTraditions(world:TerrainProductionWorld){
  const traditions=sites.map(site=>createRegionalTradition(grammar,site,measureSiteAdaptation(readOwnedRecordPhysics(initial.sites[site].physics),vegetation.initial[site])));
  return {grammar,traditions};
 }
-function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction):BirthFeatures {
+function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction,earlier:readonly AirspaceRect[]):RecordedBirth {
  const tradition=traditions[sites.indexOf(c.ref.siteId)]!;
  // Design §5.2 input 2: the confirmed terrain of the construction year, never the latest terrain.
  const raster=readOwnedRecordPhysics(terrainSitePhysics(resolveTerrainAtYear(world.terrainHistory,c.source.year),c.ref.siteId));
- const r=deriveBirthFeatures({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot)});
- if(r.status!=='ok')return fail('birth HOLD for '+JSON.stringify(c.ref)+': '+r.detail);
+ const decks=(world.review.bridgeReview?.bridges??[]).filter(b=>b.geometry.siteId===c.ref.siteId&&b.builtYear<=c.source.year).map(b=>b.geometry.deck);
+ const civic=c.ref.kind==='facility'?c.ref.civic?.style:undefined;
+ const measure=(spec:Parameters<typeof facilityAirspace>[0])=>c.ref.kind==='housing'?housingAirspace(spec,c.block??fail('housing construction without its block')):facilityAirspace(spec,c.plot,civic);
+ const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot)},
+  e=>airspaceConflict(e,{earlier,decks,raster,plot:c.plot})===null,measure);
+ if(r.status!=='ok')return fail('birth HOLD ('+r.reason+') for '+JSON.stringify(c.ref)+': '+r.detail);
  return r;
+}
+/** Births in construction order. Each is checked against the envelopes of earlier years in its site. */
+function birthsFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[]):RecordedBirth[] {
+ const out:RecordedBirth[]=[],bySite=new Map<string,{year:number;rect:AirspaceRect}[]>();
+ for(const c of listConstructions(world)){
+  const site=bySite.get(c.ref.siteId)??[];
+  const b=birthOf(world,grammar,traditions,c,site.filter(x=>x.year<c.source.year).map(x=>x.rect));
+  site.push({year:c.source.year,rect:b.envelope});bySite.set(c.ref.siteId,site);out.push(b);
+ }
+ return out;
 }
 /** The complete ledger the recorded v8 history implies. Pure in the v8 world; used by the writer and the reader. */
 export function expectedArchitectureLedger(world:TerrainProductionWorld):ArchitectureLedger {
  knownTerrainProductionWorldInternal(world);
  const {grammar,traditions}=grammarAndTraditions(world);
- return {format:'architecture-ledger-v1',schemaVersion:1,policy:architecturePolicy,envelope:'deferred-to-d2-b2',grammar,traditions,
-  births:listConstructions(world).map(c=>birthOf(world,grammar,traditions,c))};
+ return {format:'architecture-ledger-v1',schemaVersion:2,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
+  births:birthsFor(world,grammar,traditions)};
 }
 const sameLedger=(a:ArchitectureLedger,b:ArchitectureLedger)=>JSON.stringify(a)===JSON.stringify(b);
 
@@ -137,8 +158,8 @@ export function introduceArchitectureProduction(terrain:TerrainProductionWorld):
  * the past is checked as a set: every earlier birth must reappear byte-identical, features included.
  * A full recomputation costs a few milliseconds (D2-b1 audit), so nothing is appended blindly.
  */
-export function mergeBirths(previous:readonly BirthFeatures[],recomputed:readonly BirthFeatures[]):readonly BirthFeatures[] {
- const key=(b:BirthFeatures)=>JSON.stringify([b.ref,b.source]);
+export function mergeBirths<B extends {readonly ref:BuildingRef;readonly source:BirthSource}>(previous:readonly B[],recomputed:readonly B[]):readonly B[] {
+ const key=(b:B)=>JSON.stringify([b.ref,b.source]);
  const now=new Map(recomputed.map(b=>[key(b),JSON.stringify(b)]));
  if(now.size!==recomputed.length)fail('duplicate construction in the recorded history');
  for(const b of previous){
@@ -151,7 +172,7 @@ export function mergeBirths(previous:readonly BirthFeatures[],recomputed:readonl
 function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorld):ArchitectureProductionWorld {
  if(terrain===previous.terrain)return previous;
  const old=previous.architecture,{grammar,traditions}=old;
- const recomputed=listConstructions(terrain).map(c=>birthOf(terrain,grammar,traditions,c));
+ const recomputed=birthsFor(terrain,grammar,traditions);
  return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births:mergeBirths(old.births,recomputed)}});
 }
 export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={}):Promise<ArchitectureProductionWorld>{
