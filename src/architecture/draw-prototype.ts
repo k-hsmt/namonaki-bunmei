@@ -92,7 +92,7 @@ function entranceMarks(c:C,style:ArchitectureStyle,x:number,base:number,w:number
  if(style.entrance==='courtyard')width=9;
  R(c,left,base-height,width,height,p.opening);
  if(style.entrance==='under-eave'||style.entrance==='porch'){R(c,left-3,base-height-4,width+6,3,p.roof);for(const dx of [-2,width+1])R(c,left+dx,base-height-1,2,10,p.trim);}
- if(style.entrance==='stairs'){for(let i=0;i<3;i++)R(c,left-1-i,base+i,8+2*i,1,p.trim);}
+ if(style.entrance==='stairs'){for(let i=0;i<3;i++)R(c,left-2-i,base+3+i,10+2*i,1,p.trim);}
  if(style.entrance==='courtyard'){R(c,left-6,base-3,5,6,p.shade);R(c,left+width+1,base-3,5,6,p.shade);}
  if(style.entrance==='wide')R(c,left-1,base-height-2,width+2,2,p.trim);
  if(style.entrance==='side')R(c,left+width+2,top+3,2,5,p.shade);
