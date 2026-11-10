@@ -11,7 +11,7 @@ import {irrigationEconomyRule} from './economy-types-v1.js';
 import {runAnnualKernel} from './annual-baseline-internal.js';
 import {captureEconomicOriginInternal} from './economic-origin-internal.js';
 import {economicSourceCursorsInternal} from './economic-source-cursors-internal.js';
-import {reviewBaseHash,freezeReviewRecordInternal} from './wire-v1.js';
+import {reviewBaseHash,freezeReviewWriterDataInternal} from './wire-v1.js';
 import {economicOriginDialect,type EconomicProductionWorld} from './economic-production-types-v1.js';
 import {ownEconomicProductionWorldInternal as own,knownEconomicProductionWorldInternal as known} from './economic-production-owned-internal.js';
 import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
@@ -31,7 +31,7 @@ function progress(input:EconomicProductionWorld,run:Parameters<typeof runAnnualK
  const result=runAnnualKernel(economicProductionViewInternal(input),run,{}, {mode:'production',policy:'combined',introducedYear:before.introducedYear,prepared:before.prepared,capture(c,p){
   if(c.year!==applied+1||p.effect.sourceYear!==applied)throw Error('Duplicate economic production commit');
   const mask=(v:readonly boolean[])=>v.reduce((m,x,i)=>m|(x?1<<i:0),0);
-  receipts.push(freezeReviewRecordInternal({year:c.year,effect:p.effect,gainBp:p.modifier.gainBp,costBp:p.modifier.costBp,input:[[...c.before.people],c.drought,mask(regions.map(r=>c.conditions.blockedRegions.includes(r.id))),c.conditions.granaries?mask(c.conditions.granaries):-1,c.conditions.disruptionId??null,c.records.map(r=>r.id)],harvest:[...c.totals.harvest],discarded:[...c.totals.discarded]}));applied=c.year;
+  receipts.push(freezeReviewWriterDataInternal({year:c.year,effect:p.effect,gainBp:p.modifier.gainBp,costBp:p.modifier.costBp,input:[c.before.people,c.drought,mask(regions.map(r=>c.conditions.blockedRegions.includes(r.id))),c.conditions.granaries?mask(c.conditions.granaries):-1,c.conditions.disruptionId??null,c.records.map(r=>r.id)],harvest:c.totals.harvest,discarded:c.totals.discarded}));applied=c.year;
  },checkpoint(year,review,phaseCount){checkpoints.push({year,economy:structuredClone(review.state.economy!),people:[...review.state.observation!.people],phaseCount:before.phases.length+phaseCount,sourceCursors:economicSourceCursorsInternal(review,year)});}});
  if(applied!==result.diagnostics.confirmedThrough)throw Error('Economic production confirmation differs');
  return own({...result.world,format:'irrigation-economic-production-world-v1',status:'production',review:{...result.world.review,economicPolicyBoundary:economicProductionBoundary},economicCoupling:{...before,confirmedThrough:applied,receipts,checkpoints,phases:[...before.phases,...result.diagnostics.phases],prepared:result.prepared}});

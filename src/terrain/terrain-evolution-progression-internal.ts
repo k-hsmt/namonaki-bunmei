@@ -2,7 +2,7 @@
 import {regions} from '../story/population.js';
 import {runAnnualTerrainKernelInternal} from '../irrigation/annual-baseline-internal.js';
 import {economicSourceCursorsInternal} from '../irrigation/economic-source-cursors-internal.js';
-import {freezeReviewRecordInternal} from '../irrigation/wire-v1.js';
+import {freezeReviewRecordInternal,freezeReviewWriterDataInternal} from '../irrigation/wire-v1.js';
 import {resolveTerrainAtYear,terrainHistoryThrough} from './terrain-revision-v1.js';
 import {terrainEvolutionViewInternal} from './terrain-evolution-view-internal.js';
 import {selectNaturalTerrainCutInternal} from './terrain-cut-selection-internal.js';
@@ -19,7 +19,7 @@ export async function progressTerrainEvolutionInternal(input:TerrainEvolutionWor
  };
  const result=await runAnnualTerrainKernelInternal(terrainEvolutionViewInternal(input),async(batch,commit)=>run(batch,commit,()=>boundary(batch.review)),{mode:profile.kind==='production'?'terrain-production':'terrain-trial',policy:'combined',introducedYear:before.introducedYear,prepared:before.prepared,terrain:{at:(year,site)=>{if(site!=='hill-side')return history.initial;if(year>projection.confirmedThrough)projection=terrainHistoryThrough(projection,year);return resolveTerrainAtYear(projection,year);},disturbancesAt:year=>terrainCutVegetationEventsInternal(history,year)},capture(c,p){
   if(c.year!==applied+1||p.effect.sourceYear!==applied)throw Error('Duplicate terrain economic commit');const mask=(v:readonly boolean[])=>v.reduce((m,x,i)=>m|(x?1<<i:0),0);
-  receipts.push(freezeReviewRecordInternal({year:c.year,effect:p.effect,gainBp:p.modifier.gainBp,costBp:p.modifier.costBp,input:[[...c.before.people],c.drought,mask(regions.map(r=>c.conditions.blockedRegions.includes(r.id))),c.conditions.granaries?mask(c.conditions.granaries):-1,c.conditions.disruptionId??null,c.records.map(r=>r.id)],harvest:[...c.totals.harvest],discarded:[...c.totals.discarded]}));applied=c.year;
+  receipts.push(freezeReviewWriterDataInternal({year:c.year,effect:p.effect,gainBp:p.modifier.gainBp,costBp:p.modifier.costBp,input:[c.before.people,c.drought,mask(regions.map(r=>c.conditions.blockedRegions.includes(r.id))),c.conditions.granaries?mask(c.conditions.granaries):-1,c.conditions.disruptionId??null,c.records.map(r=>r.id)],harvest:c.totals.harvest,discarded:c.totals.discarded}));applied=c.year;
  },checkpoint(year,review,phaseCount){checkpoints.push({year,economy:structuredClone(review.state.economy!),people:[...review.state.observation!.people],phaseCount:before.phases.length+phaseCount,sourceCursors:economicSourceCursorsInternal(review,year)});}});
  if(applied!==result.diagnostics.confirmedThrough)throw Error('Terrain economic confirmation differs');
  return {world:result.world,economicCoupling:{...before,confirmedThrough:applied,receipts,checkpoints,phases:[...before.phases,...result.diagnostics.phases],prepared:result.prepared},terrainHistory:terrainHistoryThrough(history,applied),ledger:{...ledger,confirmedThrough:applied,decisions}};

@@ -20,3 +20,20 @@ export function frozenEconomyCapture(value:EconomyCapture):EconomyCapture {
  const rest=freeze({conditions:{...value.conditions,harvestFactors:[...value.conditions.harvestFactors],blockedRegions:[...value.conditions.blockedRegions],...(value.conditions.granaries?{granaries:[...value.conditions.granaries]}:{})},after:{economy:copyEconomy(value.after.economy),people:[...value.after.people]},records:value.records.map(r=>({id:r.id,event:{...r.event,causes:[...r.event.causes],...(r.event.relatedIds?{relatedIds:[...r.event.relatedIds]}:{})}})),totals:{harvest:[...value.totals.harvest],imports:[...value.totals.imports],traded:[...value.totals.traded],discarded:[...value.totals.discarded],moves:value.totals.moves.map(m=>({...m}))}});
  return Object.freeze({year:value.year,drought:value.drought,before,...rest});
 }
+
+/** Private annual receipts need only these detached values, not two full economies.
+ * Public observers retain the complete immutable EconomyCapture above. */
+export interface CoupledReceiptCaptureInternal {
+ readonly year:number;readonly drought:number;
+ readonly before:{readonly people:readonly number[]};
+ readonly conditions:Pick<EconomyCapture['conditions'],'blockedRegions'|'granaries'|'disruptionId'>;
+ readonly records:readonly {readonly id:string}[];
+ readonly totals:Pick<EconomyCapture['totals'],'harvest'|'discarded'>;
+}
+export type CoupledReceiptObserverInternal=(capture:CoupledReceiptCaptureInternal)=>void;
+export function frozenCoupledReceiptCaptureInternal(value:CoupledReceiptCaptureInternal):CoupledReceiptCaptureInternal {
+ return Object.freeze({year:value.year,drought:value.drought,before:Object.freeze({people:Object.freeze([...value.before.people])}),
+  conditions:Object.freeze({disruptionId:value.conditions.disruptionId,blockedRegions:Object.freeze([...value.conditions.blockedRegions]),...(value.conditions.granaries?{granaries:Object.freeze([...value.conditions.granaries])}:{})}),
+  records:Object.freeze(value.records.map(r=>Object.freeze({id:r.id}))),
+  totals:Object.freeze({harvest:Object.freeze([...value.totals.harvest]),discarded:Object.freeze([...value.totals.discarded])})});
+}

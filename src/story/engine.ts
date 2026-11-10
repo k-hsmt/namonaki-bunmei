@@ -1,5 +1,5 @@
 import {decisionTemplatesV1 as decisionTemplates} from './decision-templates-v1.js';
-import {beginEconomyCapture,frozenEconomyCapture,type EconomyObserver} from './economy-observer.js';
+import {beginEconomyCapture,frozenEconomyCapture,frozenCoupledReceiptCaptureInternal,type CoupledReceiptObserverInternal,type EconomyObserver} from './economy-observer.js';
 import {publicSpacesAt,overlapsPublicSpace,appendConfirmedPublicSpace,appendConfirmedPublicSpaceUse} from './public-space-history.js';
 import {proposePublicSpaceProgression} from './public-space-progression.js';
 import type {PublicSpaceHistory} from './public-space-history.js';
@@ -32,6 +32,7 @@ export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHis
  */
 export interface ReviewLandProgression {
  readonly mode:'generated-review-only'|'irrigation-coupled-review-only'|'irrigation-economic-production-v1'|'terrain-change-review-only'|'terrain-production-v1';readonly observeEconomy?:EconomyObserver;
+ readonly captureCoupledReceiptInternal?:CoupledReceiptObserverInternal;
  readonly coupledEconomy?:()=>import('./coupled-economy-policy-internal.js').CoupledAnnualModifier;
  placeFacility:(state:CivilizationState,siteIndex:number,candidate:Readonly<import('./settlement-history.js').Building>)=>
   {status:'clear';x:number;y:number}|{status:'hold'};
@@ -88,13 +89,16 @@ function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
  }
  s.economy??=createRegionalEconomy();
  const observer=land?.observeEconomy;if(observer!==undefined&&typeof observer!=='function')throw Error('Invalid economy observer');
+ const receiptObserver=land?.captureCoupledReceiptInternal;if(receiptObserver!==undefined&&(land?.mode==='generated-review-only'||typeof receiptObserver!=='function'||observer!==undefined))throw Error('Private receipt capture requires an exclusive coupled writer');
+ const beforePeople=receiptObserver?[...ledger.people]:undefined;
  const before=observer?beginEconomyCapture(s.economy,ledger.people):undefined,records:import('./economy-observer.js').EconomyCapture['records'][number][]=[];
  const conditions={
   harvestFactors,blockedRegions:new Set(flood?['river']:[]),disruptionId:flood?.id,
   granaries:s.society?.sites.map(site=>site.practices.some(p=>p.kind==='granary'&&p.active)),
  };
- const totals=updateRegionalEconomy(s.economy,ledger.people,s.year,conditions,event=>{const id=entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds);if(observer)records.push({id,event});return id;},ledger.legacy?.year);
+ const totals=updateRegionalEconomy(s.economy,ledger.people,s.year,conditions,event=>{const id=entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds);if(observer||receiptObserver)records.push({id,event});return id;},ledger.legacy?.year);
  if(observer)observer(frozenEconomyCapture({year:s.year,drought:s.drought,before:before!,conditions:{...conditions,blockedRegions:[...conditions.blockedRegions]},after:{economy:s.economy,people:ledger.people},records,totals}));
+ if(receiptObserver)receiptObserver(frozenCoupledReceiptCaptureInternal({year:s.year,drought:s.drought,before:{people:beforePeople!},conditions:{disruptionId:conditions.disruptionId,granaries:conditions.granaries,blockedRegions:[...conditions.blockedRegions]},records,totals}));
  const yearRecords:RecordEntry[]=[];
  for(let i=s.history.length-1;i>=0&&s.history[i]!.year===s.year;i--)yearRecords.push(s.history[i]!);
  const sources:Partial<Record<keyof typeof practiceNames,string>>={};
