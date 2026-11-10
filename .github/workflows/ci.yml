@@ -55,7 +55,9 @@ jobs:
     # Keep Chromium/WebKit dependencies stable across ubuntu-latest image rollouts.
     # The 26.04 rollout spent almost 13 minutes fetching packages in this job.
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Package mirrors can consume 9+ minutes before any test starts. Keep their
+    # allowance separate; annual, save and frame budgets remain in the scripts.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
@@ -66,12 +68,20 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 12
       - run: npm run test:browser
+        timeout-minutes: 10
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: environment34-terrain-trial-browser
           path: artifacts/environment34-terrain-trial-tests/*.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-production-browser
+          path: artifacts/environment34-terrain-production-tests/*.png
           if-no-files-found: error
       - name: Capture D7-C natural public-space review
         run: node scripts/review-public-spaces.mjs
@@ -939,4 +949,72 @@ jobs:
           name: environment34-terrain-trial-seed198
           retention-days: 14
           path: artifacts/environment34-terrain-trial/seed198/*
+          if-no-files-found: error
+
+  terrain-production:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+        timeout-minutes: 12
+      - name: Measure complete normal v7 and v8 annual, native hash and gzip branches
+        run: node scripts/benchmark-terrain-production.mjs
+      - name: Verify five normal terrain worlds against frozen preproduction and v7 references
+        run: node scripts/audit-terrain-production.mjs
+      - name: Verify v8 capacity with synthetic maximum-size change records
+        run: node scripts/check-terrain-production-capacity.mjs
+      - name: Match 840 accepted preproduction RGBA frames and preserve observed packets
+        run: node scripts/review-terrain-production-pixels.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-production
+          retention-days: 14
+          path: artifacts/environment34-terrain-production/*.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-production-seed1
+          retention-days: 14
+          path: artifacts/environment34-terrain-production/seed1/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-production-seed21
+          retention-days: 14
+          path: artifacts/environment34-terrain-production/seed21/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-production-seed29
+          retention-days: 14
+          path: artifacts/environment34-terrain-production/seed29/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-production-seed42
+          retention-days: 14
+          path: artifacts/environment34-terrain-production/seed42/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-production-seed198
+          retention-days: 14
+          path: artifacts/environment34-terrain-production/seed198/*
           if-no-files-found: error

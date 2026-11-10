@@ -31,7 +31,7 @@ export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHis
  * Omitted by every existing game/legacy caller. Never inferred from a save version.
  */
 export interface ReviewLandProgression {
- readonly mode:'generated-review-only'|'irrigation-coupled-review-only'|'irrigation-economic-production-v1'|'terrain-change-review-only';readonly observeEconomy?:EconomyObserver;
+ readonly mode:'generated-review-only'|'irrigation-coupled-review-only'|'irrigation-economic-production-v1'|'terrain-change-review-only'|'terrain-production-v1';readonly observeEconomy?:EconomyObserver;
  readonly coupledEconomy?:()=>import('./coupled-economy-policy-internal.js').CoupledAnnualModifier;
  placeFacility:(state:CivilizationState,siteIndex:number,candidate:Readonly<import('./settlement-history.js').Building>)=>
   {status:'clear';x:number;y:number}|{status:'hold'};
@@ -73,17 +73,17 @@ function setPopulation(s:CivilizationState,next:number):void {
  s.population=populationTotal(ledger.people);
 }
 function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
- if(land&&!['generated-review-only','irrigation-coupled-review-only','irrigation-economic-production-v1','terrain-change-review-only'].includes(land.mode))throw Error('Unsupported land progression mode');
+ if(land&&!['generated-review-only','irrigation-coupled-review-only','irrigation-economic-production-v1','terrain-change-review-only','terrain-production-v1'].includes(land.mode))throw Error('Unsupported land progression mode');
  if(land?.mode==='generated-review-only'&&land.coupledEconomy!==undefined)throw Error('Coupled economy requires a trial mode');
  const ledger=s.observation!;
  if(s.year===ledger.legacy?.year)return; // A choice already pending in the old save.
  const floodYear=s.lastKind.flood??-Infinity;
  const flood=s.year-floodYear<3?s.history.find(event=>event.year===floodYear&&event.kind==='flood'):undefined;
  const harvestFactors=regionalHarvestFactors(s.year,s.seed,s.drought);
- if(land?.mode==='irrigation-coupled-review-only'||land?.mode==='irrigation-economic-production-v1'||land?.mode==='terrain-change-review-only'){
+ if(land?.mode==='irrigation-coupled-review-only'||land?.mode==='irrigation-economic-production-v1'||land?.mode==='terrain-change-review-only'||land?.mode==='terrain-production-v1'){
   if(typeof land.coupledEconomy!=='function')throw Error('Missing coupled annual modifier');
   const modifier=land.coupledEconomy();checkCoupledModifier(modifier,s.year);
-  if((land.mode==='irrigation-economic-production-v1'||land.mode==='terrain-change-review-only')&&modifier.policy!=='combined')throw Error('Production requires combined economics');
+  if((land.mode==='irrigation-economic-production-v1'||land.mode==='terrain-change-review-only'||land.mode==='terrain-production-v1')&&modifier.policy!=='combined')throw Error('Production requires combined economics');
   harvestFactors[0]=harvestFactors[0]!*(1+(modifier.gainBp-modifier.costBp)/10000);
  }
  s.economy??=createRegionalEconomy();
