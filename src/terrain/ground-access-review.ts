@@ -1,6 +1,6 @@
 /** D3-A independent review kernel. No live engine, storage, or policy activation. */
 import type {RecordPoint, RecordSite} from './terrain-record-types.js';
-import type {ValidatedTerrainRecord} from './terrain-record.js';
+import {assertTerrainPhysicalYear,type TerrainPhysicalSource} from './terrain-revision-v1.js';
 import type {RecordRaster} from './terrain-record-raster-v1.js';
 import {readOwnedRecordPhysics,frozenRecordPhysics} from './owned-record-physics.js';
 import type {WalkableBridgeCrossing} from './bridge-access-types.js';
@@ -9,7 +9,7 @@ export interface GroundPlot {readonly x:number;readonly y:number;readonly width:
 export type GroundPurpose='house'|'field'|'hall'|'workshop'|'market'|'granary'|'housing'|'civic'|'public-space';
 export interface GroundOccupation {readonly id:string;readonly plot:GroundPlot;readonly entrance:RecordPoint}
 export interface GroundReviewContext {
- readonly terrain:ValidatedTerrainRecord;readonly site:RecordSite;
+ readonly terrain:TerrainPhysicalSource;readonly site:RecordSite;
  readonly year:number;readonly confirmedYear:number;readonly historyStatus:'known'|'partial'|'unknown';
  readonly primaryRoot:RecordPoint;readonly occupancy:readonly GroundOccupation[];
  /** Reservations are separate from real occupancy; the requesting ID excludes its own. */
@@ -148,6 +148,7 @@ export function createGroundAccessReviewer(ctx:GroundReviewContext):(purpose:Gro
  * No graph is reused across different candidates or mutable contexts.
  */
 export function createGroundAccessTransaction(ctx:GroundReviewContext):{readonly review:(purpose:GroundPurpose,objectId:string,plot:GroundPlot)=>GroundReview;readonly windows:Uint8Array|null} {
+ assertTerrainPhysicalYear(ctx.terrain,ctx.year);
  const site=ctx.terrain.sites[ctx.site];
  const immutable=Object.isFrozen(ctx.terrain)&&Object.isFrozen(ctx.terrain.sites)&&Object.isFrozen(site)&&frozenRecordPhysics(site.physics);
  const owned:GroundReviewContext=immutable?{...structuredClone({...ctx,terrain:null}),terrain:ctx.terrain}:ctx;
@@ -157,6 +158,7 @@ export function createGroundAccessTransaction(ctx:GroundReviewContext):{readonly
  return {review:(purpose,id,plot)=>{lastWindows=null;return reviewGroundAccessPrepared(owned,purpose,id,plot,immutable?before:undefined,after);},get windows(){return lastWindows;}};
 }
 function reviewGroundAccessPrepared(ctx:GroundReviewContext,purpose:GroundPurpose,objectId:string,plot:GroundPlot,beforeGraph?:()=>Int32Array,afterWindows?:(r:RecordRaster,plot:GroundPlot)=>Uint8Array):GroundReview {
+ assertTerrainPhysicalYear(ctx.terrain,ctx.year);
  if(ctx.historyStatus!=='known')return hold('unknown-history');
  if(!Number.isSafeInteger(ctx.year)||!Number.isSafeInteger(ctx.confirmedYear)||ctx.year<0||ctx.year>ctx.confirmedYear)return hold('unconfirmed-year');
  if(!validPlot(plot))return hold('outside-ground');

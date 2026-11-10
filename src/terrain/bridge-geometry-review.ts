@@ -1,6 +1,6 @@
 /** D3-C horizontal single-span geometry and exact access-improvement review. */
 import type {RecordPoint} from './terrain-record-types.js';
-import type {ValidatedTerrainRecord} from './terrain-record.js';
+import {assertResolvedTerrain,assertTerrainPhysicalYear,type TerrainPhysicalSource} from './terrain-revision-v1.js';
 import {decodeRecordPhysics,type RecordRaster} from './terrain-record-raster-v1.js';
 import {validateRiverReaches,riverOwnershipRaster,riverJunctionExcludes,type ValidatedRiverReaches} from './river-reaches-review.js';
 import {groundWalkWindows,groundContextWindows,groundDistances,reviewPhysicalPlot,southEntrance,type GroundPlot,type GroundReviewContext} from './ground-access-review.js';
@@ -21,7 +21,8 @@ const samePlot=(a:GroundPlot,b:GroundPlot)=>a.x===b.x&&a.y===b.y&&a.width===b.wi
 function freeze<T>(v:T):T {if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
 interface StaticData {raster:RecordRaster;templates:readonly ValidatedBridgeGeometry[]}
 const staticCache=new WeakMap<object,WeakMap<object,StaticData>>();
-function staticData(t:ValidatedTerrainRecord,h:ValidatedRiverReaches):StaticData {
+function staticData(t:TerrainPhysicalSource,h:ValidatedRiverReaches):StaticData {
+ if(t.format==='resolved-terrain-at-year')assertResolvedTerrain(t);
  let byTerrain=staticCache.get(h);if(!byTerrain){byTerrain=new WeakMap();staticCache.set(h,byTerrain);}const hit=byTerrain.get(t);if(hit)return hit;
  const checked=validateRiverReaches(h,t),{owners,streamIds}=riverOwnershipRaster(checked,t),r=decodeRecordPhysics(t.sites['river-bank'].physics);
  const runs=(y:number)=>{
@@ -67,7 +68,7 @@ export function bridgeOccupancy(g:ValidatedBridgeGeometry){
 export function bridgeCrossing(g:ValidatedBridgeGeometry):WalkableBridgeCrossing {
  return freeze({bridgeId:g.bridgeId,site:'river-bank',deck:g.deck,bankEntrances:[g.bankA,g.bankB] as const,occupiedIds:bridgeOccupiedIds(g.bridgeId)}) as WalkableBridgeCrossing;
 }
-export function validateBridgeGeometry(raw:unknown,t:ValidatedTerrainRecord,h:ValidatedRiverReaches):ValidatedBridgeGeometry {
+export function validateBridgeGeometry(raw:unknown,t:TerrainPhysicalSource,h:ValidatedRiverReaches):ValidatedBridgeGeometry {
  const object=(v:unknown,keys:readonly string[]):Record<string,unknown>=>{
   if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Invalid bridge object');const o=v as Record<string,unknown>;
   if(Object.keys(o).length!==keys.length||keys.some(k=>!Object.hasOwn(o,k)))throw Error('Unknown bridge fields');return o;
@@ -88,6 +89,7 @@ function coveredLand(distance:Int32Array,r:RecordRaster){
  }return cells;
 }
 export function proposeBridgeGeometry(ctx:GroundReviewContext,h:ValidatedRiverReaches,accessRoots:readonly RecordPoint[],nucleus:RecordPoint,bridgeId:string,mode:'cached'|'reference'='cached'){
+ assertTerrainPhysicalYear(ctx.terrain,ctx.year);
  if(!['cached','reference'].includes(mode))throw Error('Invalid bridge search mode');
  const metrics={staticCandidates:0,portalEvaluations:0,accessEvaluations:0,visitedVertices:0},hold=(reason:string)=>({status:'hold' as const,reason,metrics});
  if(ctx.site!=='river-bank')return hold('unsupported-bridge');

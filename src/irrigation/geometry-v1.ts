@@ -1,5 +1,5 @@
 /** Review-only intake, flat conveyance, occupation and pedestrian continuity. */
-import {readOwnedTerrainRecord} from '../terrain/terrain-record.js';
+import {readTerrainPhysicalSource,assertTerrainPhysicalYear} from '../terrain/terrain-revision-v1.js';
 import {rasterizeRecordShapes} from '../terrain/terrain-record-raster-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {validateRiverReaches,riverOwnershipRaster,riverJunctionExcludes} from '../terrain/river-reaches-review.js';
@@ -25,7 +25,7 @@ function components(windows:Uint8Array,metrics:IrrigationMetrics){const labels=n
 // Only deeply frozen, value-only descriptors can share verified static physics.
 function immutable(value:unknown):boolean {return !value||typeof value!=='object'||Object.isFrozen(value)&&Object.values(Object.getOwnPropertyDescriptors(value)).every(d=>'value' in d&&immutable(d.value));}
 const staticCache=new WeakMap<object,WeakMap<object,ReturnType<typeof createStatic>>>();
-function createStatic(terrain:ReturnType<typeof readOwnedTerrainRecord>,raw:IrrigationContext['hydrology']){
+function createStatic(terrain:ReturnType<typeof readTerrainPhysicalSource>,raw:IrrigationContext['hydrology']){
  const h=validateRiverReaches(raw,terrain),r=readOwnedRecordPhysics(terrain.sites['river-bank'].physics),ownership=riverOwnershipRaster(h,terrain);
  const physical=new Uint8Array(N),contacts=new Map<number,number[]>();
  for(let y=96;y<180;y++)for(let x=0;x<319;x++){const i=y*W+x;if([i,i+1].every(j=>r.surface[j]===1&&r.bearing[j]===0&&r.grade[j]===0)&&r.elevation[i]===r.elevation[i+1]){physical[i]=1;}}
@@ -33,14 +33,15 @@ function createStatic(terrain:ReturnType<typeof readOwnedTerrainRecord>,raw:Irri
  const shapeMasks=new Map(terrain.sites['river-bank'].shapes.filter(s=>s.kind==='freshwater').map(s=>[s.id,rasterizeRecordShapes([s],false).surface]));
  return {terrain,h,r,ownership,physical,contacts,shapeMasks};
 }
-function staticPhysics(terrain:ReturnType<typeof readOwnedTerrainRecord>,raw:IrrigationContext['hydrology']){let map=staticCache.get(terrain);if(!map){map=new WeakMap();staticCache.set(terrain,map);}const cached=map.get(raw);if(cached)return cached;const value=createStatic(terrain,raw);if(immutable(raw))map.set(raw,value);return value;}
+function staticPhysics(terrain:ReturnType<typeof readTerrainPhysicalSource>,raw:IrrigationContext['hydrology']){let map=staticCache.get(terrain);if(!map){map=new WeakMap();staticCache.set(terrain,map);}const cached=map.get(raw);if(cached)return cached;const value=createStatic(terrain,raw);if(immutable(raw))map.set(raw,value);return value;}
 function prepare(ctx:IrrigationContext){
  const g=ctx.ground;if(!g||!ctx.cause||!Number.isSafeInteger(ctx.cause.year)||ctx.cause.year!==g.year||typeof ctx.cause.recordId!=='string'||!ctx.cause.recordId.length)throw Error('Invalid irrigation cause');
  if(g.occupancy.some(o=>!o.id||!plotValid(o.plot)||!pointValid(o.entrance,true))||g.reservations.some(o=>!o.id||!plotValid(o.plot)))throw Error('Invalid irrigation occupation');
  if(new Set(g.occupancy.map(o=>o.id)).size!==g.occupancy.length)throw Error('Duplicate irrigation occupation');
  if(!ctx.roots.length||ctx.roots.some(p=>!pointValid(p,true))||!ctx.roots.some(p=>same(p,g.primaryRoot)))throw Error('Invalid irrigation access roots');
  const ids=new Set<string>();for(const f of ctx.fields){if(!f.id||ids.has(f.id)||!plotValid(f.plot)||!Number.isSafeInteger(f.builtYear)||f.builtYear<0||f.builtYear>g.year||!f.sourceRecordId||!g.occupancy.some(o=>o.id===f.id&&same(o.plot,f.plot)))throw Error('Invalid irrigation field');ids.add(f.id);}
- const terrain=readOwnedTerrainRecord(g.terrain),data=staticPhysics(terrain,ctx.hydrology),{r,physical}=data;
+ assertTerrainPhysicalYear(g.terrain,g.year);
+ const terrain=readTerrainPhysicalSource(g.terrain),data=staticPhysics(terrain,ctx.hydrology),{r,physical}=data;
  for(const f of ctx.fields)if(reviewPhysicalPlot(r,'field',f.plot).status!=='clear')throw Error('Invalid irrigation field ground');
  const blocked=new Uint8Array(N);for(const o of [...g.occupancy,...g.reservations])mark(blocked,o.plot);
  const available=new Uint8Array(N);for(let i=96*W;i<N;i++)available[i]=+(physical[i]===1&&!blocked[i]&&!blocked[i+1]);

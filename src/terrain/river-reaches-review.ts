@@ -1,7 +1,7 @@
 /** D3-C saved river ownership, linked to frozen D2 polygons and declared ports.
  * Pure result verifier: no generator, RNG, story, DOM, or storage dependency.
  */
-import type {ValidatedTerrainRecord} from './terrain-record.js';
+import {assertResolvedTerrain,type TerrainPhysicalSource} from './terrain-revision-v1.js';
 import {decodeRecordPhysics,rasterizeRecordShapes} from './terrain-record-raster-v1.js';
 export interface RiverReach {
  readonly parentShapeId:string;readonly streamId:string;
@@ -18,7 +18,8 @@ declare const checked:unique symbol;
 export type ValidatedRiverReaches=RiverReachesReview&{readonly [checked]:true};
 function freeze<T>(x:T):T {if(x&&typeof x==='object'){Object.values(x).forEach(freeze);Object.freeze(x);}return x;}
 const fail=(message:string):never=>{throw Error('River reaches: '+message);};
-function sourceData(t:ValidatedTerrainRecord){
+function sourceData(t:TerrainPhysicalSource){
+ if(t.format==='resolved-terrain-at-year')assertResolvedTerrain(t);
  const site=t.sites['river-bank'],raster=decodeRecordPhysics(site.physics),shapes=site.shapes.filter(s=>s.kind==='freshwater');
  const masks=new Map(shapes.map(s=>[s.id,rasterizeRecordShapes([s],false).surface]));
  const ports=t.geography.ports.filter(p=>p.site==='river-bank'&&p.visible&&p.point);
@@ -30,7 +31,7 @@ function sourceData(t:ValidatedTerrainRecord){
  return {site,raster,shapes,masks,incoming,outgoing,counts,junctions};
 }
 /** Only the producer calls this; saved-world readers must require the descriptor. */
-export function captureRiverReaches(t:ValidatedTerrainRecord):ValidatedRiverReaches {
+export function captureRiverReaches(t:TerrainPhysicalSource):ValidatedRiverReaches {
  const d=sourceData(t),reaches:RiverReach[]=[];
  const owner=(shapeId:string,ports:typeof d.incoming)=>{
   const matches=ports.filter(p=>{const [x,y]=p.point!;return d.masks.get(shapeId)![y*320+x]===2;});
@@ -55,7 +56,8 @@ function record(v:unknown,keys:readonly string[]):Record<string,unknown>{
  if(Object.keys(o).length!==keys.length||keys.some(k=>!Object.hasOwn(o,k)))return fail('unknown/missing fields');return o;
 }
 /** Returns integer indices into the stable stream-ID list; -1 means not freshwater. */
-function ownershipRaster(raw:RiverReachesReview,t:ValidatedTerrainRecord){
+function ownershipRaster(raw:RiverReachesReview,t:TerrainPhysicalSource){
+ if(t.format==='resolved-terrain-at-year')assertResolvedTerrain(t);
  const d=sourceData(t),ids=[...new Set(t.geography.streams.map(s=>s.id))].sort(),owners=new Int16Array(57600);owners.fill(-1);
  for(const reach of raw.reaches){
   const mask=d.masks.get(reach.parentShapeId),owner=ids.indexOf(reach.streamId);if(!mask||owner<0)return fail('unknown parent or stream');
@@ -68,9 +70,9 @@ function ownershipRaster(raw:RiverReachesReview,t:ValidatedTerrainRecord){
  for(const p of [...d.incoming,...d.outgoing]){const [x,y]=p.point!;if(ids[owners[y*320+x]!]!==p.streamId)return fail('port ownership mismatch');}
  return {owners,streamIds:ids};
 }
-export function riverOwnershipRaster(h:ValidatedRiverReaches,t:ValidatedTerrainRecord){return ownershipRaster(h,t);}
+export function riverOwnershipRaster(h:ValidatedRiverReaches,t:TerrainPhysicalSource){return ownershipRaster(h,t);}
 /** Validate geometry and declared topology without ever generating a world from seed. */
-export function validateRiverReaches(raw:unknown,t:ValidatedTerrainRecord):ValidatedRiverReaches {
+export function validateRiverReaches(raw:unknown,t:TerrainPhysicalSource):ValidatedRiverReaches {
  const top=record(raw,['format','schemaVersion','status','ruleId','source','siteId','reaches','junctions']);
  if(top.format!=='river-reaches-review'||top.schemaVersion!==1||top.status!=='review-only'||top.ruleId!=='river-reaches-v1'||top.siteId!=='river-bank')return fail('unsupported format');
  const source=record(top.source,['seed','revision']);if(source.seed!==t.source.seed||source.revision!==t.source.revision)return fail('terrain provenance mismatch');

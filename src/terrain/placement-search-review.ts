@@ -1,3 +1,4 @@
+import {assertTerrainPhysicalYear} from './terrain-revision-v1.js';
 /** D3-A exact branch-and-bound search for trial ordinary building scores.
  * Does not mint a policy, append history, or substitute for social conditions.
  */
@@ -52,6 +53,7 @@ function physicalCandidates(ctx:GroundReviewContext,req:SearchReviewRequest,r:Re
 }
 /** Full enumeration mode is retained as an independent check on pruning decisions. */
 export function findPlacementReview(ctx:GroundReviewContext,req:SearchReviewRequest,mode:'bounded'|'exhaustive'='bounded'){
+ assertTerrainPhysicalYear(ctx.terrain,ctx.year);
  // Only immutable physics and a complete dynamic context can reuse a miss.
  // The year itself is a gate; occupancy and verified crossings encode all
  // time-dependent geometry. Exhaustive reference searches always recompute.

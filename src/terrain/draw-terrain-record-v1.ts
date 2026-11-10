@@ -1,8 +1,9 @@
 /** Frozen renderer v1. Draws saved results; no generator/prototype imports. */
 import type {RecordSite} from './terrain-record-types.js';
-import type {ValidatedTerrainRecord} from './terrain-record.js';
+import {readTerrainPhysicalSource,type TerrainPhysicalSource} from './terrain-revision-v1.js';
 import {decodeRecordPhysics} from './terrain-record-raster-v1.js';
-export function drawTerrainRecord(canvas:HTMLCanvasElement,record:ValidatedTerrainRecord,site:RecordSite):void {
+export function drawTerrainRecord(canvas:HTMLCanvasElement,record:TerrainPhysicalSource,site:RecordSite):void {
+ record=readTerrainPhysicalSource(record);
  const s=record.sites[site],r=decodeRecordPhysics(s.physics);
  canvas.width=320;canvas.height=180;const c=canvas.getContext('2d');if(!c)throw Error('2d context missing');c.imageSmoothingEnabled=false;
  c.fillStyle='#bdc9bb';c.fillRect(0,0,320,96);c.fillStyle='#d8cfad';c.fillRect(0,53,320,43);
