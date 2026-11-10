@@ -865,7 +865,7 @@ jobs:
           if-no-files-found: error
 
   terrain-change-trial:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -879,14 +879,64 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
       - name: Measure independent C3 and terrain branches including complete hash and gzip
         run: node scripts/benchmark-terrain-trial.mjs
       - name: Verify five complete terrain histories, fixed neutrality and native gzip continuation
         run: node scripts/audit-terrain-trial.mjs
+      - name: Check complete-save size with four synthetic maximum-size change records
+        run: node scripts/check-terrain-capacity.mjs
+      - name: Compare independently recorded v7 and terrain histories, scenery and land use
+        run: node scripts/review-terrain-trial.mjs
+      - name: Show same-year physical ground, changes, occupation, walking, vegetation and water
+        run: node scripts/review-terrain-trial-layers.mjs
+      - name: Measure terrain observation, preparation and motion on desktop and CPU4x
+        run: node scripts/benchmark-terrain-observation.mjs
+      - name: Verify terrain comparison controls, downloads, mobile and offline pages
+        run: node scripts/check-terrain-trial-review.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: environment34-terrain-trial
           retention-days: 14
-          path: artifacts/environment34-terrain-trial/*.json
+          path: |
+            artifacts/environment34-terrain-trial/*.json
+            artifacts/environment34-terrain-trial/*.html
+            artifacts/environment34-terrain-trial/*.png
+            artifacts/environment34-terrain-trial/*.webm
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-trial-seed1
+          retention-days: 14
+          path: artifacts/environment34-terrain-trial/seed1/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-trial-seed21
+          retention-days: 14
+          path: artifacts/environment34-terrain-trial/seed21/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-trial-seed29
+          retention-days: 14
+          path: artifacts/environment34-terrain-trial/seed29/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-trial-seed42
+          retention-days: 14
+          path: artifacts/environment34-terrain-trial/seed42/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-trial-seed198
+          retention-days: 14
+          path: artifacts/environment34-terrain-trial/seed198/*
           if-no-files-found: error

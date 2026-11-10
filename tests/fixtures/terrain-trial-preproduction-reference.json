@@ -1,0 +1,47 @@
+{
+  "sourceSHA": "8571d6ecd483889ba67cad7d01877ec80dba3c4b",
+  "normalization": "Generated bridge view; remove terrainChangeBoundary; zero diagnostics. Changes omit only ruleId and chained revision hashes, retaining all geometry, cells, cause and timing.",
+  "cases": [
+    {
+      "seed": 1,
+      "packetHash": "bccd583b86bebbe88d8d9632ab94344861d229fc6a67a2f98f28bf8802498c9f",
+      "worldHash": "bef4f23e5f758be3deb836413e9a164d169f99a954282275f3db243d348cd98a",
+      "receiptsHash": "8d8b24ece020d2576e0ffb1640d3ee57d06bfc789ec87ab5b0202537490636a9",
+      "phasesHash": "65e90579aa118f949507d5cafb7a86a03a7401b589e4a54303dcef5c1a9c634e",
+      "changesHash": "9f7fac9947faf5e311bb260883cbc6b3cd2cc4e8f876f121d0c588320784481b"
+    },
+    {
+      "seed": 21,
+      "packetHash": "6d37c023c4d3ec31b7a5bb5ef3bc677859dedbc7503a5c6f5ffdbdd87339fd05",
+      "worldHash": "8894c6022a63bb31348141d5775135a30740d53803f64f91dd68155248d43e57",
+      "receiptsHash": "e7390e86606881c9a74e6568e7a2e9ed55d4f1e842e9c1d8845494ae10f2a59f",
+      "phasesHash": "f274ed86c8acda13b87d8da12b17139ecc25f6794b1b7949f8d4863ea06cbc04",
+      "changesHash": "149b4f5bf69ab429a215c08c4a7031c62f5862f00c9178f8ebcba0693180b744"
+    },
+    {
+      "seed": 29,
+      "packetHash": "b9a16f1e77eee6412c8da637b6088d42c0a341276207f0c288c20bf6e36c6944",
+      "worldHash": "199cbbf67babf55ca3949bd01d7613f66c15533d461ec1eb0b3c8667f2327a85",
+      "receiptsHash": "4501d467fce2f83756670ccf9c8431379350cd5e269fd6c1e4f277eb4cfa7644",
+      "phasesHash": "91647fbada045ef6811a6066ee18917259d64f58d914e5805cb5376d6c68df0a",
+      "changesHash": "cfa1c896f72917937ed42a52b077184396b64f3b41c50d77cc78a6755bbec02f"
+    },
+    {
+      "seed": 42,
+      "packetHash": "d302e6dc7e64b97f1813c5e76f7a35f5166d62fc0711b3f4370e01c2d1495357",
+      "worldHash": "322ac47246ff62c596004abe0ce50c69c68740ac525967c6d4dbd9b8ea8e8004",
+      "receiptsHash": "566b6b3473c3765eb34056279685ab6ff6d812d675a5219e432d3b36dbd5b66c",
+      "phasesHash": "4ce6054b2d05951781a282209ca2196971f3c223ec05f9a0dd60fdc263c4523d",
+      "changesHash": "a957f7635454d59d2ffcfeac04dc86b2dab1d59859363251add6886f86df4a6e"
+    },
+    {
+      "seed": 198,
+      "packetHash": "1a55f08bd750a977bcc498b100663e70a10d82f158146149933574e02e715bec",
+      "worldHash": "42493f2202d48fa059cc9dad4c7019e52fe0b0d5078602ac36e4802496841f47",
+      "receiptsHash": "9f441cd1a4aa95fd103588857c8bd87c800f26301b1dfd1674199694c0a409b2",
+      "phasesHash": "b972e887f46b357f5416838c428f626489295443290901ac6c4dffc044ed8602",
+      "changesHash": "d2381a116138bde35e261ae8a0ff2e8447c76d56dc247076c8c6a88cbc7c873b"
+    }
+  ],
+  "source": "D4-A3 committed runtime 8571d6ecd483889ba67cad7d01877ec80dba3c4b, complete native saves from CI 42762948366; frozen before introducing a production terrain profile."
+}
