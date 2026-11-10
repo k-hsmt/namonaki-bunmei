@@ -149,8 +149,13 @@ test('D2-a: 地区と敷地の観測は記録された地形・植生だけか�
 test('D2-a: 文明の乱数・時刻・本編の年次処理を読まない',async()=>{
  for(const f of await readdir('src/architecture')){
   const text=await readFile('src/architecture/'+f,'utf8');
-  for(const m of text.matchAll(/from\s+'([^']+)'/g))
-   assert.ok(/^\.\/|^\.\.\/terrain\/(terrain-hash-v1|terrain-record-raster-v1)\.js$|^\.\.\/vegetation\/history-v1\.js$/.test(m[1]),f+' imports '+m[1]);
+  // The culture modules stay strict. production-v1 (D2-b1) may read the owned v8 production world
+  // and its terrain-at-year, but never the civilization RNG or the annual engine directly.
+  const allowed=f==='production-v1.ts'
+   ?/^\.\/|^\.\.\/terrain\/(terrain-production-(types-v1|wire-v1|owned-internal|progression-v1|storage-v1|history-v1|contract-v1)|terrain-revision-v1|owned-record-physics)\.js$/
+   :/^\.\/|^\.\.\/terrain\/(terrain-hash-v1|terrain-record-raster-v1)\.js$|^\.\.\/vegetation\/history-v1\.js$/;
+  for(const m of text.matchAll(/from\s+'([^']+)'/g))assert.ok(allowed.test(m[1]),f+' imports '+m[1]);
+  assert.ok(!/engine\/rng|story\/engine/.test(text),f+' touches the civilization RNG or engine');
   assert.ok(!/Math\.random|Date\.now|performance\.now/.test(text),f);
  }
 });

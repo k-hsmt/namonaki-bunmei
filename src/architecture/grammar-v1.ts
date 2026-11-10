@@ -227,8 +227,13 @@ export function assertBirthInput(input:BirthInput):void {
  * the air above the plot (D2 §6.2). Production callers pass the real neighbour/bridge/water test;
  * only audits and unit tests may pass an explicit always-true predicate.
  */
-export function deriveBirthStyle(input:BirthInput,fits:(e:ArchitectureEnvelope)=>boolean):BirthStyle|BirthHold {
- if(typeof fits!=='function')throw Error('architecture: the envelope fit test is required');
+/** Style fixed at construction without the air-space step (D2-b1; Human decision A on D2-b). */
+export interface BirthFeatures {
+ readonly status:'ok';readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly traditionSite:ArchitectureSite;
+ readonly features:Omit<ArchitectureSpec,'use'|'faded'>;readonly adjustments:readonly string[];readonly substitutions:readonly Substitution[];
+}
+type Composed={spec:PartialSpec&{use:Use};adjustments:string[];subs:Substitution[]};
+function composeBirth(input:BirthInput):Composed|BirthHold {
  assertBirthInput(input);
  const {grammar,tradition,ref,source,use,plot}=input;
  const b=(...k:(string|number)[])=>H('architecture-birth-v1',grammar.seed,refKey(ref,source),...k);
@@ -245,6 +250,19 @@ export function deriveBirthStyle(input:BirthInput,fits:(e:ArchitectureEnvelope)=
  else if(s.foundation==='F1'&&plot.nearWater&&b('wet')%100<50){s.foundation='F3';adjustments.push('plot:water');}
  const ruled=applyUseRules(s,{hash:b('use')});Object.assign(s,ruled.spec);adjustments.push(...ruled.applied.map(a=>'use:'+a));
  try{repair(s,subs,'constraint');}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
+ return {spec:s,adjustments,subs};
+}
+const featuresOf=(x:PartialSpec&{use:Use})=>{const {use:_,faded:__,...features}=x as ArchitectureSpec;return {...features,ornaments:[...features.ornaments]};};
+/** D2-b1: the recorded birth style. No envelope; the air-space contract is added in D2-b2 after D2-c fixes drawing geometry. */
+export function deriveBirthFeatures(input:BirthInput):BirthFeatures|BirthHold {
+ const composed=composeBirth(input);if('status' in composed)return composed;
+ return {status:'ok',ref:input.ref,source:input.source,use:input.use,traditionSite:input.tradition.siteId,features:featuresOf(composed.spec),adjustments:composed.adjustments,substitutions:composed.subs};
+}
+/** Full birth with the air-space fallback chain (D2-b2). `fits` is required. */
+export function deriveBirthStyle(input:BirthInput,fits:(e:ArchitectureEnvelope)=>boolean):BirthStyle|BirthHold {
+ if(typeof fits!=='function')throw Error('architecture: the envelope fit test is required');
+ const composed=composeBirth(input);if('status' in composed)return composed;
+ const {ref,source,use,tradition}=input,{spec:s,adjustments,subs}=composed;
  // envelope fallback chain (architecture-envelope-v1, D2 §6.2). Stage 5 may still fail: fail closed.
  const stages:((x:PartialSpec&{use:Use})=>void)[]=[
   ()=>{},
@@ -258,10 +276,7 @@ export function deriveBirthStyle(input:BirthInput,fits:(e:ArchitectureEnvelope)=
   stages[stage]!(work);
   try{repair(work,subs,'constraint');}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
   const envelope=measureArchitecture(work);
-  if(fits(envelope)){
-   const {use:_,faded:__,...features}=work as ArchitectureSpec;
-   return {status:'ok',ref,source,use,traditionSite:tradition.siteId,features:{...features,ornaments:[...features.ornaments]},envelope,adjustments,substitutions:subs,envelopeStage:(stage+1) as 1|2|3|4|5};
-  }
+  if(fits(envelope))return {status:'ok',ref,source,use,traditionSite:tradition.siteId,features:featuresOf(work),envelope,adjustments,substitutions:subs,envelopeStage:(stage+1) as 1|2|3|4|5};
  }
  return {status:'hold',ref,source,reason:'envelope',detail:'no fallback stage fits the air above the plot'};
 }
