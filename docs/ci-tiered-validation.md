@@ -18,13 +18,16 @@
 | `push` to `main`／手動`workflow_dispatch` | `full` | **既存の全29ジョブ**＋`scope` | 総合回帰。仕様変更やマージ後に走り、網羅性を維持 |
 | PRにラベル`ci:full`を追加 | `full` | **既存の全29ジョブ**＋`scope` | 変更範囲が小さくても明示的に全体実行 |
 
-**prototypeの許可ファイルは以下の3つだけ**（現時点で本編から独立しているもの）。
+**prototypeの許可ファイルは以下の4つだけ**。
 
 - `scripts/preview-architecture.mjs`
-- `scripts/lib/architecture-prototype.mjs`
+- `scripts/lib/architecture-samples.mjs`
 - `tests/architecture-prototype.test.mjs`
+- `tests/fixtures/architecture35-d1-png-sha256.json`
 
-この3つに`docs/`の説明文を足すことはできる。共有の`scripts/lib/pixel-raster.mjs`、本編の`src/`、ほかのテスト、`package.json`、CIやPagesのワークフロー変更などを含む場合は**すべてfullへ昇格**する。Fable版の試作を本編へ接続するD2以降も当然fullになる。
+Issue #35 D2-aで、D1試作の描画は本番の`src/architecture`へ移した（`scripts/lib/architecture-prototype.mjs`は削除）。ギャラリーは`dist/architecture`を読むため、prototypeでも`npm ci`と`npm run build`を行ってからテストとギャラリー生成をする。`src/architecture`自体の変更は本番コードなので常にfullとする。
+
+この4つに`docs/`の説明文を足すことはできる。共有の`scripts/lib/pixel-raster.mjs`、本編の`src/`、ほかのテスト、`package.json`、CIやPagesのワークフロー変更などを含む場合は**すべてfullへ昇格**する。Fable版の試作を本編へ接続するD2以降も当然fullになる。
 
 分類はPRの比較元とHEADの**merge-base**との差分に含まれる全ファイルをチェックする。未知のパスや空差分は`full`。比較SHAの取得・git diff・単体テスト・分類スクリプト自体が失敗した場合は`scope`が失敗し、ほかのジョブは安全側に停止する。見逃して軽量へ落とすことはしない。
 

@@ -1,0 +1,618 @@
+{
+  "status": "D2A_AUDIT_NOT_ACCEPTANCE",
+  "issue": 35,
+  "stage": "D2-a",
+  "policy": {
+    "id": "architecture-policy-v1",
+    "vocab": "architecture-vocab-v1",
+    "constraints": "architecture-constraints-v1",
+    "useRules": "architecture-use-rules-v1",
+    "envelope": "architecture-envelope-v1",
+    "adaptation": "architecture-adaptation-v1",
+    "adaptationReference": "architecture-adaptation-reference-v1",
+    "introducedYear": 0
+  },
+  "sourceHead": "local-unidentified",
+  "worlds": 200,
+  "skippedSeeds": 0,
+  "seconds": 211,
+  "siteInputsPermille": {
+    "river-bank": {
+      "slope": {
+        "min": 0,
+        "p10": 0,
+        "median": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "water": {
+        "min": 48,
+        "p10": 81,
+        "median": 133,
+        "p90": 164,
+        "max": 174
+      },
+      "rock": {
+        "min": 0,
+        "p10": 0,
+        "median": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "forest": {
+        "min": 19,
+        "p10": 113,
+        "median": 202,
+        "p90": 287,
+        "max": 403
+      }
+    },
+    "hill-side": {
+      "slope": {
+        "min": 26,
+        "p10": 44,
+        "median": 113,
+        "p90": 184,
+        "max": 184
+      },
+      "water": {
+        "min": 0,
+        "p10": 0,
+        "median": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "rock": {
+        "min": 0,
+        "p10": 0,
+        "median": 0,
+        "p90": 0,
+        "max": 478
+      },
+      "forest": {
+        "min": 0,
+        "p10": 70,
+        "median": 130,
+        "p90": 232,
+        "max": 391
+      }
+    },
+    "coast-inlet": {
+      "slope": {
+        "min": 0,
+        "p10": 0,
+        "median": 0,
+        "p90": 0,
+        "max": 0
+      },
+      "water": {
+        "min": 265,
+        "p10": 284,
+        "median": 354,
+        "p90": 449,
+        "max": 485
+      },
+      "rock": {
+        "min": 0,
+        "p10": 0,
+        "median": 0,
+        "p90": 0,
+        "max": 111
+      },
+      "forest": {
+        "min": 16,
+        "p10": 99,
+        "median": 202,
+        "p90": 324,
+        "max": 442
+      }
+    }
+  },
+  "betweenSiteSpreadPermille": {
+    "slope": {
+      "min": 26,
+      "p10": 44,
+      "median": 113,
+      "p90": 184,
+      "max": 184
+    },
+    "water": {
+      "min": 265,
+      "p10": 284,
+      "median": 354,
+      "p90": 449,
+      "max": 485
+    },
+    "rock": {
+      "min": 0,
+      "p10": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 478
+    },
+    "forest": {
+      "min": 4,
+      "p10": 51,
+      "median": 126,
+      "p90": 233,
+      "max": 358
+    }
+  },
+  "sharedChoices": {
+    "roofFamily": {
+      "R05": 26,
+      "R04": 33,
+      "R03": 26,
+      "R08": 33,
+      "R06": 24,
+      "R02": 31,
+      "R01": 27
+    },
+    "eaves": {
+      "normal": 120,
+      "deep": 80
+    },
+    "pitch": {
+      "mid": 106,
+      "low": 49,
+      "high": 45
+    },
+    "ornamentCount": {
+      "0": 17,
+      "1": 43,
+      "2": 65,
+      "3": 41,
+      "4": 25,
+      "5": 8,
+      "6": 1
+    }
+  },
+  "traditionChoices": {
+    "structure": {
+      "river-bank": {
+        "S07": 50,
+        "S02": 32,
+        "S03": 25,
+        "S01": 46,
+        "S05": 15,
+        "S06": 23,
+        "S04": 9
+      },
+      "hill-side": {
+        "S04": 36,
+        "S05": 43,
+        "S06": 42,
+        "S02": 20,
+        "S07": 9,
+        "S03": 30,
+        "S01": 20
+      },
+      "coast-inlet": {
+        "S07": 55,
+        "S01": 30,
+        "S02": 39,
+        "S03": 20,
+        "S06": 28,
+        "S05": 12,
+        "S04": 16
+      }
+    },
+    "wall": {
+      "river-bank": {
+        "plank": 56,
+        "log": 47,
+        "wattle": 37,
+        "ashlar": 15,
+        "mixed": 23,
+        "earth": 5,
+        "rubble": 9,
+        "rammed": 8
+      },
+      "hill-side": {
+        "rubble": 36,
+        "ashlar": 43,
+        "mixed": 42,
+        "plank": 17,
+        "earth": 11,
+        "log": 22,
+        "rammed": 15,
+        "wattle": 14
+      },
+      "coast-inlet": {
+        "log": 74,
+        "plank": 45,
+        "wattle": 12,
+        "earth": 8,
+        "mixed": 28,
+        "ashlar": 12,
+        "rubble": 16,
+        "rammed": 5
+      }
+    },
+    "foundation": {
+      "river-bank": {
+        "F5": 80,
+        "F4": 14,
+        "F2": 22,
+        "F3": 47,
+        "F1": 37
+      },
+      "hill-side": {
+        "F3": 24,
+        "F1": 28,
+        "F2": 53,
+        "F4": 81,
+        "F5": 14
+      },
+      "coast-inlet": {
+        "F5": 74,
+        "F3": 51,
+        "F4": 21,
+        "F1": 33,
+        "F2": 21
+      }
+    },
+    "roofMaterial": {
+      "river-bank": {
+        "plaster": 20,
+        "tile": 49,
+        "slate": 26,
+        "thatch": 35,
+        "shingle": 70
+      },
+      "hill-side": {
+        "shingle": 47,
+        "tile": 54,
+        "thatch": 27,
+        "slate": 49,
+        "plaster": 23
+      },
+      "coast-inlet": {
+        "shingle": 78,
+        "slate": 33,
+        "thatch": 23,
+        "tile": 52,
+        "plaster": 14
+      }
+    },
+    "window": {
+      "river-bank": {
+        "W1": 31,
+        "W3": 36,
+        "W5": 34,
+        "W6": 25,
+        "W2": 35,
+        "W4": 39
+      },
+      "hill-side": {
+        "W4": 37,
+        "W6": 36,
+        "W2": 26,
+        "W1": 30,
+        "W5": 36,
+        "W3": 35
+      },
+      "coast-inlet": {
+        "W4": 28,
+        "W1": 39,
+        "W2": 27,
+        "W3": 35,
+        "W6": 41,
+        "W5": 30
+      }
+    },
+    "entrance": {
+      "river-bank": {
+        "E4": 60,
+        "E1": 25,
+        "E5": 60,
+        "E6": 19,
+        "E2": 28,
+        "E3": 8
+      },
+      "hill-side": {
+        "E1": 32,
+        "E5": 33,
+        "E2": 43,
+        "E6": 46,
+        "E4": 36,
+        "E3": 10
+      },
+      "coast-inlet": {
+        "E4": 61,
+        "E6": 30,
+        "E5": 50,
+        "E1": 26,
+        "E2": 23,
+        "E3": 10
+      }
+    },
+    "palette": {
+      "river-bank": {
+        "P01": 66,
+        "P05": 27,
+        "P04": 33,
+        "P02": 41,
+        "P03": 33
+      },
+      "hill-side": {
+        "P04": 32,
+        "P02": 44,
+        "P03": 50,
+        "P05": 33,
+        "P01": 41
+      },
+      "coast-inlet": {
+        "P01": 74,
+        "P04": 23,
+        "P02": 42,
+        "P03": 31,
+        "P05": 30
+      }
+    }
+  },
+  "regionalFormAxesDifferingPerSitePair": {
+    "min": 0,
+    "p10": 3,
+    "median": 5,
+    "p90": 6,
+    "max": 6,
+    "histogram": {
+      "0": 3,
+      "1": 9,
+      "2": 36,
+      "3": 65,
+      "4": 128,
+      "5": 202,
+      "6": 157
+    }
+  },
+  "worldsWithAnIdenticalSitePair": 3,
+  "conditionalShares": {
+    "raised": {
+      "driver": "water",
+      "bySite": {
+        "river-bank": {
+          "share": 635,
+          "n": 200
+        },
+        "hill-side": {
+          "share": 190,
+          "n": 200
+        },
+        "coast-inlet": {
+          "share": 625,
+          "n": 200
+        }
+      },
+      "byDriverTercile": {
+        "low": {
+          "share": 190,
+          "n": 200
+        },
+        "mid": {
+          "share": 634,
+          "n": 202
+        },
+        "high": {
+          "share": 626,
+          "n": 198
+        }
+      }
+    },
+    "stone": {
+      "driver": "slope",
+      "bySite": {
+        "river-bank": {
+          "share": 120,
+          "n": 200
+        },
+        "hill-side": {
+          "share": 395,
+          "n": 200
+        },
+        "coast-inlet": {
+          "share": 140,
+          "n": 200
+        }
+      },
+      "byDriverTercile": {
+        "low": {
+          "share": 130,
+          "n": 400
+        },
+        "mid": {
+          "share": 667,
+          "n": 3
+        },
+        "high": {
+          "share": 391,
+          "n": 197
+        }
+      }
+    },
+    "timber": {
+      "driver": "forest",
+      "bySite": {
+        "river-bank": {
+          "share": 570,
+          "n": 200
+        },
+        "hill-side": {
+          "share": 220,
+          "n": 200
+        },
+        "coast-inlet": {
+          "share": 605,
+          "n": 200
+        }
+      },
+      "byDriverTercile": {
+        "low": {
+          "share": 301,
+          "n": 206
+        },
+        "mid": {
+          "share": 447,
+          "n": 188
+        },
+        "high": {
+          "share": 646,
+          "n": 206
+        }
+      }
+    },
+    "terraced": {
+      "driver": "slope",
+      "bySite": {
+        "river-bank": {
+          "share": 180,
+          "n": 200
+        },
+        "hill-side": {
+          "share": 670,
+          "n": 200
+        },
+        "coast-inlet": {
+          "share": 210,
+          "n": 200
+        }
+      },
+      "byDriverTercile": {
+        "low": {
+          "share": 195,
+          "n": 400
+        },
+        "mid": {
+          "share": 1000,
+          "n": 3
+        },
+        "high": {
+          "share": 665,
+          "n": 197
+        }
+      }
+    }
+  },
+  "births": {
+    "total": 4200,
+    "hold": 0,
+    "constraintSubstitutions": {
+      "roofMaterial:thatch→shingle": 27
+    },
+    "envelopeStage": {
+      "1": 4200
+    },
+    "adjustments": {
+      "variation:window": 816,
+      "variation:ornaments": 1496,
+      "use:granary-small-windows": 500,
+      "use:market-open-front": 600,
+      "variation:roof-material": 430,
+      "variation:pitch": 464,
+      "use:dressed-stone": 122,
+      "use:workshop-wide-opening": 258,
+      "use:hall-two-storeys": 70,
+      "use:hall-ridge-ornament": 459,
+      "use:workshop-level-floor": 116
+    }
+  },
+  "d1Reproduction": {
+    "matchingCells": 36,
+    "totalCells": 42,
+    "detail": {
+      "C1": {
+        "house": "match",
+        "rowhouse": "match",
+        "courtyard": "match",
+        "granary": {
+          "roofMaterial": {
+            "rule": "thatch",
+            "d1": "shingle"
+          }
+        },
+        "workshop": "match",
+        "market": "match",
+        "hall": "match"
+      },
+      "C2": {
+        "house": "match",
+        "rowhouse": "match",
+        "courtyard": "match",
+        "granary": {
+          "window": {
+            "rule": "W1",
+            "d1": "W6"
+          }
+        },
+        "workshop": "match",
+        "market": "match",
+        "hall": "match"
+      },
+      "C3": {
+        "house": "match",
+        "rowhouse": "match",
+        "courtyard": "match",
+        "granary": "match",
+        "workshop": "match",
+        "market": "match",
+        "hall": {
+          "ornaments": {
+            "rule": "O1+O7",
+            "d1": "O7+O8"
+          },
+          "storeys": {
+            "rule": "2",
+            "d1": "1"
+          }
+        }
+      },
+      "C4": {
+        "house": "match",
+        "rowhouse": "match",
+        "courtyard": "match",
+        "granary": "match",
+        "workshop": "match",
+        "market": "match",
+        "hall": {
+          "ornaments": {
+            "rule": "O1",
+            "d1": "O2"
+          }
+        }
+      },
+      "C5": {
+        "house": "match",
+        "rowhouse": "match",
+        "courtyard": "match",
+        "granary": {
+          "entrance": {
+            "rule": "E6",
+            "d1": "E2"
+          }
+        },
+        "workshop": "match",
+        "market": "match",
+        "hall": "match"
+      },
+      "C6": {
+        "house": "match",
+        "rowhouse": "match",
+        "courtyard": "match",
+        "granary": "match",
+        "workshop": "match",
+        "market": "match",
+        "hall": {
+          "roofMaterial": {
+            "rule": "shingle",
+            "d1": "tile"
+          },
+          "storeys": {
+            "rule": "2",
+            "d1": "1"
+          }
+        }
+      }
+    }
+  }
+}

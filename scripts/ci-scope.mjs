@@ -8,10 +8,13 @@ import {appendFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 const DOC_EXTENSIONS=new Set(['.md','.markdown','.txt','.png','.jpg','.jpeg','.webp','.svg']);
+// Issue #35 gallery-only files. They read dist/architecture, so prototype CI builds first.
+// src/architecture itself is production code and always runs full.
 const PROTOTYPE_FILES=new Set([
   'scripts/preview-architecture.mjs',
-  'scripts/lib/architecture-prototype.mjs',
+  'scripts/lib/architecture-samples.mjs',
   'tests/architecture-prototype.test.mjs',
+  'tests/fixtures/architecture35-d1-png-sha256.json',
 ]);
 const ext=(path)=>{const i=path.lastIndexOf('.');return i===-1?'':path.slice(i).toLowerCase();};
 const isDoc=(path)=>path==='README.md'||(path.startsWith('docs/')&&DOC_EXTENSIONS.has(ext(path)));
@@ -51,7 +54,7 @@ function main(){
    '## CI execution scope: '+mode+'\n\n'+
    '| Scope | Verification |\n|---|---|\n'+
    '| docs | Classifier and classifier tests only |\n'+
-   '| prototype | Architecture D1 unit tests and 320×180 gallery |\n'+
+   '| prototype | Build, architecture sample tests and 320×180 gallery |\n'+
    '| full | All existing CI jobs and matrices |\n\n'+
    'Event: '+event+'; changed paths: '+files.length+'; forced full: '+forceFull+'\n\n'+
    '<details><summary>Changed paths</summary>\n\n'+escaped+'\n</details>\n');

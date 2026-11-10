@@ -1,13 +1,13 @@
 /**
- * Issue #35 / D1：建築ビジュアル試作の専用ギャラリー。PROTOTYPE ONLY — NOT HISTORY。
- * ゲーム本編の描画・履歴・保存・RNGを読まず、変更もしない。dist/ のビルドも不要。
- * 同じ位置・同じ用途の建物を、比較用の固定サンプル文化ごとに描き比べる。
- *   node scripts/preview-architecture.mjs  →  artifacts/architecture35-d1/
+ * Issue #35：D1建築比較ギャラリー。PROTOTYPE SAMPLES ONLY — NOT HISTORY。
+ * D2-a以降、語彙と描画は本番の src/architecture（dist/ 経由）を使う。比較用の固定サンプルは scripts/lib/architecture-samples.mjs。
+ * ゲーム本編の履歴・保存・RNGを読まず、変更もしない。
+ *   npm run build && node scripts/preview-architecture.mjs  →  artifacts/architecture35-d1/
  */
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {Raster,difference} from './lib/pixel-raster.mjs';
-import * as A from './lib/architecture-prototype.mjs';
+import * as A from './lib/architecture-samples.mjs';
 
 const out='artifacts/architecture35-d1';
 await mkdir(out,{recursive:true});
@@ -140,6 +140,11 @@ const report={status:'PROTOTYPE_NOT_HISTORY',prototypeId:A.PROTOTYPE_ID,issue:35
  stagePlaces:places.map(([use,x,groundY])=>({use,x,groundY})),a01,
  pngSha256:Object.fromEntries(Object.entries(files).map(([k,v])=>[k,sha(v.png)]))};
 await writeFile(out+'/report.json',JSON.stringify(report,null,2));
+
+// ---- 5b. D1でHuman受け入れ済みの画素と一致すること（D2-aの移設で見た目を変えない） ----
+const accepted=JSON.parse(await readFile(new URL('../tests/fixtures/architecture35-d1-png-sha256.json',import.meta.url),'utf8'));
+const drift=Object.keys({...accepted,...report.pngSha256}).filter(k=>accepted[k]!==report.pngSha256[k]);
+if(drift.length)throw Error('D1-accepted pixels changed (update the fixture only with Human review): '+drift.join(', '));
 
 // ---- 6. 自己完結HTMLギャラリー（原寸と4倍を並べ、ラベルは画像の外に置く） ----
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

@@ -1,0 +1,23 @@
+{
+ "catalog_roofs": "3b4f29394e670587a7921654ed37c15f0864200805ab7eba0a1c4509f1a34704",
+ "catalog_structures": "387b247216fc27079a1c6bd661c3a38dc47757d8320cc05abe3ab19fec47c5fb",
+ "catalog_wallMaterials": "85ef131d3e29787fef3b4cf7db2e9d8a6d91844f54e84eb5f863bdc40589cba0",
+ "catalog_roofMaterials": "dc69b3f1cb3b3e3d190bedbc3fb6bd557998ba9c69ff4dae755424004160820e",
+ "catalog_foundations": "0877ee33beac1960a01771690ff2f14c6b64f20844ff4d44eeaff98a566b36a7",
+ "catalog_windows": "4049ece1ec89102734cea3bce3fda2a2f29353aa022b5e31ab940fec60b30425",
+ "catalog_entrances": "5ac80d6687ad00ca98068d6bf47e88f49857b5082ba75e3210f116a52ab01548",
+ "catalog_ornaments": "8f8d0ae8ee899b40d1695fe47e6e761716cd83fb2dfdfdea9e44c69e577f5404",
+ "catalog_palettes": "4df88a018b4e05fe60345e1db049da02f62f96f2a03f9fb68449c95ee2d4671d",
+ "matrix_use_by_culture": "e3068ea6d6b123ad1a531893f30b5f556907bdaf96d26b7a0d7389f10fb7207a",
+ "stage_C1_NOT_HISTORY": "96c97967af39b29d473586634c8b11c7c542e41bd61f47752137d8d8ad7bb241",
+ "stage_C2_NOT_HISTORY": "5fc58b4d8df3e0d2c82b5d60f5e3cbc0cf7008e1750ab7cb68e4c30235008ed7",
+ "stage_C3_NOT_HISTORY": "7447f517714104fceb0eeec955242cae87351fcdd4225b27a883a9a594a8fb1c",
+ "stage_C4_NOT_HISTORY": "4bbe622b0917178a36aa67a101c4a59c396c9ee289fc1a927c26d4036f49008e",
+ "stage_C5_NOT_HISTORY": "db59e7eb8eba755fa8825c4809d9ae671b266368466942158b2d46591444f37f",
+ "stage_C6_NOT_HISTORY": "253c9cb4536bcdc17a18b51cf87d37c23f80ff6f849cada4dbdad63a5f2bc7a3",
+ "stage_A1_NOT_HISTORY": "2488a584ad041d501313bd7f50227bf32744bc8b02c99a899c8fb8e71ca59aae",
+ "stage_A2_NOT_HISTORY": "45b6f7ee3bf2316e90b3074312b3e8543dd1d107dad86b2463979e49cd344289",
+ "stage_A3_NOT_HISTORY": "45e3ad27d962a697b04f7227c2b32cc09ca8a5cde808a673edeb208629e75385",
+ "stages_cultures_six_NOT_HISTORY": "14b34fec5420074266dd0a28595cff2e24b49d8a624013fa638f2abf55c5356c",
+ "stages_advanced_three_NOT_HISTORY": "88b2c3a5f31f874d303be9ac537f5791a0f22532295cff1028c1fd78db354086"
+}
