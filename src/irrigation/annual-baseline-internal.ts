@@ -64,7 +64,9 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
   if(phase.confirmedBefore!==through)throw Error('Ecology did not commit before next phase');
   if(phase.confirmedAfter===through){if(!phase.pending)throw Error('Missing annual commit');record();return;}
   const year=phase.confirmedAfter;if(year!==through+1||phase.pending||year>10000)throw Error('Invalid annual ecology boundary');
-  const delta=cursor.take(),disturbances=trial?.mode==='terrain-trial'?trial.terrain!.disturbancesAt(year):[],vegetationEvents=[...delta.events,...disturbances];index.append(delta);uses.push(...delta.uses);events.push(...vegetationEvents);runner.append(delta.uses,vegetationEvents);
+  const delta=cursor.take();let vegetationEvents=delta.events;
+  if(trial?.mode==='terrain-trial'){const disturbances=trial.terrain!.disturbancesAt(year);if(disturbances.length)vegetationEvents=[...vegetationEvents,...disturbances];}
+  index.append(delta);uses.push(...delta.uses);events.push(...vegetationEvents);runner.append(delta.uses,vegetationEvents);
   const next=lifecycle.step(year),nextKey=[next.channel?.id,next.channel?.status,next.channel?.status==='active'?index.source.keyAt(year):0].join('/');
   prefixChannelEvents=next.events;
   if(key!==nextKey){cached=irrigationEffects(next.system,next.channel,next.channel?.status==='active'?next.frame:undefined);key=nextKey;}

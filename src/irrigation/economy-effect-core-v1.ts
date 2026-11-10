@@ -18,13 +18,21 @@ export interface EconomyPrefixAccess {
  environmentAt(year:number):{humidity:number;patchAt(index:number):PatchState|null};
 }
 export function economyEffectCalculator(review:GeneratedFacilityReview,source:Pick<IrrigationSourceIndex,'at'|'keyAt'>,access:EconomyPrefixAccess,introducedYear:number){
- const r=readOwnedRecordPhysics(review.terrain.sites['river-bank'].physics),buffer=waterBuffers(review,'river-bank'),wetCache=new Map<string,Uint8Array>();
+ const r=readOwnedRecordPhysics(review.terrain.sites['river-bank'].physics),buffer=waterBuffers(review,'river-bank');
+ // Only geometry is cached. Climate and soil are read afresh from each confirmed prefix.
+ // Retain cell order (including repeated patch indices) to preserve floating-point sums.
+ const groundCache=new Map<string,{indices:readonly number[];wetCells:number}>();
  return (year:number):EconomyEffect=>{
   const sourceYear=year-1,channel=access.channelAt(sourceYear),status=channel?.status??'none',system=channel?access.system(channel.id):undefined,work=access.eventsAt(sourceYear).filter(e=>e.year>introducedYear&&['built','maintained','repaired','backfilled'].includes(e.kind));
   const {requestedCostBp,costBp}=economyCostBp(work.map(e=>({kind:e.kind as 'built'|'maintained'|'repaired'|'backfilled',length:access.system(e.systemId)!.geometry.path.length})),system&&(status==='active'||status==='idle')?system.geometry.path.length:null);let wetCells=0,fieldCells=0,moisture:number|null=null,fieldCount=0;
   if(status==='active'&&system){const frame=source.at(sourceYear);fieldCount=frame.fields.length;if(frame.fields.some(f=>f.id===system.geometry.field.id)){
-   const key=system.id+'/'+source.keyAt(sourceYear);let wet=wetCache.get(key);if(!wet){wet=irrigationWettedCells(system,frame);wetCache.set(key,wet);}const state=access.environmentAt(sourceYear),p=system.geometry.field.plot;let total=0,known=true;const patches=new Map<number,PatchState|null>();
-   for(let y=p.y;y<p.y+p.depth;y++)for(let x=p.x;x<p.x+p.width;x++){const i=y*320+x;if(r.surface[i]!==1||r.bearing[i]!==0)continue;fieldCells++;wetCells+=wet[i]!;const index=patchIndex(x,y);if(!patches.has(index))patches.set(index,state.patchAt(index));const patch=patches.get(index);if(!patch)known=false;else total+=moistureAt(state.humidity,buffer[index]!,patch[2]);}if(known&&fieldCells)moisture=total/fieldCells;
+   const key=system.id+'/'+source.keyAt(sourceYear);let ground=groundCache.get(key);
+   if(!ground){const wet=irrigationWettedCells(system,frame),indices:number[]=[],p=system.geometry.field.plot;let count=0;
+    for(let y=p.y;y<p.y+p.depth;y++)for(let x=p.x;x<p.x+p.width;x++){const i=y*320+x;if(r.surface[i]!==1||r.bearing[i]!==0)continue;indices.push(patchIndex(x,y));count+=wet[i]!;}
+    ground={indices,wetCells:count};groundCache.set(key,ground);
+   }
+   fieldCells=ground.indices.length;wetCells=ground.wetCells;const state=access.environmentAt(sourceYear),moistures=new Map<number,number|null>();let total=0,known=true;
+   for(const index of ground.indices){if(!moistures.has(index)){const patch=state.patchAt(index);moistures.set(index,patch?moistureAt(state.humidity,buffer[index]!,patch[2]):null);}const value=moistures.get(index)!;if(value===null)known=false;else total+=value;}if(known&&fieldCells)moisture=total/fieldCells;
   }}
   return {sourceYear,systemId:system?.id??null,status,wetCells,fieldCells,moisture,fieldCount,gainBp:economyGainBp(wetCells,fieldCells,moisture,fieldCount),requestedCostBp,costBp,workEventIds:work.map(e=>e.id)};
  };
