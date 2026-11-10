@@ -68,6 +68,7 @@ function wallTexture(c:C,style:ArchitectureStyle,w:number,h:number,top:number):v
   R(c,l,top+Math.floor(h*.64),w,Math.ceil(h*.36),p.shade);
   for(let x=l+2;x<l+w-3;x+=10)R(c,x,top+Math.floor(h*.72),7,2,p.trim);
  }
+ if(wallMaterial==='rammed-earth'){for(let y=top+5;y<b-3;y+=5){R(c,l+4,y,w-8,2,p.shade);R(c,l+9,y+2,w-18,1,p.trim);}}
  if(wallMaterial==='wattle')for(let x=l+4;x<l+w-4;x+=8){R(c,x,top+4,1,h-7,p.shade);R(c,x+2,top+6,2,1,p.trim);}
 }
 function windowMarks(c:C,style:ArchitectureStyle,x:number,y:number):void{
