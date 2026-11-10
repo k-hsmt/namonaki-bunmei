@@ -6,6 +6,7 @@
 import {spawnSync} from 'node:child_process';
 import {appendFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
+import {resolve} from 'node:path';
 const DOC_EXTENSIONS=new Set(['.md','.markdown','.txt','.png','.jpg','.jpeg','.webp','.svg']);
 const PROTOTYPE_FILES=new Set([
   'scripts/preview-architecture.mjs',
@@ -57,4 +58,4 @@ function main(){
  }
  console.log(JSON.stringify({event,mode,fileCount:files.length,forceFull,files}));
 }
-if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1])main();
+if(process.argv[1]&&fileURLToPath(import.meta.url)===resolve(process.argv[1]))main();
