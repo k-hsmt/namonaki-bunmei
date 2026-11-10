@@ -51,7 +51,9 @@ for(let seed=1,used=0;used<count;seed++){
  pairDifferences.push(...pairs);
  if(pairs.some(n=>n===0))identicalWorlds.push(seed);
  for(const t of traditions)for(const use of uses){
-  const r=G.deriveBirthStyle({grammar,tradition:t,use,plot:{grade:0,nearWater:false},ref:{kind:'facility',siteId:t.siteId,id:'audit-'+use},source:{kind:'built',year:0}});
+  const ref=['rowhouse','courtyard'].includes(use)?{kind:'housing',siteId:t.siteId,blockId:'audit-'+use,parts:{from:0,to:3}}:{kind:'facility',siteId:t.siteId,id:'audit-'+use};
+  // Explicit always-true air-space test: D2-a has no neighbours yet, so every birth stays at envelope stage 1.
+  const r=G.deriveBirthStyle({grammar,tradition:t,use,plot:{grade:0,nearWater:false},ref,source:{kind:'built',year:0}},()=>true);
   births.total++;if(r.status!=='ok'){births.hold++;continue;}
   bump(births.envelopeStage,r.envelopeStage);
   for(const s of r.substitutions)bump(births.constraintSubstitutions,s.axis+':'+s.from+'→'+s.to);

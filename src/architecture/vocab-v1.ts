@@ -77,6 +77,10 @@ const rules:readonly Rule[]=[
 const d2Rules:readonly Rule[]=[
  {fields:['storeys','use'],message:'D2では2階建ては会堂のみ',broken:s=>s.storeys>1&&s.use!=='hall'},
  {fields:['structure'],message:'D2では高度構造を選ばない',broken:s=>isAdvancedStructure(s.structure)},
+ {fields:['foundation'],message:'D2では大規模構造の基礎(F6)を選ばない',broken:s=>s.foundation==='F6'},
+ {fields:['wall'],message:'D2では金属支持・複合外皮を選ばない',broken:s=>['metal','composite'].includes(s.wall)},
+ {fields:['roofMaterial'],message:'D2では金属板・透過材の屋根を選ばない',broken:s=>['metal','glazed'].includes(s.roofMaterial)},
+ {fields:['window'],message:'D2では大きな採光窓(W7)を選ばない',broken:s=>s.window==='W7'},
 ];
 const evaluate=(list:readonly Rule[],s:PartialSpec)=>list.filter(r=>r.fields.every(f=>s[f]!==undefined)&&r.broken(s as Required<PartialSpec>)).map(r=>r.message);
 /** D1 drawing constraints (architecture-constraints-v1). Accepts partial specs. */

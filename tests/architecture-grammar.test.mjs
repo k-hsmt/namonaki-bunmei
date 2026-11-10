@@ -13,8 +13,11 @@ const flat={slope:100,water:100,rock:0,forest:500};
 const wet={slope:50,water:900,rock:0,forest:500};
 const rocky={slope:900,water:0,rock:900,forest:100};
 const plot={grade:0,nearWater:false};
+/** Explicit always-true fit: audits and unit tests only. Production must pass the real air-space test. */
+const anyFit=()=>true;
+const refFor=(use,siteId,id)=>['rowhouse','courtyard'].includes(use)?{kind:'housing',siteId,blockId:id,parts:{from:0,to:3}}:{kind:'facility',siteId,id};
 const birth=(grammar,tradition,use,id='b-1',year=10,extra={})=>G.deriveBirthStyle({grammar,tradition,use,plot,
- ref:{kind:'facility',siteId:tradition.siteId,id},source:{kind:'built',year},...extra});
+ ref:refFor(use,tradition.siteId,id),source:{kind:'built',year},...extra},anyFit);
 
 test('D2-a: 同じseedなら文法・伝統・建設時様式は完全に一致し、別のseedでは異なる',()=>{
  const a=G.createWorldGrammar(42),b=G.createWorldGrammar(42);
@@ -74,13 +77,13 @@ test('D2-a: 入力を書き換えず、範囲外の適応入力は拒否する',
  assert.throws(()=>G.createRegionalTradition(g,'hill-side',{...flat,water:1001}),/per-mille/);
  assert.throws(()=>G.createRegionalTradition(g,'hill-side',{...flat,slope:.5}),/per-mille/);
  assert.throws(()=>birth(g,t,'house','x',-1),/birth year/);
- assert.throws(()=>G.deriveBirthStyle({grammar:g,tradition:t,use:'house',plot,ref:{kind:'facility',siteId:'river-bank',id:'x'},source:{kind:'built',year:1}}),/another site/);
+ assert.throws(()=>G.deriveBirthStyle({grammar:g,tradition:t,use:'house',plot,ref:{kind:'facility',siteId:'river-bank',id:'x'},source:{kind:'built',year:1}},anyFit),/another site/);
 });
 
 test('D2-a/§3.4.1: 住宅の部品範囲と出典イベントごとに様式が決まり、同じ鍵なら一致する',()=>{
  const g=G.createWorldGrammar(11),t=G.createRegionalTradition(g,'coast-inlet',flat);
  const housing=(from,to,kind,year,seq)=>G.deriveBirthStyle({grammar:g,tradition:t,use:'rowhouse',plot,
-  ref:{kind:'housing',siteId:'coast-inlet',blockId:'blk-1',parts:{from,to}},source:{kind,year,seq}});
+  ref:{kind:'housing',siteId:'coast-inlet',blockId:'blk-1',parts:{from,to}},source:{kind,year,seq}},anyFit);
  assert.deepEqual(housing(0,3,'built',40,0),housing(0,3,'built',40,0));
  const seen=new Set();for(let y=41;y<120;y++)seen.add(JSON.stringify(housing(3,5,'expanded',y,0).features));
  assert.ok(seen.size>1,'expansions never vary individually');
@@ -114,7 +117,7 @@ test('D2-a: 敷地の傾斜・水際は建設年の敷地の観測から基礎�
  for(let seed=1;seed<=200;seed++){
   const g=G.createWorldGrammar(seed),t=G.createRegionalTradition(g,'hill-side',flat);
   if(t.choices.foundation!=='F1')continue;
-  const steep=G.deriveBirthStyle({grammar:g,tradition:t,use:'house',plot:{grade:800,nearWater:false},ref:{kind:'facility',siteId:'hill-side',id:'p'},source:{kind:'built',year:3}});
+  const steep=G.deriveBirthStyle({grammar:g,tradition:t,use:'house',plot:{grade:800,nearWater:false},ref:{kind:'facility',siteId:'hill-side',id:'p'},source:{kind:'built',year:3}},anyFit);
   assert.equal(steep.features.foundation,'F4');assert.ok(steep.adjustments.includes('plot:slope'));
   return;
  }
@@ -155,4 +158,39 @@ test('D2-a: 輪郭の計測は描画と同じ経路で、深い軒は張り出�
  const a=measureArchitecture({use:'house',roofFamily:'R01',structure:'S01'}),b=measureArchitecture({use:'house',roofFamily:'R01',eaves:'deep',structure:'S01'});
  assert.ok(b.left>a.left&&b.right>a.right);
  assert.ok(a.top>0&&a.left>0&&a.right>0);
+});
+
+test('D2-a/§5.2: 建設時様式の入口で、履歴なしに分かる参照と出典の矛盾を拒否する',()=>{
+ const g=G.createWorldGrammar(5),t=G.createRegionalTradition(g,'river-bank',flat);
+ const call=(ref,source,use='house',p=plot)=>()=>G.deriveBirthStyle({grammar:g,tradition:t,use,plot:p,ref,source},anyFit);
+ const fac={kind:'facility',siteId:'river-bank',id:'f'},blk=parts=>({kind:'housing',siteId:'river-bank',blockId:'b',parts});
+ assert.throws(call(fac,{kind:'expanded',year:10}),/facility birth must come from its built source/);
+ assert.throws(call(fac,{kind:'built',year:10},'rowhouse'),/not a facility use/);
+ assert.throws(call({...fac,civic:{style:'great-hall',constructionRecordId:'r'}},{kind:'built',year:1},'house'),/civic attribute only on halls/);
+ assert.throws(call({...fac,civic:{style:'castle',constructionRecordId:'r'}},{kind:'built',year:1},'hall'),/invalid civic/);
+ assert.throws(call({...fac,id:''},{kind:'built',year:1}),/facility id required/);
+ assert.throws(call(blk({from:5,to:2}),{kind:'expanded',year:10},'rowhouse'),/0 <= from < to/);
+ assert.throws(call(blk({from:-1,to:2}),{kind:'built',year:10},'rowhouse'),/0 <= from < to/);
+ assert.throws(call(blk({from:0,to:1.5}),{kind:'built',year:10},'rowhouse'),/0 <= from < to/);
+ assert.throws(call(blk({from:2,to:4}),{kind:'built',year:10},'rowhouse'),/starts at part 0/);
+ assert.throws(call(blk({from:0,to:4}),{kind:'expanded',year:10},'rowhouse'),/after existing ones/);
+ assert.throws(call(blk({from:0,to:3}),{kind:'built',year:10},'hall'),/not a housing use/);
+ assert.throws(call(blk({from:0,to:3}),{kind:'damaged',year:10},'rowhouse'),/unknown housing source/);
+ assert.throws(call(fac,{kind:'built',year:10,seq:-1}),/invalid source seq/);
+ assert.throws(call(fac,{kind:'built',year:10},'house',{grade:1200,nearWater:false}),/invalid plot/);
+ assert.throws(call({kind:'tower',siteId:'river-bank',id:'x'},{kind:'built',year:1}),/unknown building reference/);
+ assert.equal(call(blk({from:0,to:3}),{kind:'built',year:10},'courtyard')().status,'ok');
+ assert.equal(call({...fac,civic:{style:'courtyard-hall',constructionRecordId:'r-1'}},{kind:'built',year:1},'hall')().status,'ok');
+});
+
+test('D2-a/§6.2: 上空の判定は省略できない',()=>{
+ const g=G.createWorldGrammar(5),t=G.createRegionalTradition(g,'river-bank',flat);
+ assert.throws(()=>G.deriveBirthStyle({grammar:g,tradition:t,use:'house',plot,ref:{kind:'facility',siteId:'river-bank',id:'f'},source:{kind:'built',year:1}}),/fit test is required/);
+});
+
+test('D2-a/§3.2: D2の制約は高度技術の部材を単体でも拒否する',()=>{
+ for(const bad of [{foundation:'F6'},{wall:'metal'},{wall:'composite'},{roofMaterial:'metal'},{roofMaterial:'glazed'},{window:'W7'},{structure:'X2'}])
+  assert.ok(V.d2Inconsistencies({use:'hall',...bad}).length>0,JSON.stringify(bad));
+ assert.deepEqual(V.d2Inconsistencies({use:'hall',structure:'S05',foundation:'F2'}),[]);
+ assert.ok(V.d2Inconsistencies({use:'hall',structure:'S05',foundation:'F6'}).length>0);
 });

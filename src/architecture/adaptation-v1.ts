@@ -14,7 +14,11 @@ export interface SiteAdaptationInputs {
  readonly water:number;
  /** Share of land cells that are cliff. */
  readonly rock:number;
- /** Share of vegetated patches that are mature woodland (stage >= 3) at year 0. */
+ /**
+  * Maturity of the year-0 vegetation: among the initial vegetation patches that exist (non-null),
+  * the share at stage >= 3. It is NOT the share of the site area covered by forest; a site with few
+  * but old patches scores high. Calibration of what this should mean is a Human gate (D2-a §3.1).
+  */
  readonly forest:number;
 }
 const permille=(n:number,d:number)=>d?Math.round(1000*n/d):0;

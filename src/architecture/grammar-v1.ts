@@ -175,14 +175,50 @@ function repair(s:PartialSpec&{use:Use},subs:Substitution[],reason:Substitution[
  throw Error('architecture: repair did not converge');
 }
 
+const facilityUses:readonly Use[]=['house','granary','workshop','market','hall'];
+/** ResidentialBlock styleId low/terraced/courtyard map to house/rowhouse/courtyard (design §3.4). */
+const housingUses:readonly Use[]=['house','rowhouse','courtyard'];
+const nonEmpty=(v:unknown)=>typeof v==='string'&&v.length>0;
 /**
- * Fixes the style of one construction. `fits` answers whether an envelope may occupy the air above the
- * plot (D2 §6.2); D2-b supplies the real neighbour/bridge/water test. Without it every envelope fits.
+ * Fail-closed entry checks for contradictions detectable without history (design §5.2). Matching
+ * against the recorded placements / housing.events themselves happens when D2-b connects history.
  */
-export function deriveBirthStyle(input:BirthInput,fits:(e:ArchitectureEnvelope)=>boolean=()=>true):BirthStyle|BirthHold {
+export function assertBirthInput(input:BirthInput):void {
+ const {tradition,ref,source,use,plot}=input;
+ const fail=(m:string):never=>{throw Error('architecture: '+m);};
+ if(ref.siteId!==tradition.siteId)fail('tradition belongs to another site');
+ if(!Number.isSafeInteger(source.year)||source.year<0)fail('invalid birth year');
+ if(source.seq!==undefined&&(!Number.isSafeInteger(source.seq)||source.seq<0))fail('invalid source seq');
+ if(source.recordId!==undefined&&!nonEmpty(source.recordId))fail('invalid source record id');
+ if(ref.kind==='facility'){
+  if(!nonEmpty(ref.id))fail('facility id required');
+  if(source.kind!=='built')fail('a facility birth must come from its built source');
+  if(!facilityUses.includes(use))fail('use '+use+' is not a facility use');
+  if(ref.civic){
+   if(use!=='hall')fail('civic attribute only on halls');
+   if(!['great-hall','courtyard-hall'].includes(ref.civic.style)||!nonEmpty(ref.civic.constructionRecordId))fail('invalid civic reference');
+  }
+ }else if(ref.kind==='housing'){
+  if(!nonEmpty(ref.blockId))fail('housing block id required');
+  const {from,to}=ref.parts??{};
+  if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from!<0||from!>=to!)fail('housing parts must be integers with 0 <= from < to');
+  if(source.kind==='built'&&from!==0)fail('a built block starts at part 0');
+  if(source.kind==='expanded'&&from===0)fail('an expansion adds parts after existing ones');
+  if(source.kind!=='built'&&source.kind!=='expanded')fail('unknown housing source');
+  if(!housingUses.includes(use))fail('use '+use+' is not a housing use');
+ }else fail('unknown building reference');
+ if(!Number.isSafeInteger(plot?.grade)||plot.grade<0||plot.grade>1000||typeof plot.nearWater!=='boolean')fail('invalid plot inputs');
+}
+
+/**
+ * Fixes the style of one construction. `fits` is required: it answers whether an envelope may occupy
+ * the air above the plot (D2 §6.2). Production callers pass the real neighbour/bridge/water test;
+ * only audits and unit tests may pass an explicit always-true predicate.
+ */
+export function deriveBirthStyle(input:BirthInput,fits:(e:ArchitectureEnvelope)=>boolean):BirthStyle|BirthHold {
+ if(typeof fits!=='function')throw Error('architecture: the envelope fit test is required');
+ assertBirthInput(input);
  const {grammar,tradition,ref,source,use,plot}=input;
- if(ref.siteId!==tradition.siteId)throw Error('architecture: tradition belongs to another site');
- if(!Number.isSafeInteger(source.year)||source.year<0)throw Error('architecture: invalid birth year');
  const b=(...k:(string|number)[])=>H('architecture-birth-v1',grammar.seed,refKey(ref,source),...k);
  const c=tradition.choices,adjustments:string[]=[],subs:Substitution[]=[];
  const s:PartialSpec&{use:Use}={use,...sharedSpec(grammar),structure:c.structure,wall:c.wall,foundation:c.foundation,roofMaterial:c.roofMaterial,
