@@ -49,11 +49,14 @@ jobs:
         with:
           node-version-file: .node-version
           package-manager-cache: false
+      # The gallery draws with src/architecture via dist/, so every non-doc scope installs and builds.
       - run: npm ci
-        if: needs.scope.outputs.mode == 'full'
       - run: npm test
         if: needs.scope.outputs.mode == 'full'
-      - name: Validate independent Issue 35 prototype only
+      - name: Build for the Issue 35 architecture gallery
+        if: needs.scope.outputs.mode == 'prototype'
+        run: npm run build
+      - name: Validate Issue 35 architecture samples only
         if: needs.scope.outputs.mode == 'prototype'
         run: node --test tests/architecture-prototype.test.mjs
       - name: Audit 1,000 terrain result records

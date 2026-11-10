@@ -3,6 +3,8 @@
 **状態：PROTOTYPE ONLY / NOT HISTORY / HUMAN REVIEW REQUIRED。**
 設計：[`issue35-architecture-design.md`](issue35-architecture-design.md) §3・§9（D1）／対象：[Issue #35](https://github.com/k-hsmt/namonaki-bunmei/issues/35)
 
+> **D2-aでの移設（追記）**：D1の語彙と描画は、Human受け入れ（PR #107）後に本番の `src/architecture/vocab-v1.ts`・`draw-v1.ts` へ移し、`scripts/lib/architecture-prototype.mjs` は削除した。比較用サンプル（C1〜C6・A1〜A3）は `scripts/lib/architecture-samples.mjs` に残る。ギャラリーの21枚はD1と画素が完全に一致し、そのハッシュを `tests/fixtures/architecture35-d1-png-sha256.json` で固定している。生成には `npm run build` が先に必要。以下の本文はD1時点の記録。
+
 ## 1. このD1で行ったこと・行っていないこと
 
 既存のゲーム画面は改造していない。**同じ位置・同じ用途の建物を、比較用に固定した文化サンプルごとに描き比べる専用ギャラリー**を追加した。

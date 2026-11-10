@@ -1,9 +1,10 @@
-/** Issue #35 / D1：試作ギャラリーの語彙・整合・決定性・本編からの隔離。視覚の受入判定ではない。 */
+/** Issue #35 / D1→D2-a：比較サンプルの語彙・整合・決定性と、src/architectureへの移設後の境界。視覚の受入判定ではない。 */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,readdir} from 'node:fs/promises';
 import {Raster,difference} from '../scripts/lib/pixel-raster.mjs';
-import * as A from '../scripts/lib/architecture-prototype.mjs';
+import * as A from '../scripts/lib/architecture-samples.mjs';
+import * as V from '../dist/architecture/vocab-v1.js';
 
 const render=(spec,use=spec.use??'house')=>{const r=new Raster(96,72);A.drawBuilding(r,{...spec,use},48,60);return r;};
 const useList=Object.keys(A.uses);
@@ -71,7 +72,7 @@ test('D1: 支持・屋根・入口が成立しない組み合わせは描かず�
  for(const bad of [
   {structure:'S07',entrance:'E1'},{structure:'S04',foundation:'F5',entrance:'E5'},{entrance:'E3'},{entrance:'E5'},
   {roofing:'thatch',roof:'R05'},{roofing:'thatch',pitch:'low'},{roofing:'plaster',roof:'R01'},
-  {wall:'metal'},{roofing:'metal'},{window:'W7'},{storeys:2},{structure:'X3',storeys:3},
+  {wall:'metal'},{roofing:'metal'},{window:'W7'},{storeys:2},{structure:'X3',storeys:3},{roofFamily:'R07'},
   {roof:'R99'},{use:'castle'},{use:'fortress'},{ornaments:['O9']},
  ])assert.throws(()=>A.drawBuilding(g,bad,48,60),JSON.stringify(bad));
  assert.ok(!g.mask().includes('1'),'a rejected prototype painted pixels');
@@ -86,11 +87,37 @@ test('D1: 再描画・仕様の往復で画素が一致し、入力を書き換�
  }
 });
 
-test('D1: 試作は本編から隔離されている',async()=>{
- const lib=await readFile('scripts/lib/architecture-prototype.mjs','utf8'),gallery=await readFile('scripts/preview-architecture.mjs','utf8');
- for(const source of [lib,gallery])assert.ok(!/from\s+'[^']*(dist|src)\//.test(source),'prototype must not import the game');
- assert.ok(!/Math\.random|Date\.now/.test(lib+gallery));
+test('D2-a/R07: 正規形は屋根の系統と軒の出に分かれ、R07を保存値として受け付けない',()=>{
+ assert.ok(!V.roofFamilies.includes('R07'));
+ assert.throws(()=>V.normalizeSpec({use:'house',roofFamily:'R07'}),/unknown roof family/);
+ assert.deepEqual(A.toNormalForm({roof:'R07'}),{use:'house',roofFamily:'R01',eaves:'deep'});
+ // D1では表せなかった「深い軒の寄棟」も正規形では表せる
+ const hipDeep=V.normalizeSpec({use:'house',roofFamily:'R03',eaves:'deep',structure:'S01'});
+ assert.equal(hipDeep.roofFamily,'R03');assert.equal(hipDeep.eaves,'deep');
+ assert.ok(difference(render({roof:'R03',structure:'S01'}),render({roof:'R03',deepEaves:true,structure:'S01'})).silhouette>0);
+});
+
+test('D2-a: 制約表は未確定の軸を含む部分指定でも、確定した軸の組だけで判定する',()=>{
+ assert.deepEqual(V.inconsistencies({structure:'S07'}),[]);
+ assert.equal(V.inconsistencies({structure:'S07',foundation:'F1'}).length,1);
+ assert.equal(V.d2Inconsistencies({use:'house',storeys:2,structure:'S05'}).length,1,'D2では2階建ては会堂のみ');
+ assert.deepEqual(V.d2Inconsistencies({use:'hall',storeys:2,structure:'S05'}),[]);
+ assert.equal(V.d2Inconsistencies({structure:'X1'}).length,1,'D2では高度構造を選ばない');
+});
+
+test('D2-a: 描画は src/architecture の1実装だけで、本編の年次・保存・描画にはまだ接続しない',async()=>{
+ const samples=await readFile('scripts/lib/architecture-samples.mjs','utf8'),gallery=await readFile('scripts/preview-architecture.mjs','utf8');
+ for(const m of (samples+gallery).matchAll(/from\s+'([^']+)'/g))
+  assert.ok(!/\/(src|dist)\//.test(m[1])||/^\.\.\/\.\.\/dist\/architecture\//.test(m[1]),'gallery may import only dist/architecture: '+m[1]);
+ assert.ok(!/drawBuilding\s*\(g,input|function drawBuilding\(g,input/.test(samples),'the D1 drawing copy must be removed');
+ await assert.rejects(readFile('scripts/lib/architecture-prototype.mjs'),'prototype drawing removed after the port');
+ assert.ok(!/Math\.random|Date\.now/.test(samples+gallery));
  const walk=async dir=>(await Promise.all((await readdir(dir,{withFileTypes:true})).map(e=>e.isDirectory()?walk(dir+'/'+e.name):[dir+'/'+e.name]))).flat();
- for(const file of await walk('src'))assert.ok(!(await readFile(file,'utf8')).includes('architecture-prototype'),file);
+ for(const file of await walk('src')){
+  const text=await readFile(file,'utf8');
+  assert.ok(!text.includes('scripts/'),file+' imports a script');
+  if(!file.startsWith('src/architecture/'))assert.ok(!/architecture\/[a-z-]+-v1\.js/.test(text),file+' connects D2-a code to the game before D2-b');
+  if(file.startsWith('src/architecture/'))assert.ok(!/Math\.random|Date\.now|performance\.now/.test(text),file);
+ }
  assert.ok(!(await readFile('index.html','utf8')).includes('architecture'));
 });
