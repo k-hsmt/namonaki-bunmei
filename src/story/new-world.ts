@@ -1,3 +1,5 @@
+import {introduceTerrainProduction} from '../terrain/terrain-production-progression-v1.js';
+import {terrainProductionSession,type TerrainGeneratedSession} from './world-session.js';
 import {introduceEconomicProduction} from '../irrigation/economic-production-progression-v1.js';
 import {economicProductionSession,type EconomicGeneratedSession} from './world-session.js';
 import {introduceProductionIrrigation} from '../irrigation/production-progression-v1.js';
@@ -25,7 +27,12 @@ export function createNewWorld(seed:number,policy?:'terrain-placement-v1'|'terra
 /** Versioned B producer; retained for old saves, fixtures and independent comparisons. */
 export function createNewIrrigatedWorld(seed:number):BaselineGeneratedSession {const world=createNewWorld(seed);if(world.mode!=='generated')throw Error('Generated world required');return generatedSession(introduceProductionIrrigation(world.review));}
 
-/** Current default: generate the B origin once, then bind future economic effects at year zero. */
+/** Versioned v7 producer; retained when the normal UI moves to terrain-aware worlds. */
 export async function createNewEconomicWorld(seed:number):Promise<EconomicGeneratedSession>{
  const source=createNewIrrigatedWorld(seed);return economicProductionSession(await introduceEconomicProduction(source.review));
+}
+
+/** Current new-world default. The immutable v7 origin is generated once at the chosen seed. */
+export async function createNewTerrainWorld(seed:number):Promise<TerrainGeneratedSession>{
+ const source=await createNewEconomicWorld(seed);return terrainProductionSession(await introduceTerrainProduction(source.review));
 }

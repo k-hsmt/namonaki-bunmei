@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {chromium} from 'playwright';
-import {createNewEconomicWorld as createNewWorld} from '../../dist/story/new-world.js';
+import {createNewTerrainWorld as createNewWorld} from '../../dist/story/new-world.js';
 import {prepareWorldSessionSave} from '../../dist/story/world-session.js';
 import {decodeWorldSave} from '../../dist/story/world-storage.js';
 import {createCivilization,step,chooseAutomatically} from '../../dist/story/engine.js';
 const port=process.env.H2B_TEST_PORT??'5198',origin='http://127.0.0.1:'+port;
-const KEY='namonaki-story-v7',BASELINE_KEY='namonaki-story-v6',OLD='namonaki-story-v3';
+const KEY='namonaki-story-v8',BASELINE_KEY='namonaki-story-v6',OLD='namonaki-story-v3';
 let server,browser;
 test.before(async()=>{
  server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:port},stdio:['ignore','pipe','inherit']});
@@ -22,12 +22,12 @@ const pageFor=async t=>{
  t.after(()=>assert.deepEqual(errors,[]));
  await page.goto(origin);return page;
 };
-test('新規ゲームは生成v7とknownの住宅記録を保存し、再読込でも同一',async t=>{
+test('新規ゲームは生成v8とknownの住宅記録を保存し、再読込でも同一',async t=>{
  const page=await pageFor(t);
  await page.locator('#save').click();
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
  const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));
- assert.equal(saved.version,7);assert.equal(saved.initialTerrain.mode,'generated');
+ assert.equal(saved.version,8);assert.equal(saved.initialTerrain.mode,'generated');
  assert.deepEqual(saved,await prepareWorldSessionSave(await createNewWorld(Number(await page.locator('#seed').inputValue()))),'browser and Node produce the same complete seeded world');
  assert.deepEqual(saved.state.housing,{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
  const pixels=await page.locator('#scene').evaluate(e=>e.toDataURL());

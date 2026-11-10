@@ -1,8 +1,8 @@
 import {environmentLabel} from './environment/presentation-v1.js';
 import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
-import {findWorldSave,storeWorldSave,decodeWorldSave} from './story/world-storage.js';
-import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSession,chooseWorldSession,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
+import {findWorldSave,storeWorldSave,decodeWorldSave,higherPriorityWorldSaveKeys} from './story/world-storage.js';
+import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSessionAsync,chooseWorldSessionAsync,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
 import {serializeWorldSave} from './story/world-save.js';
 import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
@@ -35,11 +35,11 @@ let choiceTimeout:ReturnType<typeof setTimeout>|null=null;
 let choiceDeadline=0;
 let choiceId:string|null=null;
 function clearChoiceTimer(){if(choiceTimeout!==null){clearTimeout(choiceTimeout);choiceTimeout=null;}choiceId=null;choiceDeadline=0;autoStatus.textContent='';}
-function resolvePending(index:number|'random'){
- if(busy||!state.pending)return;
- clearChoiceTimer();
- world=chooseWorldSession(world,index);state=world.state;
- viewedYear=null;render();
+async function resolvePending(index:number|'random'){
+ if(busy||!state.pending)return;clearChoiceTimer();const source=world,ticket=++operation;setBusy(true);
+ try{if(source.mode==='generated'&&source.review.format==='terrain-production-world-v1')await paintFeedback();const candidate=await chooseWorldSessionAsync(source,index);if(ticket!==operation||world!==source)return;adopt(candidate,true,true);}
+ catch{if(ticket===operation&&world===source){stop();el('feedback').textContent='選択を確定できませんでした。現在の歴史は保持しています。';}}
+ finally{if(ticket===operation){setBusy(false);render();scheduleChoice();}}
 }
 function scheduleChoice(){
  if(!state.pending||!autoChoiceInput.checked||timer===null||viewedYear!==null){clearChoiceTimer();return;}
@@ -48,9 +48,9 @@ function scheduleChoice(){
  const delay=Number(autoDelayInput.value)*1000;
  choiceDeadline=Date.now()+delay;
  autoStatus.textContent=`${delay/1000}秒後にランダム選択`;
- choiceTimeout=setTimeout(()=>{
+ const source=world;choiceTimeout=setTimeout(()=>{
   choiceTimeout=null;
-  if(state.pending?.id===choiceId&&autoChoiceInput.checked&&timer!==null&&viewedYear===null)resolvePending('random');
+  if(world===source&&state.pending?.id===choiceId&&autoChoiceInput.checked&&timer!==null&&viewedYear===null)resolvePending('random');
   else clearChoiceTimer();
  },delay);
 }
@@ -74,9 +74,12 @@ function render(){
  const economicEligible=world.mode==='generated'&&world.review.format==='generated-bridge-review'&&Boolean(world.review.irrigation)&&world.review.review.growthPattern==='organic-v3';
  economicButton.hidden=!economicEligible;economicButton.disabled=busy||Boolean(state.pending)||lastObservedYear(state)>=10000;
  economicNote.hidden=!economicEligible||(!state.pending&&lastObservedYear(state)<10000);economicNote.textContent=lastObservedYear(state)>=10000?'この文明は観測上限に達しています。':'現在の選択を終えると導入できます。';
+ const terrainButton=el('enable-terrain') as HTMLButtonElement,terrainNote=el('terrain-note');
+ const terrainEligible=world.mode==='generated'&&world.review.format==='irrigation-economic-production-world-v1';terrainButton.hidden=!terrainEligible;terrainButton.disabled=busy||Boolean(state.pending)||lastObservedYear(state)>=10000;
+ terrainNote.hidden=!terrainEligible;terrainNote.textContent=lastObservedYear(state)>=10000?'この文明は観測上限に達しています。':state.pending?'現在の選択を終えると、丘陵の整地を始められます。':'過去の地形と暮らしを保ち、これからの丘陵で小さな平場を作ります。工事の直接収穫効果と追加負担は加えません。';
  const irrigationButton=el('enable-irrigation') as HTMLButtonElement;irrigationButton.hidden=world.mode!=='generated'||!world.review.environment||world.review.review.growthPattern!=='organic-v3'||Boolean(world.review.irrigation);irrigationButton.disabled=busy;
  const environmentButton=el('improve-environment') as HTMLButtonElement;environmentButton.hidden=world.mode!=='generated'||!world.review.environment||world.review.environmentAppearance==='landscape-v3';environmentButton.disabled=busy;
- const climateButton=el('slow-climate') as HTMLButtonElement;climateButton.hidden=world.mode!=='generated'||!world.review.environment||(world.review.environment.ruleId==='environment-coupled-v2'||world.review.environment.climateRule==='environment-coupled-v2');climateButton.disabled=busy;
+ const climateButton=el('slow-climate') as HTMLButtonElement;climateButton.hidden=world.mode!=='generated'||!world.review.environment||(world.review.environment.ruleId==='environment-coupled-v2'||world.review.environment.climateRule==='environment-coupled-v2');climateButton.disabled=busy||lastObservedYear(state)>=10000;
  const growthButton=el('improve-growth') as HTMLButtonElement;growthButton.hidden=world.mode!=='generated'||world.review.review.growthPattern==='organic-v3';growthButton.disabled=busy;
  const confirmedYear=lastObservedYear(state);
  const viewingPast=viewedYear!==null;
@@ -93,6 +96,13 @@ function render(){
  const scene=motion.show(world,y,siteIndex);
  const environment=motion.environment;el('site-environment').hidden=!environment;el('site-environment').textContent=environment?environmentLabel(environment):'';
  const channel=motion.channelView,waterline=el('site-waterway');waterline.hidden=!channel||siteIndex!==0;waterline.textContent=!channel?'':!channel.introduced?'水路の記録はまだありません':channel.channel?({active:'水路に水が流れています',idle:'水路は休止しています',damaged:'水路は傷み、水が止まっています',abandoned:'放棄された水路の跡があります',retired:'水路は埋め戻されています'}[channel.channel.status]):'記録された水路はありません';
+ const terrainLine=el('site-terrain'),terrainInfo=siteIndex===1?worldTerrainDevelopmentAtYear(world,y):null;terrainLine.hidden=!terrainInfo;
+ if(terrainInfo){const counts={prepared:0,cultivated:0,abandoned:0,'built-over':0};for(const use of terrainInfo.uses)counts[use.status]++;
+  const parts=[`丘陵の整地 ${terrainInfo.activeCount}件`,...(terrainInfo.pendingCount?[`翌年から使える平場 ${terrainInfo.pendingCount}件`]:[])];
+  for(const [status,text]of [['prepared','未耕作の平場'],['cultivated','耕作に利用'],['abandoned','耕作終了'],['built-over','建築に利用']] as const)if(counts[status])parts.push(`${text} ${counts[status]}件`);
+  terrainLine.textContent=y<terrainInfo.introducedYear?'この年は丘陵の整地を始める前です。':parts.join(' · ');
+ }
+ canvas.setAttribute('aria-label',`${['川辺','丘陵','入り江'][siteIndex]}の観測地点。時代によって家々や暮らしの様子が変化します`);
  const site=siteAt(state.observation?.sites,siteIndex,y);
  el('scene-place').hidden=!site;
  if(site&&scene.local){
@@ -134,7 +144,7 @@ function render(){
  el('step').toggleAttribute('disabled',busy||Boolean(state.pending)&&!viewingPast);
  el('play').toggleAttribute('disabled',busy);
  el('step').innerHTML=viewingPast?'現在に戻る <span>→</span>':'時を進める <span>→</span>';
- if(state.pending){el('question').textContent=state.pending.question;el('context').textContent=state.pending.context;el('options').replaceChildren();state.pending.options.forEach((o,i)=>{const b=document.createElement('button');b.className='option';const strong=document.createElement('strong');strong.textContent=o.label;const small=document.createElement('span');small.textContent=o.description;b.append(strong,small);b.onclick=()=>resolvePending(i);el('options').append(b);});}
+ if(state.pending){el('question').textContent=state.pending.question;el('context').textContent=state.pending.context;el('options').replaceChildren();state.pending.options.forEach((o,i)=>{const b=document.createElement('button');b.className='option';const strong=document.createElement('strong');strong.textContent=o.label;const small=document.createElement('span');small.textContent=o.description;b.append(strong,small);b.disabled=busy;b.onclick=()=>void resolvePending(i);el('options').append(b);});}
  const memory=ensureMemory(state);
  const list=el('legacies-list');list.replaceChildren();
  const visibleKinds=new Map<string,{strength:number;established:number}>();
@@ -153,7 +163,14 @@ function render(){
  for(const e of [...records].reverse()){const li=document.createElement('li');li.tabIndex=0;li.classList.toggle('active',viewingPast&&active.id===e.id);const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  ${e.tag}`;li.append(time,document.createTextNode(e.title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
  el('toggle-all').textContent=expanded?'最近の5件だけ見る −':`過去の記録をすべて見る ＋（${confirmedRecords.length}件）`;
 }
-function forward(){if(busy)return;if(viewedYear!==null){viewedYear=null;render();return;}if(state.pending){render();scheduleChoice();return;}world=advanceWorldSession(world);state=world.state;render();scheduleChoice();}
+async function forward(){
+ if(busy)return;if(viewedYear!==null){viewedYear=null;render();return;}if(state.pending){render();scheduleChoice();return;}
+ if(world.mode==='generated'&&world.review.format==='terrain-production-world-v1'&&lastObservedYear(state)>=10000){stop();render();return;}
+ const source=world,ticket=++operation;setBusy(true);
+ try{if(source.mode==='generated'&&source.review.format==='terrain-production-world-v1')await paintFeedback();const candidate=await advanceWorldSessionAsync(source);if(ticket!==operation||world!==source)return;adopt(candidate,true,true);}
+ catch{if(ticket===operation&&world===source){stop();el('feedback').textContent='時を進められませんでした。現在の歴史は保持しています。';}}
+ finally{if(ticket===operation){setBusy(false);render();scheduleChoice();}}
+}
 siteSelect.addEventListener('change',render);
 el('step').addEventListener('click',forward);
 speedInput.addEventListener('change',()=>{if(timer!==null)start();});
@@ -163,21 +180,31 @@ el('play').addEventListener('click',()=>{if(busy)return;if(viewedYear!==null){vi
 el('return-now').addEventListener('click',()=>{viewedYear=null;render();});
 scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===state.year?null:y;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
-function setBusy(value:boolean){busy=value;for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic'])(el(id) as HTMLButtonElement).disabled=value;}
-function adopt(candidate:WorldSession,keepObservation=false){const previousYear=viewedYear;verifyWorldCandidate(candidate);world=candidate;state=world.state;viewedYear=keepObservation?previousYear:null;expanded=false;input.value=String(state.seed);render();}
+function setBusy(value:boolean){busy=value;document.querySelectorAll<HTMLButtonElement>('#options button').forEach(b=>b.disabled=value);for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic','enable-terrain'])(el(id) as HTMLButtonElement).disabled=value;}
+function adopt(candidate:WorldSession,keepObservation=false,keepArchive=false){
+ verifyWorldCandidate(candidate);const previous={world,state,viewedYear,expanded,active,input:input.value};
+ try{world=candidate;state=world.state;viewedYear=keepObservation?previous.viewedYear:null;expanded=keepArchive?previous.expanded:false;active=keepObservation?(state.history.find(r=>r.id===previous.active.id)??state.history[0]!):state.history[0]!;input.value=String(state.seed);render();}
+ catch(error){world=previous.world;state=previous.state;viewedYear=previous.viewedYear;expanded=previous.expanded;active=previous.active;input.value=previous.input;try{render();}catch{}throw error;}
+}
 async function restart(seed:number){
  if(busy)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='新しい土地を探しています。';
- try{const {createNewEconomicWorld:createNewWorld}=await import('./story/new-world.js');const candidate=await createNewWorld(seed);if(ticket!==operation||world!==source)return;adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
+ try{await paintFeedback();const {createNewTerrainWorld:createNewWorld}=await import('./story/new-world.js');const candidate=await createNewWorld(seed);if(ticket!==operation||world!==source)return;adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
  catch{if(ticket===operation)el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
  finally{if(ticket===operation){setBusy(false);render();}}
 }
 el('enable-irrigation').addEventListener('click',async()=>{
- if(busy||world.mode!=='generated')return;stop();setBusy(true);el('feedback').textContent='水路の記録を準備しています。';await paintFeedback();try{adopt(enableWorldIrrigation(world),true);el('feedback').textContent='これまでの風景を保ち、これからの水路を記録します。「この歴史を保存」で変更を残せます。';}catch{el('feedback').textContent='水路の記録を始められませんでした。現在の歴史と保存はそのままです。';}finally{setBusy(false);render();}
+ if(busy||world.mode!=='generated')return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='水路の記録を準備しています。';try{await paintFeedback();const candidate=enableWorldIrrigation(source);if(ticket!==operation||world!==source)return;adopt(candidate,true);el('feedback').textContent='これまでの風景を保ち、これからの水路を記録します。「この歴史を保存」で変更を残せます。';}catch{if(ticket===operation)el('feedback').textContent='水路の記録を始められませんでした。現在の歴史と保存はそのままです。';}finally{if(ticket===operation){setBusy(false);render();}}
 });
 el('enable-economic').addEventListener('click',async()=>{
  if(busy||world.mode!=='generated'||state.pending)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='水路と暮らしの記録を準備しています。';
  try{await paintFeedback();const candidate=await enableWorldEconomicCoupling(source);if(ticket!==operation||world!==source)return;adopt(candidate,true);el('feedback').textContent='これからの収穫と維持の負担に、水路の状態を反映します。過去の歴史は変わりません。「この歴史を保存」で変更を残せます。';}
  catch{if(ticket===operation)el('feedback').textContent='水路を暮らしに反映できませんでした。現在の歴史と保存はそのままです。';}
+ finally{if(ticket===operation){setBusy(false);render();}}
+});
+el('enable-terrain').addEventListener('click',async()=>{
+ if(busy||world.mode!=='generated'||world.review.format!=='irrigation-economic-production-world-v1'||state.pending||lastObservedYear(state)>=10000)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='丘陵の整地の記録を準備しています。';
+ try{await paintFeedback();const candidate=await enableWorldTerrainDevelopment(source);if(ticket!==operation||world!==source)return;adopt(candidate,true);el('feedback').textContent='過去の地形と暮らしを保ち、これからの丘陵に整地を反映します。「この歴史を保存」で変更を残せます。';}
+ catch{if(ticket===operation)el('feedback').textContent='丘陵の整地を始められませんでした。現在の歴史と保存はそのままです。';}
  finally{if(ticket===operation){setBusy(false);render();}}
 });
 el('slow-climate').addEventListener('click',()=>{
@@ -190,39 +217,43 @@ el('improve-growth').addEventListener('click',()=>{
  if(busy||world.mode!=='generated')return;stop();adopt(improveWorldGrowth(world));el('feedback').textContent='今後の建設では橋の対岸にも広がります。過去の建物は移動しません。「この歴史を保存」で変更を保存できます。';
 });
 el('restart').addEventListener('click',()=>void restart(Number(input.value)||1));
-el('random').addEventListener('click',()=>void restart(Math.floor(Math.random()*4294967295)+1));
+el('random').addEventListener('click',()=>{if(!busy)void restart(randomSeed());});
 function download(json:string){const blob=new Blob([json],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`namonaki-${state.seed}-${state.year}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 el('save').addEventListener('click',async()=>{
- if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を保存しています。';
- try{const result=await storeWorldSave(localStorage,await prepareWorldSessionSave(world));
-  if(result.status==='saved')el('feedback').textContent='この文明の歴史をブラウザに保存しました。';
-  else{el('feedback').textContent='ブラウザに保存できませんでした。現在の歴史と以前の保存は保持しています。JSONを書き出して保存できます。';}
- }catch{el('feedback').textContent='保存できませんでした。現在の歴史と以前の保存はそのままです。';}
- finally{setBusy(false);render();}
+ if(busy)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='歴史を保存しています。';
+ try{await paintFeedback();const packet=await prepareWorldSessionSave(source);if(ticket!==operation||world!==source)return;
+  const result=await storeWorldSave({setItem:(key,value)=>{if(ticket!==operation||world!==source)throw Error('Stale save');localStorage.setItem(key,value);}},packet);if(ticket!==operation||world!==source)return;
+  if(result.status==='saved'){
+   try{for(const key of higherPriorityWorldSaveKeys(packet)){if(ticket!==operation||world!==source)throw Error('Stale save');localStorage.removeItem(key);}el('feedback').textContent='この文明の歴史をブラウザに保存しました。';}
+   catch{el('feedback').textContent='記録は書き込めましたが、優先する保存を切り替えられませんでした。現在の歴史は保持しています。JSONを書き出して保存できます。';}
+  }else el('feedback').textContent='ブラウザに保存できませんでした。現在の歴史と以前の保存は保持しています。JSONを書き出して保存できます。';
+ }catch{if(ticket===operation)el('feedback').textContent='保存できませんでした。現在の歴史と以前の保存はそのままです。';}
+ finally{if(ticket===operation){setBusy(false);render();}}
 });
 el('load').addEventListener('click',async()=>{
- if(busy)return;stop();setBusy(true);el('feedback').textContent='歴史を開いています。';
- try{await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
+ if(busy)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='歴史を開いています。';
+ try{await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));if(ticket!==operation||world!==source)return;if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
   const candidate=restoreWorldSession(saved);adopt(candidate);el('feedback').textContent='保存された歴史を開きました。';
- }catch{el('feedback').textContent='この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
- finally{setBusy(false);render();}
+ }catch{if(ticket===operation)el('feedback').textContent='この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
+ finally{if(ticket===operation){setBusy(false);render();}}
 });
 el('export').addEventListener('click',async()=>{
- if(busy)return;stop();setBusy(true);try{download(serializeWorldSave(await prepareWorldSessionSave(world)));el('feedback').textContent='歴史のJSONを書き出しました。';}
- catch{el('feedback').textContent='歴史を書き出せませんでした。現在の歴史はそのままです。';}finally{setBusy(false);render();}
+ if(busy)return;stop();setBusy(true);const source=world,ticket=++operation;
+ try{await paintFeedback();const packet=await prepareWorldSessionSave(source);if(ticket!==operation||world!==source)return;download(serializeWorldSave(packet));el('feedback').textContent='歴史のJSONを書き出しました。';}
+ catch{if(ticket===operation)el('feedback').textContent='歴史を書き出せませんでした。現在の歴史はそのままです。';}finally{if(ticket===operation){setBusy(false);render();}}
 });
 const file=el('import-file') as HTMLInputElement;
 el('import').addEventListener('click',()=>{if(!busy)file.click();});
 file.addEventListener('change',async()=>{
- const selected=file.files?.[0];if(!selected||busy)return;stop();setBusy(true);
- el('feedback').textContent='記録ファイルを開いています。';await paintFeedback();
- try{if(selected.size>16*1024*1024)throw Error('File too large');const candidate=restoreWorldSession(await decodeWorldSave(await selected.text()));adopt(candidate);el('feedback').textContent='記録ファイルを開きました。';}
- catch{el('feedback').textContent='この記録ファイルを開けませんでした。現在の歴史と保存値はそのままです。';}
- finally{file.value='';setBusy(false);render();}
+ const selected=file.files?.[0];if(!selected||busy)return;stop();setBusy(true);const source=world,ticket=++operation;
+ el('feedback').textContent='記録ファイルを開いています。';
+ try{await paintFeedback();if(selected.size>16*1024*1024)throw Error('File too large');const candidate=restoreWorldSession(await decodeWorldSave(await selected.text()));if(ticket!==operation||world!==source)return;adopt(candidate);el('feedback').textContent='記録ファイルを開きました。';}
+ catch{if(ticket===operation)el('feedback').textContent='この記録ファイルを開けませんでした。現在の歴史と保存値はそのままです。';}
+ finally{if(ticket===operation){file.value='';setBusy(false);render();}}
 });
 input.value=String(state.seed);render();
 }
-const bootControls=['scene-motion','step','play','save','load','export','import','restart','random','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic'];
+const bootControls=['scene-motion','step','play','save','load','export','import','restart','random','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic','enable-terrain'];
 let bootBusy=false;
 function startWorld(world:WorldSession){
  verifyWorldCandidate(world);
@@ -235,7 +266,7 @@ async function boot(){
  el('feedback').textContent='文明の記録を準備しています。';
  try{
   await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));
-  const world=saved?restoreWorldSession(saved):await (await import('./story/new-world.js')).createNewEconomicWorld(randomSeed());
+  const world=saved?restoreWorldSession(saved):await (await import('./story/new-world.js')).createNewTerrainWorld(randomSeed());
   startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
  }catch{
   el('feedback').textContent='記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
@@ -243,11 +274,11 @@ async function boot(){
   el('load').onclick=()=>void boot();
   const recover=async(make:()=>Promise<WorldSession>)=>{
    if(bootBusy)return;bootBusy=true;for(const id of recovery)(el(id) as HTMLButtonElement).disabled=true;
-   try{startWorld(await make());el('feedback').textContent='文明の記録を開きました。';}
+   try{await paintFeedback();startWorld(await make());el('feedback').textContent='文明の記録を開きました。';}
    catch{el('feedback').textContent='文明を開けませんでした。保存値は保持しています。';for(const id of recovery)(el(id) as HTMLButtonElement).disabled=false;}
    finally{bootBusy=false;}
   };
-  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewEconomicWorld(seed));
+  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewTerrainWorld(seed));
   el('restart').onclick=()=>void fresh(Number((el('seed') as HTMLInputElement).value)||randomSeed());el('random').onclick=()=>void fresh(randomSeed());
   const file=el('import-file') as HTMLInputElement;el('import').onclick=()=>file.click();file.onchange=()=>{const f=file.files?.[0];if(!f)return;void recover(async()=>{if(f.size>16*1024*1024)throw Error('File too large');return restoreWorldSession(await decodeWorldSave(await f.text()));});file.value='';};
  }finally{bootBusy=false;}

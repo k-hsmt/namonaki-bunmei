@@ -25,7 +25,7 @@ for(const [engine,name,options] of [['chromium','desktop',{}],['chromium','mobil
  const page=await open(t,engine,options),errors=[];page.on('pageerror',e=>errors.push(e.message));
  assert.equal(await page.evaluate(()=>!!window.audioTest.context),false);
  assert.equal(await page.locator('#music-toggle').textContent(),'BGM ▷');assert.equal(await page.locator('.music-control').textContent(),'BGM ▷音量');assert.equal(await page.locator('.scene-controls #scene-motion').count(),1);assert.equal(await page.locator('.scene-controls #music-toggle').count(),1);
- await page.locator('#save').click();await page.waitForFunction(()=>document.getElementById('feedback').textContent.length>0);
+ await page.locator('#save').click();await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
  const before=await page.evaluate(()=>JSON.stringify(Object.entries(localStorage).filter(([k])=>!k.includes(':music:'))));const year=await page.locator('#year').textContent();
  const response=await page.request.get(origin+'assets/audio/namonaki_asa_v3.mp3');assert.equal(response.status(),200);assert.match(response.headers()['content-type'],/audio\/mpeg/);assert.equal((await response.body()).length,1262070);
  await page.locator('#music-toggle').click();
