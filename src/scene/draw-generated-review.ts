@@ -1,3 +1,4 @@
+import {paintTerrainCutSurface} from '../terrain/draw-terrain-cut-v1.js';
 import {channelMask,clearChannelRoot,drawProductionCanal} from '../irrigation/presentation-v1.js';
 import type {Foliage} from '../environment/landscape-v3.js';
 import type {LeafPalette} from '../environment/landscape-v2.js';
@@ -47,7 +48,7 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
  if(scene.generatedGround!==ground||scene.year!==s.year||scene.siteIndex!==(s.local?.index??0))throw Error('Generated scene composition mismatch');
  if(layer==='structures'){canvas.width=320;canvas.height=180;}else drawTerrainRecord(canvas,ground.terrain,ground.site);const c=canvas.getContext('2d');if(!c)throw Error('2d context missing');
  c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}
- if(layer!=='structures')paintEnvironmentGround(c,ground);
+ if(layer!=='structures'){paintEnvironmentGround(c,ground);if(ground.terrain.format==='resolved-terrain-at-year')paintTerrainCutSurface(c,ground.terrain,ground.site);}
  const {presentation,vegetation}=paint??projectScenePaint(observation),r=readOwnedRecordPhysics(ground.terrain.sites[ground.site].physics);
  if(!layer)for(const {x,y} of presentation.clouds){c.fillStyle=presentation.drought?'#c4c3aa':'#e9e1cb';c.fillRect(x+4,y,19,3);c.fillRect(x,y+3,31,5);c.fillRect(x+8,y-3,10,4);}
  // Weather paints only the saved surface type; floods never invent new water.

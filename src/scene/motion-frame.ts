@@ -9,7 +9,7 @@ import {planSceneMotion,journeyAt,sceneActivityCount} from './motion-plan.js';
 /** Equivalent paint/activities within one immutable terrain; ages remain in history. */
 export function sceneMotionVisualKey(o:GeneratedSceneObservation):string {
  const {snapshot:s,composition:c,ground:g}=o;
- return JSON.stringify([environmentAppearance(g.environment,g.environmentAppearance),g.site,g.terrain.source.seed,...(g.channelView?[g.channelView.key,g.channelView.geometry?.cells]:[]),s.objects,s.publicSpaces,s.scars,c.residentialBlocks,g.facilities,g.bridges,
+ return JSON.stringify([environmentAppearance(g.environment,g.environmentAppearance),g.site,g.terrain.source.seed,...(g.terrain.format==='resolved-terrain-at-year'?[g.terrain.revisionId]:[]),...(g.channelView?[g.channelView.key,g.channelView.geometry?.cells]:[]),s.objects,s.publicSpaces,s.scars,c.residentialBlocks,g.facilities,g.bridges,
   g.vegetation?.map(p=>[p.index,p.stage,p.stage===0&&p.disturbedYear!==null&&s.year-p.disturbedYear<15]),
   Math.floor(s.year/20),sceneActivityCount(c.population,c.scale),presentationPeopleCount(c.population,s.scars.includes('epidemic'))]);
 }
