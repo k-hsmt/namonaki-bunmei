@@ -1,0 +1,82 @@
+{
+  "status": "D2B1_AUDIT_NOT_ACCEPTANCE",
+  "issue": 35,
+  "stage": "D2-b1",
+  "sourceHead": "abde94e9be5ae8aea0fdcbe4e643d1f244b6e351",
+  "years": 10000,
+  "limits": {
+    "plainBytes": 16777216,
+    "gzipStoredBytes": 4194304
+  },
+  "rows": [
+    {
+      "seed": 7,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 81,
+      "kinds": {
+        "facility:built": 27,
+        "housing:built": 54
+      },
+      "terrainCuts": 3,
+      "bytes": {
+        "save": 9459638,
+        "architecture": 42161,
+        "v8": 9417390,
+        "saveGzip": 1060671,
+        "architectureGzip": 2837
+      },
+      "ms": {
+        "advance10000WithArchitecture": 17531,
+        "recomputeArchitectureOnly": 11,
+        "validateV9Total": 11783
+      }
+    },
+    {
+      "seed": 21,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 74,
+      "kinds": {
+        "facility:built": 24,
+        "housing:built": 50
+      },
+      "terrainCuts": 4,
+      "bytes": {
+        "save": 8482081,
+        "architecture": 38490,
+        "v8": 8443504,
+        "saveGzip": 994971,
+        "architectureGzip": 2551
+      },
+      "ms": {
+        "advance10000WithArchitecture": 16747,
+        "recomputeArchitectureOnly": 6,
+        "validateV9Total": 7751
+      }
+    },
+    {
+      "seed": 198,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 72,
+      "kinds": {
+        "facility:built": 27,
+        "housing:built": 45
+      },
+      "terrainCuts": 2,
+      "bytes": {
+        "save": 8457015,
+        "architecture": 37035,
+        "v8": 8419893,
+        "saveGzip": 1023990,
+        "architectureGzip": 2603
+      },
+      "ms": {
+        "advance10000WithArchitecture": 14190,
+        "recomputeArchitectureOnly": 5,
+        "validateV9Total": 5364
+      }
+    }
+  ]
+}
