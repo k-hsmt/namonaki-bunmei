@@ -41,7 +41,16 @@ export function projectScenePaint(observation:GeneratedSceneObservation){
 }
 export type ScenePaintProjection=ReturnType<typeof projectScenePaint>;
 export type GeneratedSceneLayer='backdrop'|'structures';
-export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:GeneratedSceneObservation,layer?:GeneratedSceneLayer,paint?:ScenePaintProjection):void {
+/**
+ * Optional replacement for how housing parts and facilities are painted (Issue #35 D2-c review only).
+ * Absent, the scene is drawn exactly as before. A facility painter returns false to fall back to the
+ * live sprite. Called inside the same mirroring and footprint clip as the live drawing.
+ */
+export interface GeneratedStructurePainter {
+ readonly residentialRoofs?:(c:CanvasRenderingContext2D,scene:GeneratedSceneObservation['composition'],depth:'far'|'middle'|'near')=>void;
+ readonly facility?:(c:CanvasRenderingContext2D,o:GeneratedSceneObservation['snapshot']['objects'][number],plot:GroundPlot)=>boolean;
+}
+export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:GeneratedSceneObservation,layer?:GeneratedSceneLayer,paint?:ScenePaintProjection,painter?:GeneratedStructurePainter):void {
  if(layer!==undefined&&layer!=='backdrop'&&layer!=='structures')throw Error('Unknown scene layer');
  if(paint&&paint.observation!==observation)throw Error('Scene paint projection mismatch');
  const {snapshot:s,composition:scene,ground}=observation;
@@ -67,13 +76,14 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
  c.fillStyle=presentation.drought?'#aa9b77':'#b1a180';for(const [x,y] of presentation.wear)c.fillRect(x,y,1,1);
  drawConfirmedPublicSpaces(c,s.publicSpaces??[]);drawHousingPlotSurface(c,scene);
  }
- if(layer!=='backdrop')for(const depth of ['far','middle','near'] as const)drawResidentialRoofs(c,scene,depth);
+ if(layer!=='backdrop')for(const depth of ['far','middle','near'] as const)(painter?.residentialRoofs??drawResidentialRoofs)(c,scene,depth);
  if(!layer)for(const [i,[x,y]] of presentation.people.entries()){
   c.fillStyle='#d2b894';c.fillRect(x,y-6,2,2);c.fillStyle=['#66594f','#b29b74','#667a70'][i%3]!;c.fillRect(x,y-4,2,3);c.fillStyle='#454e48';c.fillRect(x,y-1,2,2);
  }
  if(layer!=='backdrop')for(const o of [...s.objects.filter(o=>o.civic),...s.objects.filter(o=>!o.civic&&o.kind!=='bridge')]){
   const f=ground.facilities.find(p=>p.id===o.id)!.plot;
   withinFootprint(c,f,()=>{
+   if(painter?.facility?.(c,o,f))return;
    if(o.civic){drawCivicArchitecture(c,o);return;}
    if(o.kind==='field'){
     if(vegetation&&o.condition==='ruined')return;

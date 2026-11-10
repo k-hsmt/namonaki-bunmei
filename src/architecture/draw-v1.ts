@@ -32,21 +32,34 @@ export const useSizes:Readonly<Record<Use,readonly [number,number]>>={house:[19,
 interface Mass {x:number;w:number;top:number;main?:boolean;link?:boolean;wing?:boolean}
 interface Crown {apex:[number,number];H:number;xa:number;xb:number;ridge?:[number,number];flat?:boolean}
 
-/** cx = building centre, gy = ground line (the building occupies rows above it). */
-export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Use},cx:number,gy:number):ArchitectureSpec {
- const s=normalizeSpec(input),deep=s.eaves==='deep';
+/** Wall, roof and material colours of a normalized spec (shared by the full drawing and the D2-c miniature). */
+export function architectureColors(s:ArchitectureSpec){
  let p:Slots={...slots[s.palette]};
  if(s.faded)p=Object.fromEntries(Object.entries(p).map(([k,v])=>[k,fade(v)])) as Slots;
  const tone=(c:string)=>s.faded?fade(c):c;
- const R=(x:number,y:number,w:number,h:number,c:string)=>{if(w>0&&h>0)g.rect(x,y,w,h,c);};
- const [w0,h0]=useSizes[s.use];
- let w=w0,h=h0+(s.storeys-1)*8;
- if(s.structure==='X1'&&['hall','market','workshop'].includes(s.use)){w+=8;}
- if(s.structure==='S03')h-=1;
- const wallColor={log:p.timber,plank:light(p.timber,.12),wattle:p.plaster,earth:p.earth,rammed:mix(p.earth,p.stone,.25),
+ const wall={log:p.timber,plank:light(p.timber,.12),wattle:p.plaster,earth:p.earth,rammed:mix(p.earth,p.stone,.25),
   rubble:p.stone,ashlar:light(p.stone,.12),mixed:light(p.timber,.1),metal:tone(METAL),composite:tone('#b9bdb2')}[s.wall];
- const roofColor={thatch:p.straw,shingle:dark(p.timber,.12),slate:mix(p.stone,'#56656e',.55),tile:p.roof,plaster:light(p.earth,.18),
+ const roof={thatch:p.straw,shingle:dark(p.timber,.12),slate:mix(p.stone,'#56656e',.55),tile:p.roof,plaster:light(p.earth,.18),
   metal:tone('#6f7f80'),glazed:tone(GLASS)}[s.roofMaterial];
+ return {p,tone,wall,roof};
+}
+export const shade={dark,light,mix};
+/**
+ * Optional size override (D2-c, civic halls widened to their plot). Omitted, the D1 size is used and
+ * the output is pixel-identical to D1 (pinned by the D1 gallery hashes).
+ */
+export interface ArchitectureSize {readonly width?:number;readonly height?:number}
+/** cx = building centre, gy = ground line (the building occupies rows above it). */
+export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Use},cx:number,gy:number,size?:ArchitectureSize):ArchitectureSpec {
+ const s=normalizeSpec(input),deep=s.eaves==='deep';
+ const {p,tone}=architectureColors(s);
+ const R=(x:number,y:number,w:number,h:number,c:string)=>{if(w>0&&h>0)g.rect(x,y,w,h,c);};
+ if(size&&[size.width,size.height].some(v=>v!==undefined&&(!Number.isSafeInteger(v)||v<8||v>120)))throw Error('architecture: invalid size override');
+ const [w0,h0]=useSizes[s.use];
+ let w=size?.width??w0,h=(size?.height??h0)+(s.storeys-1)*8;
+ if(s.structure==='X1'&&['hall','market','workshop'].includes(s.use)&&size?.width===undefined){w+=8;}
+ if(s.structure==='S03')h-=1;
+ const {wall:wallColor,roof:roofColor}=architectureColors(s);
  const lift={F1:0,F2:2,F3:2,F4:4,F5:6,F6:3}[s.foundation];
  const x0=cx-(w>>1),base=gy-lift,top=base-h;
  const ov=deep?4:s.structure==='S03'&&s.roofFamily==='R05'?0:1;
