@@ -52,7 +52,9 @@ jobs:
           if-no-files-found: warn
 
   visual-browser:
-    runs-on: ubuntu-latest
+    # Keep Chromium/WebKit dependencies stable across ubuntu-latest image rollouts.
+    # The 26.04 rollout spent almost 13 minutes fetching packages in this job.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
@@ -65,6 +67,12 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-trial-browser
+          path: artifacts/environment34-terrain-trial-tests/*.png
+          if-no-files-found: error
       - name: Capture D7-C natural public-space review
         run: node scripts/review-public-spaces.mjs
         env:
@@ -854,4 +862,31 @@ jobs:
           name: environment34-terrain-cut-fixtures
           retention-days: 14
           path: artifacts/environment34-terrain-cut-fixtures/*
+          if-no-files-found: error
+
+  terrain-change-trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - name: Measure independent C3 and terrain branches including complete hash and gzip
+        run: node scripts/benchmark-terrain-trial.mjs
+      - name: Verify five complete terrain histories, fixed neutrality and native gzip continuation
+        run: node scripts/audit-terrain-trial.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-trial
+          retention-days: 14
+          path: artifacts/environment34-terrain-trial/*.json
           if-no-files-found: error

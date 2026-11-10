@@ -61,7 +61,7 @@ export function validatePlans(raw:unknown,terrain:ValidatedTerrainRecord):Readon
  }
  return plans as unknown as Readonly<Record<RecordSite,ReviewFacilityPlan>>;
 }
-export function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,plans:GeneratedFacilityReview['plans'],mode:ReservationReviewMode,state:CivilizationState,land:unknown,growthPattern?:GrowthPattern,trialBoundary?:GeneratedFacilityReview['trialBoundary'],economicPolicyBoundary?:GeneratedFacilityReview['economicPolicyBoundary']):GeneratedFacilityReview {
+export function decodeReviewPartsInternal(terrain:ValidatedTerrainRecord,hydrology:ValidatedRiverReaches,plans:GeneratedFacilityReview['plans'],mode:ReservationReviewMode,state:CivilizationState,land:unknown,growthPattern?:GrowthPattern,trialBoundary?:GeneratedFacilityReview['trialBoundary'],economicPolicyBoundary?:GeneratedFacilityReview['economicPolicyBoundary'],terrainChangeBoundary?:GeneratedFacilityReview['terrainChangeBoundary']):GeneratedFacilityReview {
  const h=wireObject(land,['schemaVersion','events']);if(h.schemaVersion!==1||!Array.isArray(h.events)||h.events.length>10000)throw Error('Invalid land history');
  const placements:ReviewFacilityPlacement[]=[],bridges:SavedReviewBridge[]=[];
  for(const value of h.events){
@@ -75,7 +75,7 @@ export function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:Validat
    if(e.purpose!=='housing'&&e.purpose!=='public-space')placements.push({objectId:e.objectId,site:e.site as RecordSite,kind:e.purpose as GroundPurpose,plot:f,entrance,builtYear:e.year as number,sourceRecordId:e.sourceRecordId});
   }
  }
- const review:GeneratedFacilityReview={format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode:mode,state,placements,bridgeReview:{schemaVersion:1,hydrology,bridges},diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{}),...(trialBoundary?{trialBoundary}:{}),...(economicPolicyBoundary?{economicPolicyBoundary}:{})};
+ const review:GeneratedFacilityReview={format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode:mode,state,placements,bridgeReview:{schemaVersion:1,hydrology,bridges},diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{}),...(trialBoundary?{trialBoundary}:{}),...(economicPolicyBoundary?{economicPolicyBoundary}:{}),...(terrainChangeBoundary?{terrainChangeBoundary}:{})};
  for(const [index,site] of sites.entries()){
   const buildings=siteAt(state.observation?.sites,index,lastObservedYear(state))!.buildings,placed=placements.filter(p=>p.site===site);
   if(buildings.length!==placed.length+(site==='river-bank'?bridges.length:0))throw Error('Facility birth ledger is incomplete');
@@ -87,10 +87,14 @@ export function reviewFromParts(terrain:ValidatedTerrainRecord,hydrology:Validat
    if(p.objectId===site+'-0'&&(p.builtYear!==0||p.sourceRecordId!==state.history[0]?.id||!sameWire(p.plot,plans[site].slots[0]!.plot)))throw Error('Initial plan and birth disagree');
   }
  }
- validateGeneratedBridgeLedger(review);validateGeneratedPublicSpaceLedger(review,lastObservedYear(state));
- if(!sameWire(captureGeneratedLandFoundations(review),land))throw Error('Land birth, access path, order or immutable geometry changed');
  return review;
 }
+/** Complete validation is deliberately separate so D4 can bind verified time-dependent physics first. */
+export function validateDecodedReviewPartsInternal(review:GeneratedFacilityReview,land:unknown):void {
+ validateGeneratedBridgeLedger(review);validateGeneratedPublicSpaceLedger(review,lastObservedYear(review.state));
+ if(!sameWire(captureGeneratedLandFoundations(review),land))throw Error('Land birth, access path, order or immutable geometry changed');
+}
+export function reviewFromParts(...args:Parameters<typeof decodeReviewPartsInternal>):GeneratedFacilityReview {const review=decodeReviewPartsInternal(...args);validateDecodedReviewPartsInternal(review,args[5]);return review;}
 export function validateGeneratedSaveDraft(raw:unknown):ValidatedGeneratedSaveDraft {
  assertJsonWire(raw);
  const json=JSON.stringify(raw);if(typeof json!=='string'||new TextEncoder().encode(json).length>generatedDraftMaxBytes)throw Error('Generated draft exceeds 16MiB');

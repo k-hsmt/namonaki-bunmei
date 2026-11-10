@@ -1,3 +1,4 @@
+import {terrainForReviewAtInternal} from './terrain-review-binding-internal.js';
 /** D3-B assembly-ground stage. Explicit generated dispatch; no live save writer. */
 import {withGeneratedBridgeAccess} from './generated-bridge-history-review.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
@@ -30,12 +31,12 @@ function context(review:GeneratedFacilityReview,site:RecordSite,year:number,pref
  const occupancy:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===site&&p.builtYear<=year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),
   ...homes.blocks.map(b=>({id:b.blockId,kind:'housing' as const,plot:b.footprint,entrance:southEntrance(b.footprint)})),
   ...at(prefix,year).spaces.filter(p=>p.siteId===site).map(p=>({id:p.id,kind:'public-space' as const,plot:p.footprint,entrance:southEntrance(p.footprint)}))];
- return withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year,confirmedYear:year,historyStatus:'known' as const,primaryRoot:review.plans[site].primaryRoot,occupancy,
+ return withGeneratedBridgeAccess(review,{terrain:terrainForReviewAtInternal(review,year,site),site,year,confirmedYear:year,historyStatus:'known' as const,primaryRoot:review.plans[site].primaryRoot,occupancy,
   reservations:selectReviewReservations(review.plans[site],review.reservationMode,new Set(occupancy.map(p=>p.id)))});
 }
 function nearestHomes(review:GeneratedFacilityReview,space:PublicSpace,year:number,prefix:PublicSpaceHistory){
  const ctx=context(review,space.siteId,year,prefix),homes=housingAt(review.state.housing,year,space.siteId).blocks.filter(b=>b.condition!=='ruined'&&b.use!=='vacant');
- const r=decodeRecordPhysics(review.terrain.sites[space.siteId].physics),windows=groundContextWindows(r,ctx,[space.footprint]);
+ const r=decodeRecordPhysics(terrainForReviewAtInternal(review,year,space.siteId).sites[space.siteId].physics),windows=groundContextWindows(r,ctx,[space.footprint]);
  const entry=southEntrance(space.footprint),distances=groundDistances(windows,entry);
  const ranked=homes.map(b=>{const p=southEntrance(b.footprint),d=distances[p[1]*320+p[0]];return {b,d:d===undefined||d<0?Infinity:d};})
   .sort((a,b)=>a.d-b.d||(a.b.blockId<b.b.blockId?-1:a.b.blockId>b.b.blockId?1:0));
@@ -51,12 +52,12 @@ function passage(ground:GroundPlot,plot:GroundPlot):GroundPlot|null {
 function passageClear(review:GeneratedFacilityReview,space:PublicSpace,ground:GroundPlot,ctx:ReturnType<typeof context>){
  const p=passage(ground,space.footprint);if(!p||p.width<2||p.depth<2||p.x<0||p.y<96||p.x+p.width>320||p.y+p.depth>180)return false;
  if(ctx.occupancy.some(o=>overlap(p,o.plot)))return false;
- const r=decodeRecordPhysics(review.terrain.sites[space.siteId].physics);
+ const r=decodeRecordPhysics(ctx.terrain.sites[space.siteId].physics);
  for(let y=p.y;y<p.y+p.depth;y++)for(let x=p.x;x<p.x+p.width;x++){const i=y*320+x;if(r.surface[i]!==1||r.grade[i]!>1||r.bearing[i]!==0)return false;}
  return true;
 }
 function waterPenalty(review:GeneratedFacilityReview,space:PublicSpace){
- const p=space.footprint,r=decodeRecordPhysics(review.terrain.sites[space.siteId].physics);let distance=8;
+ const p=space.footprint,r=decodeRecordPhysics(terrainForReviewAtInternal(review,review.state.year,space.siteId).sites[space.siteId].physics);let distance=8;
  for(let y=Math.max(96,p.y-7);y<Math.min(180,p.y+p.depth+7);y++)for(let x=Math.max(0,p.x-7);x<Math.min(320,p.x+p.width+7);x++){
   const i=y*320+x;if(r.surface[i]!==2&&r.surface[i]!==3)continue;
   const dx=x<p.x?p.x-x:x>=p.x+p.width?x-p.x-p.width+1:0,dy=y<p.y?p.y-y:y>=p.y+p.depth?y-p.y-p.depth+1:0;distance=Math.min(distance,dx+dy);
