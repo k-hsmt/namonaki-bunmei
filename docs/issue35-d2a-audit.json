@@ -11,10 +11,10 @@
     "adaptation": "architecture-adaptation-v1",
     "introducedYear": 0
   },
-  "sourceHead": "local-d2a",
+  "sourceHead": "local-unidentified",
   "worlds": 200,
   "skippedSeeds": 0,
-  "seconds": 205,
+  "seconds": 219,
   "siteInputsPermille": {
     "river-bank": {
       "slope": {
@@ -370,19 +370,19 @@
     "total": 4200,
     "hold": 0,
     "constraintSubstitutions": {
-      "roofMaterial:thatch→shingle": 39
+      "roofMaterial:thatch→shingle": 42
     },
     "envelopeStage": {
       "1": 4200
     },
     "adjustments": {
-      "variation:window": 811,
-      "variation:ornaments": 1497,
-      "variation:roof-material": 412,
+      "variation:window": 816,
+      "variation:ornaments": 1496,
       "use:granary-small-windows": 500,
       "use:workshop-wide-opening": 301,
       "use:market-open-front": 600,
-      "variation:pitch": 461,
+      "variation:roof-material": 430,
+      "variation:pitch": 464,
       "use:workshop-level-floor": 112,
       "use:hall-ridge-ornament": 459,
       "use:dressed-stone": 116,
