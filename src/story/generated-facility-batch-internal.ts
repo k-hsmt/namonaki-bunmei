@@ -3,7 +3,7 @@ import {runGeneratedLandBatch,type LandPhaseObserver} from './generated-land-bat
 import {assertProductionBoundary,coupledTrialBoundary,economicProductionBoundary,terrainChangeTrialBoundary,terrainProductionBoundary} from './trial-boundary.js';
 import type {CoupledAnnualModifier} from './coupled-economy-policy-internal.js';
 import {coupledChoiceBinding} from './coupled-choice-binding-internal.js';
-import type {EconomyObserver} from './economy-observer.js';
+import type {CoupledReceiptObserverInternal,EconomyObserver} from './economy-observer.js';
 /** D3-A independent ordinary-facility progression. Not a v5 save or live UI mode. */
 import {createHousingCivilization} from './housing-persistence.js';
 import {choose,chooseAutomatically,lastObservedYear,type CivilizationState,type ReviewLandProgression} from './engine.js';
@@ -113,19 +113,19 @@ export function createGeneratedFacilityBatch(input:GeneratedFacilityReview,exten
  return batchFor(review,policy);
 }
 /** Only the coupled annual kernel owns this mode and its prepared coefficients. */
-export function createCoupledFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,observeEconomy:EconomyObserver){
- const review=mutableCopy(input,'trial'),base=policyFor(review,extension,observeEconomy);
- return batchFor(review,{...base,mode:'irrigation-coupled-review-only',coupledEconomy:prepare},prepare);
+export function createCoupledFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal){
+ const review=mutableCopy(input,'trial'),base=policyFor(review,extension);
+ return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'irrigation-coupled-review-only',coupledEconomy:prepare},prepare);
 }
 /** Production-only annual adapter; its caller must own the full production root. */
-export function createEconomicProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,observeEconomy:EconomyObserver){
- const review=mutableCopy(input,'production'),base=policyFor(review,extension,observeEconomy);
- return batchFor(review,{...base,mode:'irrigation-economic-production-v1',coupledEconomy:prepare},prepare);
+export function createEconomicProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal){
+ const review=mutableCopy(input,'production'),base=policyFor(review,extension);
+ return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'irrigation-economic-production-v1',coupledEconomy:prepare},prepare);
 }
 /** Dedicated D4 adapter: future terrain stays private to the annual writer. */
-export function createTerrainChangeFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,observeEconomy:EconomyObserver,terrainAt:TerrainReviewProvider){
- const review=mutableCopy(input,'terrain-trial');bindTerrainReviewInternal(review,terrainAt);const base=policyFor(review,extension,observeEconomy);
- return batchFor(review,{...base,mode:'terrain-change-review-only',coupledEconomy:prepare},prepare);
+export function createTerrainChangeFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal,terrainAt:TerrainReviewProvider){
+ const review=mutableCopy(input,'terrain-trial');bindTerrainReviewInternal(review,terrainAt);const base=policyFor(review,extension);
+ return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'terrain-change-review-only',coupledEconomy:prepare},prepare);
 }
 function batchFor(review:GeneratedFacilityReview,policy:ReviewLandProgression,beforePhase?:()=>unknown){
  return {review,advance(years:number,choices:'stop'|'automatic',stopAtNewRecord?:boolean,onPhase?:LandPhaseObserver){
@@ -151,7 +151,7 @@ export function chooseAutomaticallyGeneratedFacilityReview(input:GeneratedFacili
 }
 
 /** Production terrain owns a separate land boundary, sharing only the private batch mechanics. */
-export function createTerrainProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,observeEconomy:EconomyObserver,terrainAt:TerrainReviewProvider){
- const review=mutableCopy(input,'terrain-production');bindTerrainReviewInternal(review,terrainAt);const base=policyFor(review,extension,observeEconomy);
- return batchFor(review,{...base,mode:'terrain-production-v1',coupledEconomy:prepare},prepare);
+export function createTerrainProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal,terrainAt:TerrainReviewProvider){
+ const review=mutableCopy(input,'terrain-production');bindTerrainReviewInternal(review,terrainAt);const base=policyFor(review,extension);
+ return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'terrain-production-v1',coupledEconomy:prepare},prepare);
 }

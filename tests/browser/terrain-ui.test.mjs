@@ -41,7 +41,7 @@ test('normal year-filtered ground status and motion preserve the stored world',a
  const p=await pageFor(t,{raw:normalWire});await p.locator('#site-select').selectOption('1');
  for(const [year,pattern]of [[99,/整地 0件/],[100,/翌年から使える平場 1件/],[101,/整地 1件/],[700,/整地 2件/]]){await rewind(p,year);assert.match(await p.locator('#site-terrain').textContent(),pattern);}
  await p.locator('#site-select').selectOption('0');assert.equal(await p.locator('#site-terrain').isVisible(),false);await p.locator('#site-select').selectOption('1');await rewind(p,101);
- await p.emulateMedia({reducedMotion:'no-preference'});await p.locator('#scene-motion').check();const before=await pixels(p),year=await p.locator('#scene-year').textContent();await p.waitForTimeout(600);assert.notEqual(await pixels(p),before);assert.equal(await p.locator('#scene-year').textContent(),year);assert.equal(await p.evaluate(k=>localStorage.getItem(k),KEY),normalWire);
+ await p.emulateMedia({reducedMotion:'no-preference'});await p.waitForFunction(()=>{const c=document.getElementById('scene-motion');return !c.disabled&&c.checked;});const before=await pixels(p),year=await p.locator('#scene-year').textContent();await p.waitForTimeout(600);assert.notEqual(await pixels(p),before);assert.equal(await p.locator('#scene-year').textContent(),year);assert.equal(await p.evaluate(k=>localStorage.getItem(k),KEY),normalWire);
  await mkdir('artifacts/environment34-terrain-ui-tests',{recursive:true});await p.screenshot({path:'artifacts/environment34-terrain-ui-tests/mobile-v8.png',fullPage:true});
 });
 test('manual and automatic choice share one async commit; busy operations cannot start a second writer',async t=>{

@@ -5,10 +5,10 @@ import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
 import {createGeneratedFacilityBatch,createCoupledFacilityBatch,createEconomicProductionFacilityBatch,createTerrainChangeFacilityBatch,createTerrainProductionFacilityBatch} from '../story/generated-facility-batch-internal.js';
 import {coupledAnnualModifier,type CoupledAnnualModifier} from '../story/coupled-economy-policy-internal.js';
 import {coupledTrialBoundary,economicProductionBoundary,terrainChangeTrialBoundary,terrainProductionBoundary} from '../story/trial-boundary.js';
-import type {EconomyCapture} from '../story/economy-observer.js';
+import type {CoupledReceiptCaptureInternal} from '../story/economy-observer.js';
 import {economyEffectCalculator} from './economy-effect-core-v1.js';
 import type {EconomyEffect,EconomyPolicy} from './economy-types-v1.js';
-import {freezeReview,freezeReviewRecordInternal} from './wire-v1.js';
+import {freezeReviewWriterDataInternal} from './wire-v1.js';
 import type {GeneratedAdvanceOptions} from '../story/generated-facility-review.js';
 import {generatedPublicSpaceExtension,validateGeneratedPublicSpaceLedger} from '../story/generated-public-space-review.js';
 import {validateGeneratedBridgeLedger} from '../story/generated-bridge-history-review.js';
@@ -30,7 +30,7 @@ export interface CoupledKernelHooks {
  readonly mode?:'trial'|'production'|'terrain-trial'|'terrain-production';
  readonly terrain?:{readonly at:TerrainReviewProvider;readonly disturbancesAt:(year:number)=>readonly VegetationEvent[]};
  readonly introducedYear:number;readonly policy:EconomyPolicy;readonly prepared:PreparedCoupledEffect|null;
- readonly capture:(capture:EconomyCapture,prepared:PreparedCoupledEffect)=>void;
+ readonly capture:(capture:CoupledReceiptCaptureInternal,prepared:PreparedCoupledEffect)=>void;
  readonly checkpoint?:(year:number,review:GeneratedBridgeReview['review'],phaseCount:number)=>void;
 }
 
@@ -41,7 +41,7 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
  }else if(trial?.mode==='production'){if(input.review.economicPolicyBoundary!==economicProductionBoundary||input.review.trialBoundary!==undefined||input.review.terrainChangeBoundary!==undefined||input.review.terrainPolicyBoundary!==undefined||trial.policy!=='combined')throw Error('Missing annual production boundary');}else if(trial){if(input.review.trialBoundary!==coupledTrialBoundary||input.review.terrainChangeBoundary!==undefined||input.review.terrainPolicyBoundary!==undefined)throw Error('Missing annual trial boundary');}else validateProductionWorld(input);
  validateGeneratedBridgeLedger(input.review);validateGeneratedPublicSpaceLedger(input.review,lastObservedYear(input.review.state));
  let prepare:()=>CoupledAnnualModifier=()=>{throw Error('Annual prefix not initialized');},prepared=trial?.prepared??null;
- const capture=(c:EconomyCapture)=>{if(!trial||!prepared)throw Error('Missing prepared economy effect');trial.capture(c,prepared);};
+ const capture=(c:CoupledReceiptCaptureInternal)=>{if(!trial||!prepared)throw Error('Missing prepared economy effect');trial.capture(c,prepared);};
  const batch=terrainMode?(trial!.mode==='terrain-production'?createTerrainProductionFacilityBatch:createTerrainChangeFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture,terrainHooks!.at):trial?(trial.mode==='production'?createEconomicProductionFacilityBatch:createCoupledFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture):createGeneratedFacilityBatch(input.review,generatedPublicSpaceExtension,options.observeEconomy);
  const world={...input,review:{...batch.review,plans:input.review.plans,bridgeReview:{...batch.review.bridgeReview!,hydrology:input.review.bridgeReview!.hydrology}}};
  if(terrainHooks)bindTerrainReviewInternal(world.review,terrainHooks.at);
@@ -55,7 +55,7 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
   const requirePrefix=(y:number)=>{if(y!==through)throw Error('Economy must read the previous confirmed prefix');};
   const calculate=economyEffectCalculator(world.review,index.source,{channelAt:y=>{requirePrefix(y);return lifecycle.channel;},system:id=>lifecycle.systems.find(s=>s.id===id),eventsAt:y=>{requirePrefix(y);return prefixChannelEvents;},environmentAt:y=>{requirePrefix(y);return {humidity:runner.climate().humidity,patchAt:i=>runner.patchAt('river-bank',i)};}},trial.introducedYear);
   prepare=()=>{
-   if(!prepared||prepared.effect.sourceYear!==through){const effect=calculate(through+1);prepared=freezeReviewRecordInternal({effect:freezeReviewRecordInternal(effect),modifier:freezeReviewRecordInternal(coupledAnnualModifier(through+1,trial.policy,effect))});}
+   if(!prepared||prepared.effect.sourceYear!==through){const effect=calculate(through+1);prepared=freezeReviewWriterDataInternal({effect:freezeReviewWriterDataInternal(effect),modifier:freezeReviewWriterDataInternal(coupledAnnualModifier(through+1,trial.policy,effect))});}
    if(prepared.modifier.year!==through+1||prepared.modifier.policy!==trial.policy)throw Error('Stale annual economy effect');return prepared.modifier;
   };
  }
@@ -63,7 +63,7 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
   const draws=boundedRngDraws(phase.rngBefore,phase.rngAfter,phase.phase==='step'?64:phase.phase==='manual-choice'?0:1);
   if(phase.phase==='step'?draws<6:phase.phase==='automatic-choice'?draws!==1:draws!==0)throw Error('Unexpected annual RNG consumption');
   totalDraws+=draws;if(totalDraws>1000000)throw Error('Annual RNG batch exceeds bound');
-  const ecologyBefore=through,record=()=>phases.push(freezeReviewRecordInternal({...phase,draws,ecologyBefore,ecologyAfter:through}));
+  const ecologyBefore=through,record=()=>phases.push(freezeReviewWriterDataInternal({...phase,draws,ecologyBefore,ecologyAfter:through}));
   if(phase.confirmedBefore!==through)throw Error('Ecology did not commit before next phase');
   if(phase.confirmedAfter===through){if(!phase.pending)throw Error('Missing annual commit');record();return;}
   const year=phase.confirmedAfter;if(year!==through+1||phase.pending||year>10000)throw Error('Invalid annual ecology boundary');
@@ -82,7 +82,9 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
   if(trial&&(year-trial.introducedYear)%100===0)trial.checkpoint?.(year,world.review,phases.length);
  };
  const finish=()=>{
- const completed={...world,vegetation:{...v,confirmedThrough:through,events},environment:{...e,confirmedThrough:through,targets,uses,checkpoints,current:{...runner.snapshot(),channel:lifecycle.channel}},irrigation:{...i,confirmedThrough:through,systems:lifecycle.systems.map(s=>({...s,geometry:productionGeometry(s.geometry)})),events:lifecycle.events,attempts:lifecycle.attempts}},result=trial?freezeReview(completed):ownProductionWorld(completed);
+ // The private batch has finished. Its detached JSON data has no external accessors;
+ // native readers and public B ownership still use the full descriptor-aware freezer.
+ const completed={...world,vegetation:{...v,confirmedThrough:through,events},environment:{...e,confirmedThrough:through,targets,uses,checkpoints,current:{...runner.snapshot(),channel:lifecycle.channel}},irrigation:{...i,confirmedThrough:through,systems:lifecycle.systems.map(s=>({...s,geometry:productionGeometry(s.geometry)})),events:lifecycle.events,attempts:lifecycle.attempts}},result=trial?freezeReviewWriterDataInternal(completed):ownProductionWorld(completed);
  validateGeneratedBridgeLedger(result.review);validateGeneratedPublicSpaceLedger(result.review,through);
  return Object.freeze({world:result,prepared:result.review.state.pending?prepared:null,diagnostics:Object.freeze({format:'irrigation-annual-baseline-audit-v1' as const,originPending:!!input.review.state.pending,originPendingStepDraws:null,totalDraws,ecologySteps,confirmedThrough:through,phases:Object.freeze(phases)})});
  };
