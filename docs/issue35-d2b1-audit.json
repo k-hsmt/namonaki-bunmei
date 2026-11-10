@@ -2,7 +2,7 @@
   "status": "D2B1_AUDIT_NOT_ACCEPTANCE",
   "issue": 35,
   "stage": "D2-b1",
-  "sourceHead": "local-unidentified",
+  "sourceHead": "abde94e9be5ae8aea0fdcbe4e643d1f244b6e351",
   "years": 10000,
   "limits": {
     "plainBytes": 16777216,
@@ -27,9 +27,9 @@
         "architectureGzip": 2837
       },
       "ms": {
-        "advance10000WithArchitecture": 16168,
-        "recomputeArchitectureOnly": 10,
-        "validateV9Total": 11588
+        "advance10000WithArchitecture": 17531,
+        "recomputeArchitectureOnly": 11,
+        "validateV9Total": 11783
       }
     },
     {
@@ -50,9 +50,9 @@
         "architectureGzip": 2551
       },
       "ms": {
-        "advance10000WithArchitecture": 16371,
-        "recomputeArchitectureOnly": 5,
-        "validateV9Total": 7716
+        "advance10000WithArchitecture": 16747,
+        "recomputeArchitectureOnly": 6,
+        "validateV9Total": 7751
       }
     },
     {
@@ -73,9 +73,9 @@
         "architectureGzip": 2603
       },
       "ms": {
-        "advance10000WithArchitecture": 13808,
-        "recomputeArchitectureOnly": 3,
-        "validateV9Total": 5048
+        "advance10000WithArchitecture": 14190,
+        "recomputeArchitectureOnly": 5,
+        "validateV9Total": 5364
       }
     }
   ]
