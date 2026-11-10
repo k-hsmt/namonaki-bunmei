@@ -1,3 +1,4 @@
+import {terrainForReviewAtInternal} from './terrain-review-binding-internal.js';
 /** D3-B housing stage only. Civic/public-space and bridge stages remain separate. */
 import {hash01} from '../engine/rng.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
@@ -88,9 +89,9 @@ export function createGeneratedHousingExtension(extra?:GeneratedLandReviewExtens
   const {id,ordinal}=nextId(state,site),plan=review.plans[site];
   const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===site&&p.builtYear<=state.year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...additionalOccupancy(review,state,site),...(extra?.(review,state,site)??[])];
   const reservations=selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id))),neighborEntrances=reviewNeighborEntrances('housing',occupied);
-  const context=withGeneratedBridgeAccess(review,{terrain:review.terrain,site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations});
+  const context=withGeneratedBridgeAccess(review,{terrain:terrainForReviewAtInternal(review,state.year,site),site,year:state.year,confirmedYear:state.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,reservations});
   const key=JSON.stringify([site,id,plan.primaryRoot,plan.nucleus,context.occupancy,reservations,neighborEntrances,context.crossings,review.growthPattern]);
-  let failed=failedPlots.get(review.terrain);if(!failed){failed=new Set();failedPlots.set(review.terrain,failed);}
+  let failed=failedPlots.get(context.terrain.sites[site].physics);if(!failed){failed=new Set();failedPlots.set(context.terrain.sites[site].physics,failed);}
   const reused=failed.has(key);if(reused)replayMetrics.plotHoldReuses++;
   const result=reused?{status:'hold' as const,reason:'no-safe-plot'}:findPlacementReview(context,
    {objectId:id,purpose:'housing',width:18,depth:8,nucleus:plan.nucleus,neighborEntrances,...(review.growthPattern?{growthPattern:review.growthPattern}:{})});

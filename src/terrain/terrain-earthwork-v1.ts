@@ -2,7 +2,7 @@
 import {resolveTerrainAtYear,appendTerrainCutInternal,type TerrainHistory} from './terrain-revision-v1.js';
 import {terrainRevisionCanonical,terrainRevisionHash} from './terrain-revision-wire-v1.js';
 import {decodeRecordPhysics,type RecordRaster} from './terrain-record-raster-v1.js';
-import {groundContextWindows,groundReachParents,reviewPhysicalPlot,southEntrance,type GroundPlot,type GroundReviewContext} from './ground-access-review.js';
+import {groundContextWindows,groundReachParents,groundDistances,reviewPhysicalPlot,southEntrance,type GroundPlot,type GroundReviewContext} from './ground-access-review.js';
 import type {TerrainCutChange,TerrainCellChange} from './terrain-change-types-v1.js';
 export interface TerrainCutContext {
  readonly history:TerrainHistory;readonly ground:GroundReviewContext;
@@ -12,7 +12,7 @@ export interface TerrainCutContext {
 }
 export type TerrainCutHold='unconfirmed-year'|'unsupported-site'|'outside-ground'|'unchanged'|'unstable'|'cut-limit'|'water'|'occupied'|'no-access'|'limit';
 export type TerrainCutProposal={readonly status:'hold';readonly reason:TerrainCutHold;readonly conflicts:readonly string[]}|{readonly status:'review-only';readonly change:TerrainCutChange};
-const proposals=new WeakMap<object,{history:TerrainHistory;change:TerrainCutChange;result?:TerrainHistory}>();
+const proposals=new WeakMap<object,{history:TerrainHistory;change:TerrainCutChange;fieldWalkDistance:number;result?:TerrainHistory}>();
 const W=320,N=57600;
 const overlap=(a:GroundPlot,b:GroundPlot)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.depth&&a.y+a.depth>b.y;
 const validId=(v:unknown)=>typeof v==='string'&&v.length>0&&v.length<=256;
@@ -24,7 +24,7 @@ function freeze<T>(value:T):T {if(value&&typeof value==='object'){Object.values(
 function cell(r:RecordRaster,i:number):readonly [number,number,number,number]{return [r.surface[i]!,r.grade[i]!,r.bearing[i]!,r.elevation[i]!];}
 function neighbors(i:number){const x=i%W,y=Math.floor(i/W);return [x>0?i-1:-1,x<319?i+1:-1,y>96?i-W:-1,y<179?i+W:-1].filter(n=>n>=0);}
 /** All context values needed by the transaction are read before the asynchronous hash. */
-export async function proposeTerrainCut(ctx:TerrainCutContext,requested:GroundPlot):Promise<TerrainCutProposal>{
+async function evaluateTerrainCutInternal(ctx:TerrainCutContext,requested:GroundPlot,rule:'terrain-cut-review-v1'|'terrain-cut-review-v2'='terrain-cut-review-v2'):Promise<TerrainCutProposal>{
  const {history,ground:g,field}=ctx,year=g.year;
  if(g.site!=='hill-side')return hold('unsupported-site');
  if(g.historyStatus!=='known'||!Number.isSafeInteger(year)||year!==history.confirmedThrough||year!==g.confirmedYear||year>=10000)return hold('unconfirmed-year');
@@ -43,23 +43,33 @@ export async function proposeTerrainCut(ctx:TerrainCutContext,requested:GroundPl
  for(let y=plot.y;y<plot.y+plot.depth;y++)for(let x=plot.x;x<plot.x+plot.width;x++){const h=before.elevation[y*W+x]!;target=Math.min(target,h);high=Math.max(high,h);}
  if(high===target)return hold('unchanged');if(high-target>2)return hold('cut-limit');let cutVolume=0;
  for(let y=plot.y;y<plot.y+plot.depth;y++)for(let x=plot.x;x<plot.x+plot.width;x++){const i=y*W+x;cutVolume+=after.elevation[i]!-target;after.elevation[i]=target;}
+ if(rule==='terrain-cut-review-v2')for(let y=plot.y-1;y<=plot.y+plot.depth;y++)for(let x=plot.x-1;x<=plot.x+plot.width;x++){
+  if(x>=plot.x&&x<plot.x+plot.width&&y>=plot.y&&y<plot.y+plot.depth)continue;const i=y*W+x,next=Math.min(after.elevation[i]!,target+1),cut=after.elevation[i]!-next;if(cut>2)return hold('cut-limit');cutVolume+=cut;after.elevation[i]=next;
+ }
  // Recompute every possibly affected grade, including the one-cell exterior ring.
  for(let y=bounds.y;y<bounds.y+bounds.depth;y++)for(let x=bounds.x;x<bounds.x+bounds.width;x++){const i=y*W+x;after.grade[i]=after.bearing[i]===2?2:after.surface[i]===1?Math.min(2,...neighbors(i).map(j=>Math.abs(after.elevation[i]!-after.elevation[j]!))):0;}
  if(reviewPhysicalPlot(after,'field',plot).status!=='clear')return hold('cut-limit');
- const old=groundReachParents(groundContextWindows(before,g),g.primaryRoot),next=groundReachParents(groundContextWindows(after,g,[plot]),g.primaryRoot),entrance=southEntrance(plot);
+ const afterWindows=groundContextWindows(after,g,[plot]),old=groundReachParents(groundContextWindows(before,g),g.primaryRoot),next=groundReachParents(afterWindows,g.primaryRoot),entrance=southEntrance(plot);
  if(!validPoint(entrance)||next[pointIndex(entrance)]===-1)return hold('no-access');
  const lost=g.occupancy.filter(o=>old[pointIndex(o.entrance)]!==-1&&next[pointIndex(o.entrance)]===-1).map(o=>o.id);if(lost.length)return hold('no-access',lost);
  for(const p of g.crossings?.flatMap(c=>c.bankEntrances)??[])if(old[pointIndex(p)]!==-1&&next[pointIndex(p)]===-1)return hold('no-access');
+ const fieldEntrance=g.occupancy.find(o=>o.id===field.id)!.entrance,fieldWalkDistance=groundDistances(afterWindows,fieldEntrance)[pointIndex(entrance)]!;if(fieldWalkDistance<0)return hold('no-access');
  const cells:TerrainCellChange[]=[];for(let y=bounds.y;y<bounds.y+bounds.depth;y++)for(let x=bounds.x;x<bounds.x+bounds.width;x++){const i=y*W+x,a=cell(before,i),b=cell(after,i);if(a.some((v,n)=>v!==b[n]))cells.push([i,...a,...b]);}
  const disturbedPatches=[...new Set(cells.filter(c=>c[4]!==c[8]).map(c=>Math.floor((Math.floor(c[0]/320)-96)/8)*40+Math.floor(c[0]%320/8)))].sort((a,b)=>a-b);
- const body=freeze({format:'terrain-cut-event-v1' as const,schemaVersion:1 as const,ruleId:'terrain-cut-review-v1' as const,id:'terrain-cut-'+year,site:'hill-side' as const,approvedYear:year,effectiveYear:year+1,parentRevision:view.revisionId,cause:{recordId:ctx.causeRecordId,fieldId:field.id,fieldSourceRecordId:field.sourceRecordId,fieldBuiltYear:field.builtYear},plot,bounds,targetElevation:target,cutVolume,cells,disturbedPatches});
- const revisionId=await terrainRevisionHash({baseHash:history.baseHash,...body}),change:TerrainCutChange=Object.freeze({...body,revisionId}),proposal=Object.freeze({status:'review-only' as const,change});proposals.set(proposal,{history,change});return proposal;
+ const body=freeze({format:'terrain-cut-event-v1' as const,schemaVersion:1 as const,ruleId:rule,id:'terrain-cut-'+year,site:'hill-side' as const,approvedYear:year,effectiveYear:year+1,parentRevision:view.revisionId,cause:{recordId:ctx.causeRecordId,fieldId:field.id,fieldSourceRecordId:field.sourceRecordId,fieldBuiltYear:field.builtYear},plot,bounds,targetElevation:target,cutVolume,cells,disturbedPatches});
+ const revisionId=await terrainRevisionHash({baseHash:history.baseHash,...body}),change:TerrainCutChange=Object.freeze({...body,revisionId}),proposal=Object.freeze({status:'review-only' as const,change});proposals.set(proposal,{history,change,fieldWalkDistance});return proposal;
 }
+export async function proposeTerrainCut(ctx:TerrainCutContext,requested:GroundPlot):Promise<TerrainCutProposal>{return evaluateTerrainCutInternal(ctx,requested);}
 export function commitTerrainCut(proposal:TerrainCutProposal):TerrainHistory {
  const owned=proposals.get(proposal);if(!owned)throw Error('Unowned or unsuccessful terrain cut');return owned.result??=(appendTerrainCutInternal(owned.history,owned.change));
 }
 /** Reader replay of a saved candidate; never enumerates candidates or consumes RNG. */
 export async function verifyTerrainCut(raw:unknown,ctx:TerrainCutContext):Promise<TerrainCutProposal>{
  const canonical=terrainRevisionCanonical(raw);if(canonical.length>100000||!raw||typeof raw!=='object'||!('plot'in raw))throw Error('Invalid terrain cut wire');
- const expected=await proposeTerrainCut(ctx,(raw as TerrainCutChange).plot);if(expected.status!=='review-only'||terrainRevisionCanonical(expected.change)!==canonical)throw Error('Terrain cut replay mismatch');return expected;
+ const rule=(raw as TerrainCutChange).ruleId;if(!['terrain-cut-review-v1','terrain-cut-review-v2'].includes(rule))throw Error('Unknown terrain cut rule');const expected=await evaluateTerrainCutInternal(ctx,(raw as TerrainCutChange).plot,rule);if(expected.status!=='review-only'||terrainRevisionCanonical(expected.change)!==canonical)throw Error('Terrain cut replay mismatch');return expected;
 }
+
+export function terrainCutProposalMetrics(proposal:TerrainCutProposal):{readonly fieldWalkDistance:number}{const p=proposals.get(proposal);if(!p)throw Error('Unowned terrain cut metrics');return Object.freeze({fieldWalkDistance:p.fieldWalkDistance});}
+
+/** Native replay never invokes the public proposal or commit writer entry points. */
+export async function replayTerrainCutInternal(raw:unknown,ctx:TerrainCutContext):Promise<{history:TerrainHistory;fieldWalkDistance:number}>{const verified=await verifyTerrainCut(raw,ctx),p=proposals.get(verified)!;return {history:appendTerrainCutInternal(ctx.history,p.change),fieldWalkDistance:p.fieldWalkDistance};}

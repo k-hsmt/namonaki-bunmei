@@ -22,3 +22,7 @@ test('failed cuts protect occupation, reservations, earlier earthworks, cliffs a
  for(const [options,p,reason] of cases){const ctx=await context(options),before=JSON.stringify(ctx),result=await proposeTerrainCut(ctx,p);assert.equal(result.status,'hold',reason);assert.equal(result.reason,reason);assert.equal(JSON.stringify(ctx),before);}
  const ctx=await context(),successful=commitTerrainCut(await proposeTerrainCut(ctx,plot)),history=terrainHistoryThrough(successful,600),next={...ctx,history,ground:{...ctx.ground,year:600,confirmedYear:600,terrain:resolveTerrainAtYear(history,600)}};assert.equal((await proposeTerrainCut(next,plot)).reason,'occupied');
 });
+
+test('the fixed pre-v2 A2 event retains exact native v1 replay',async()=>{
+ const reference=JSON.parse(await readFile('tests/fixtures/terrain-cut-v1-reference.json','utf8')),ctx=await context();assert.equal(ctx.history.baseHash,reference.baseHash);const verified=await verifyTerrainCut(reference.change,ctx);assert.equal(commitTerrainCut(verified).events[0].revisionId,reference.change.revisionId);
+});

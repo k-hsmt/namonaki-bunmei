@@ -1,3 +1,4 @@
+import {terrainForReviewAtInternal} from './terrain-review-binding-internal.js';
 /** Immutable v5 draft land births and original access, reconstructed from saved history. */
 import type {GeneratedFacilityReview} from './generated-facility-review.js';
 import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
@@ -30,12 +31,12 @@ export function captureGeneratedLandFoundations(review:GeneratedFacilityReview):
   if(ids.has(b.id))throw Error('Duplicate land foundation');ids.add(b.id);
   const plan=review.plans[b.site],occupancy=occupied[b.site],site=siteAt(review.state.observation?.sites,sites.indexOf(b.site),b.year);
   const crossings=bridges.filter(g=>g.siteId===b.site&&site?.buildings.some(x=>x.id===g.bridgeId&&x.condition==='intact')).map(bridgeCrossing);
-  const ctx:GroundReviewContext={terrain:review.terrain,site:b.site,year:b.year,confirmedYear:b.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy,crossings,
+  const ctx:GroundReviewContext={terrain:terrainForReviewAtInternal(review,b.year,b.site),site:b.site,year:b.year,confirmedYear:b.year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy,crossings,
    reservations:selectReviewReservations(plan,review.reservationMode,new Set(occupancy.map(p=>p.id)))};
   let entrance:RecordPoint,access:readonly RecordPoint[];
   if(b.bridge){
    const g=b.bridge,after={...ctx,occupancy:[...occupancy,...bridgeOccupancy(g)],crossings:[...crossings,bridgeCrossing(g)]};
-   const parents=groundReachParents(groundContextWindows(decodeRecordPhysics(review.terrain.sites[b.site].physics),after),plan.primaryRoot),path:RecordPoint[]=[];
+   const parents=groundReachParents(groundContextWindows(decodeRecordPhysics(ctx.terrain.sites[b.site].physics),after),plan.primaryRoot),path:RecordPoint[]=[];
    entrance=g.bankA;let i=entrance[1]*320+entrance[0];if(!Number.isSafeInteger(i)||i<0||i>=parents.length||parents[i]===-1)throw Error('Bridge birth access missing');
    while(true){if(path.length>=parents.length||!Number.isSafeInteger(i)||i<0||i>=parents.length||parents[i]===-1)throw Error('Invalid bridge birth path');path.push([i%320,Math.floor(i/320)]);if(parents[i]===i)break;i=parents[i]!;}access=path.reverse();
    occupancy.push(...bridgeOccupancy(g));bridges.push(g);

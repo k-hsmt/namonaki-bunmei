@@ -1,8 +1,10 @@
+export const terrainChangeTrialBoundary='terrain-change-review-v1' as const;
 /** A value boundary survives structuredClone and ordinary shape adapters. */
 export const coupledTrialBoundary='irrigation-coupled-review-v1' as const;
 export function assertProductionBoundary(value:unknown):void {
  if(!value||typeof value!=='object')return;
  const v=value as {format?:unknown;review?:unknown};
+ if(Object.hasOwn(value,'terrainChangeBoundary')||Object.hasOwn(value,'terrainChanges')||v.format==='terrain-change-review-world-v1'||v.format==='terrain-change-review-save-v1'||v.review&&typeof v.review==='object'&&Object.hasOwn(v.review,'terrainChangeBoundary'))throw Error('Terrain trial cannot enter production');
  if(Object.hasOwn(value,'trialBoundary')||v.format===coupledTrialBoundary||v.format==='irrigation-coupled-review-world-v1'||v.review&&typeof v.review==='object'&&Object.hasOwn(v.review,'trialBoundary'))throw Error('Coupled trial cannot enter production');
  assertBaselineEconomicBoundary(value);
 }

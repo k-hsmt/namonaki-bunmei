@@ -1,3 +1,4 @@
+import {terrainForReviewAtInternal} from './terrain-review-binding-internal.js';
 /** D3-B civic stage. No public-space/bridge or live save activation. */
 import {hash01} from '../engine/rng.js';
 import type {RecordSite} from '../terrain/terrain-record-types.js';
@@ -35,7 +36,7 @@ export function proposeGeneratedCivic(review:GeneratedFacilityReview,index:numbe
  if((state.observation!.people[index]??0)<4500||(district?.coverage.at(-1)??0)<.94||(district?.shortageYears??1)>0||!state.economy||tradeYearsFor(state.economy,regions[index]!.id)<3)return hold('no-capacity');
  const style=hash01(state.seed,14,0)<.5?'great-hall':'courtyard-hall',id='civic-'+siteId+'-'+year+'-'+style;
  const occupied:TypedGroundOccupation[]=[...review.placements.filter(p=>p.site===siteId&&p.builtYear<=year).map(p=>({id:p.objectId,kind:p.kind,plot:p.plot,entrance:p.entrance})),...generatedHousingExtension.additionalOccupancy(review,state,siteId),...extra];
- const plan=review.plans[siteId],result=findPlacementReview(withGeneratedBridgeAccess(review,{terrain:review.terrain,site:siteId,year,confirmedYear:year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,
+ const plan=review.plans[siteId],result=findPlacementReview(withGeneratedBridgeAccess(review,{terrain:terrainForReviewAtInternal(review,year,siteId),site:siteId,year,confirmedYear:year,historyStatus:'known',primaryRoot:plan.primaryRoot,occupancy:occupied,
   reservations:selectReviewReservations(plan,review.reservationMode,new Set(occupied.map(p=>p.id)))}),
   {objectId:id,purpose:'civic',width:style==='great-hall'?44:56,depth:style==='great-hall'?22:30,nucleus:plan.nucleus,
    neighborEntrances:reviewNeighborEntrances('civic',occupied),housingEntrances:housing.blocks.map(b=>southEntrance(b.footprint)),...(review.growthPattern?{growthPattern:review.growthPattern}:{})});

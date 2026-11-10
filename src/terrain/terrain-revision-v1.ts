@@ -65,7 +65,7 @@ export function appendTerrainCutInternal(history:TerrainHistory,event:TerrainCut
   const keys=['surface','grade','bearing','elevation'] as const;for(let n=0;n<4;n++){const key=keys[n]!;if(r[key][i]!==values[n])throw Error('Terrain cell before value differs');const after=values[n+4]!;if(!Number.isSafeInteger(after)||after<0||after>255)throw Error('Invalid terrain cell value');r[key][i]=after;}
  }
  const physics=encodeRecordPhysics(r);physics.rows.forEach(row=>{row.forEach(Object.freeze);Object.freeze(row);});Object.freeze(physics.rows);Object.freeze(physics);
- const changed=new Set(event.cells.filter(c=>c[4]!==c[8]).map(c=>c[0])),site=previous['hill-side'];
+ const changed=new Set(event.cells.filter(c=>event.ruleId==='terrain-cut-review-v2'||c[4]!==c[8]).map(c=>c[0])),site=previous['hill-side'];
  const decals=Object.freeze(site.render.decals.filter(([x,y,w])=>!Array.from({length:w},(_,n)=>y*320+x+n).some(i=>changed.has(i))));
  const updated:RecordSiteTerrain=Object.freeze({...site,physics,render:Object.freeze({...site.render,decals})}),sites=Object.freeze({...previous,'hill-side':updated});
  const next:TerrainHistory=Object.freeze({...history,events:Object.freeze([...history.events,event])});histories.add(next);snapshots.set(next,Object.freeze([...(snapshots.get(history)??[]),{event,sites}]));return next;
