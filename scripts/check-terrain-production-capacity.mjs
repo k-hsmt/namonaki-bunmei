@@ -1,0 +1,9 @@
+/** Serialization cap stress, not a feasible native terrain history. No synthetic save is published. */
+import assert from 'node:assert/strict';
+import {readFile,writeFile} from 'node:fs/promises';
+import {gzipSync} from 'node:zlib';
+import {decodeWorldSave} from '../dist/story/world-storage.js';
+const out='artifacts/environment34-terrain-production',audit=JSON.parse(await readFile(out+'/audit.json','utf8')),largest=[...audit.cases].sort((a,b)=>b.plainBytes-a.plainBytes)[0],packet=structuredClone(await decodeWorldSave(await readFile(out+`/seed${largest.seed}-v8.json`,'utf8'))),original=packet.terrainHistory.events[0];
+packet.terrainHistory.events=Array.from({length:4},(_,n)=>({...structuredClone(original),id:'terrain-cut-'+(100+500*n),approvedYear:100+500*n,effectiveYear:101+500*n,cells:Array.from({length:640},(_,i)=>[(i*83+n*997)%57600,1,i%3,0,(i*37+n*13)%256,1,(i+1)%3,0,(i*37+n*13+254)%256]),disturbedPatches:Array.from({length:20},(_,i)=>i+n*40)}));
+const plain=Buffer.from(JSON.stringify(packet)),stored=JSON.stringify({format:'namonaki-world-save-gzip',version:8,schemaVersion:1,mode:'generated',encoding:'gzip-base64-v1',uncompressedBytes:plain.length,data:gzipSync(plain).toString('base64')}),report={sourceSHA:audit.sourceSHA,kind:'serialization-capacity-stress-only',scope:'Largest complete v8 save plus synthetic four 640-tuple records, exceeding the 540-cell geometric envelope. This is not a feasible or native-valid history; legal natural four-project replay is audited separately. No synthetic world file is published.',baseSeed:largest.seed,projects:4,cellsPerProject:640,actualGeometryCellUpperBound:540,plainBytes:plain.length,storedBytes:Buffer.byteLength(stored),plainLimit:16*1024*1024,storedLimit:4*1024*1024};
+assert.ok(report.plainBytes<=report.plainLimit&&report.storedBytes<=report.storedLimit);await writeFile(out+'/capacity-stress.json',JSON.stringify({...report,passed:true},null,2)+'\n');console.log(JSON.stringify(report));

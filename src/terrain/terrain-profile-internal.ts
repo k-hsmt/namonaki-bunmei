@@ -1,0 +1,7 @@
+/** Closed internal profiles, never a public option for upgrading a trial world. */
+import {terrainChangeTrialBoundary,terrainProductionBoundary} from '../story/trial-boundary.js';
+import {terrainCutRuntimeRules} from './terrain-cut-rules-v1.js';
+import {terrainProductionRuntimeRules,terrainProductionEconomicRule} from './terrain-production-contract-v1.js';
+export const terrainTrialProfile={kind:'trial',boundary:terrainChangeTrialBoundary,landMarker:'terrainChangeBoundary',worldWireFormat:'terrain-change-recorded-world-v1',worldFormat:'terrain-change-review-world-v1',status:'review-only',renderer:'terrain-scene-review-v1',historyFormat:'terrain-history-review-v1',historyStatus:'review-only',currentReference:'terrain-environment-checkpoint-ref-v1',cutRule:'terrain-cut-review-v2',runtimeRules:terrainCutRuntimeRules} as const;
+export const terrainProductionProfile={kind:'production',boundary:terrainProductionBoundary,landMarker:'terrainPolicyBoundary',worldWireFormat:'namonaki-world-save',worldFormat:'terrain-production-world-v1',status:'production',renderer:'generated-scene-v7',historyFormat:'terrain-history-v1',historyStatus:'recorded',currentReference:'terrain-production-environment-checkpoint-ref-v1',cutRule:'terrain-cut-v1',runtimeRules:terrainProductionRuntimeRules,economicRule:terrainProductionEconomicRule} as const;
+export type TerrainEvolutionProfile=typeof terrainTrialProfile|typeof terrainProductionProfile;

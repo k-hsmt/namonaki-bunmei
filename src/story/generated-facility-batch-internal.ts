@@ -1,6 +1,6 @@
 import {bindTerrainReviewInternal,terrainForReviewAtInternal,type TerrainReviewProvider} from './terrain-review-binding-internal.js';
 import {runGeneratedLandBatch,type LandPhaseObserver} from './generated-land-batch-internal.js';
-import {assertProductionBoundary,coupledTrialBoundary,economicProductionBoundary,terrainChangeTrialBoundary} from './trial-boundary.js';
+import {assertProductionBoundary,coupledTrialBoundary,economicProductionBoundary,terrainChangeTrialBoundary,terrainProductionBoundary} from './trial-boundary.js';
 import type {CoupledAnnualModifier} from './coupled-economy-policy-internal.js';
 import {coupledChoiceBinding} from './coupled-choice-binding-internal.js';
 import type {EconomyObserver} from './economy-observer.js';
@@ -22,6 +22,7 @@ export interface ReviewFacilityPlacement {
 }
 export interface GeneratedFacilityReview {
  readonly terrainChangeBoundary?:typeof terrainChangeTrialBoundary;
+ readonly terrainPolicyBoundary?:typeof terrainProductionBoundary;
  readonly trialBoundary?:typeof coupledTrialBoundary;
  readonly economicPolicyBoundary?:typeof economicProductionBoundary;
  readonly format:'generated-facility-review';readonly status:'review-only';readonly placementPolicy:null;
@@ -53,8 +54,8 @@ export function createGeneratedFacilityReview(terrain:ValidatedTerrainRecord,res
  }
  return {format:'generated-facility-review',status:'review-only',placementPolicy:null,terrain,plans,reservationMode,state,placements,diagnostics:{holds:{},fullSearches:0},...(growthPattern?{growthPattern}:{})};
 }
-function mutableCopy(input:GeneratedFacilityReview,coupled:false|'trial'|'production'|'terrain-trial'=false):GeneratedFacilityReview {
- if(coupled==='terrain-trial'){if(input.terrainChangeBoundary!==terrainChangeTrialBoundary||input.trialBoundary!==undefined||input.economicPolicyBoundary!==undefined)throw Error('Missing terrain land boundary');}else if(coupled==='production'){if(input.economicPolicyBoundary!==economicProductionBoundary||input.trialBoundary!==undefined||input.terrainChangeBoundary!==undefined)throw Error('Missing production economic boundary');}else if(coupled){if(input.trialBoundary!==coupledTrialBoundary||input.economicPolicyBoundary!==undefined||input.terrainChangeBoundary!==undefined)throw Error('Missing coupled land boundary');}else assertProductionBoundary(input);
+function mutableCopy(input:GeneratedFacilityReview,coupled:false|'trial'|'production'|'terrain-trial'|'terrain-production'=false):GeneratedFacilityReview {
+ if(coupled==='terrain-production'){if(input.terrainPolicyBoundary!==terrainProductionBoundary||input.terrainChangeBoundary!==undefined||input.trialBoundary!==undefined||input.economicPolicyBoundary!==undefined)throw Error('Missing production terrain land boundary');}else if(coupled==='terrain-trial'){if(input.terrainChangeBoundary!==terrainChangeTrialBoundary||input.terrainPolicyBoundary!==undefined||input.trialBoundary!==undefined||input.economicPolicyBoundary!==undefined)throw Error('Missing terrain land boundary');}else if(coupled==='production'){if(input.economicPolicyBoundary!==economicProductionBoundary||input.trialBoundary!==undefined||input.terrainChangeBoundary!==undefined||input.terrainPolicyBoundary!==undefined)throw Error('Missing production economic boundary');}else if(coupled){if(input.trialBoundary!==coupledTrialBoundary||input.economicPolicyBoundary!==undefined||input.terrainChangeBoundary!==undefined||input.terrainPolicyBoundary!==undefined)throw Error('Missing coupled land boundary');}else assertProductionBoundary(input);
  if(input.format!=='generated-facility-review'||input.status!=='review-only'||input.placementPolicy!==null||input.state.version!==4||input.state.seed!==input.terrain.source.seed)throw Error('Invalid generated review boundary');
  if(input.growthPattern!==undefined&&!['organic-v2','organic-v3'].includes(input.growthPattern))throw Error('Unknown growth pattern');
  const terrain=readOwnedTerrainRecord(input.terrain),next=structuredClone({...input,terrain:null});return {...next,terrain};
@@ -147,4 +148,10 @@ export function chooseGeneratedFacilityReview(input:GeneratedFacilityReview,inde
 }
 export function chooseAutomaticallyGeneratedFacilityReview(input:GeneratedFacilityReview,extension?:GeneratedLandReviewExtension,observeEconomy?:EconomyObserver):GeneratedFacilityReview {
  const next=mutableCopy(input);chooseAutomatically(next.state,policyFor(next,extension,observeEconomy));return next;
+}
+
+/** Production terrain owns a separate land boundary, sharing only the private batch mechanics. */
+export function createTerrainProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,observeEconomy:EconomyObserver,terrainAt:TerrainReviewProvider){
+ const review=mutableCopy(input,'terrain-production');bindTerrainReviewInternal(review,terrainAt);const base=policyFor(review,extension,observeEconomy);
+ return batchFor(review,{...base,mode:'terrain-production-v1',coupledEconomy:prepare},prepare);
 }

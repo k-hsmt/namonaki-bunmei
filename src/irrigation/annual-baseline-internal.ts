@@ -2,9 +2,9 @@ import {bindTerrainReviewInternal,type TerrainReviewProvider} from '../story/ter
 import type {VegetationEvent} from '../vegetation/history-v1.js';
 /** Neutral annual ecology foundation. Still B, not an economic C2 trial/save. */
 import type {GeneratedBridgeReview} from '../story/generated-bridge-review.js';
-import {createGeneratedFacilityBatch,createCoupledFacilityBatch,createEconomicProductionFacilityBatch,createTerrainChangeFacilityBatch} from '../story/generated-facility-batch-internal.js';
+import {createGeneratedFacilityBatch,createCoupledFacilityBatch,createEconomicProductionFacilityBatch,createTerrainChangeFacilityBatch,createTerrainProductionFacilityBatch} from '../story/generated-facility-batch-internal.js';
 import {coupledAnnualModifier,type CoupledAnnualModifier} from '../story/coupled-economy-policy-internal.js';
-import {coupledTrialBoundary,economicProductionBoundary,terrainChangeTrialBoundary} from '../story/trial-boundary.js';
+import {coupledTrialBoundary,economicProductionBoundary,terrainChangeTrialBoundary,terrainProductionBoundary} from '../story/trial-boundary.js';
 import type {EconomyCapture} from '../story/economy-observer.js';
 import {economyEffectCalculator} from './economy-effect-core-v1.js';
 import type {EconomyEffect,EconomyPolicy} from './economy-types-v1.js';
@@ -27,7 +27,7 @@ import type {BaselinePhaseReceipt} from './coupled-baseline-audit-v1.js';
 export interface AnnualReceipt extends BaselinePhaseReceipt {readonly ecologyBefore:number;readonly ecologyAfter:number}
 export interface PreparedCoupledEffect {readonly effect:EconomyEffect;readonly modifier:CoupledAnnualModifier}
 export interface CoupledKernelHooks {
- readonly mode?:'trial'|'production'|'terrain-trial';
+ readonly mode?:'trial'|'production'|'terrain-trial'|'terrain-production';
  readonly terrain?:{readonly at:TerrainReviewProvider;readonly disturbancesAt:(year:number)=>readonly VegetationEvent[]};
  readonly introducedYear:number;readonly policy:EconomyPolicy;readonly prepared:PreparedCoupledEffect|null;
  readonly capture:(capture:EconomyCapture,prepared:PreparedCoupledEffect)=>void;
@@ -35,13 +35,16 @@ export interface CoupledKernelHooks {
 }
 
 function annualKernelSessionInternal(input:GeneratedBridgeReview,options:GeneratedAdvanceOptions={},trial?:CoupledKernelHooks){
- if(trial?.mode==='terrain-trial'){if(input.review.terrainChangeBoundary!==terrainChangeTrialBoundary||input.review.economicPolicyBoundary!==undefined||input.review.trialBoundary!==undefined||trial.policy!=='combined'||!trial.terrain)throw Error('Missing terrain annual boundary');bindTerrainReviewInternal(input.review,trial.terrain.at);}else if(trial?.mode==='production'){if(input.review.economicPolicyBoundary!==economicProductionBoundary||input.review.trialBoundary!==undefined||input.review.terrainChangeBoundary!==undefined||trial.policy!=='combined')throw Error('Missing annual production boundary');}else if(trial){if(input.review.trialBoundary!==coupledTrialBoundary||input.review.terrainChangeBoundary!==undefined)throw Error('Missing annual trial boundary');}else validateProductionWorld(input);
+ const terrainMode=trial?.mode==='terrain-trial'||trial?.mode==='terrain-production',terrainHooks=terrainMode?trial.terrain:undefined;
+ if(terrainMode){
+  if(!trial||!terrainHooks||trial.policy!=='combined'||input.review.economicPolicyBoundary!==undefined||input.review.trialBoundary!==undefined||(trial.mode==='terrain-production'?(input.review.terrainPolicyBoundary!==terrainProductionBoundary||input.review.terrainChangeBoundary!==undefined):(input.review.terrainChangeBoundary!==terrainChangeTrialBoundary||input.review.terrainPolicyBoundary!==undefined)))throw Error('Missing terrain annual boundary');bindTerrainReviewInternal(input.review,terrainHooks.at);
+ }else if(trial?.mode==='production'){if(input.review.economicPolicyBoundary!==economicProductionBoundary||input.review.trialBoundary!==undefined||input.review.terrainChangeBoundary!==undefined||input.review.terrainPolicyBoundary!==undefined||trial.policy!=='combined')throw Error('Missing annual production boundary');}else if(trial){if(input.review.trialBoundary!==coupledTrialBoundary||input.review.terrainChangeBoundary!==undefined||input.review.terrainPolicyBoundary!==undefined)throw Error('Missing annual trial boundary');}else validateProductionWorld(input);
  validateGeneratedBridgeLedger(input.review);validateGeneratedPublicSpaceLedger(input.review,lastObservedYear(input.review.state));
  let prepare:()=>CoupledAnnualModifier=()=>{throw Error('Annual prefix not initialized');},prepared=trial?.prepared??null;
  const capture=(c:EconomyCapture)=>{if(!trial||!prepared)throw Error('Missing prepared economy effect');trial.capture(c,prepared);};
- const batch=trial?.mode==='terrain-trial'?createTerrainChangeFacilityBatch(input.review,generatedPublicSpaceExtension,()=>prepare(),capture,trial.terrain!.at):trial?(trial.mode==='production'?createEconomicProductionFacilityBatch:createCoupledFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture):createGeneratedFacilityBatch(input.review,generatedPublicSpaceExtension,options.observeEconomy);
+ const batch=terrainMode?(trial!.mode==='terrain-production'?createTerrainProductionFacilityBatch:createTerrainChangeFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture,terrainHooks!.at):trial?(trial.mode==='production'?createEconomicProductionFacilityBatch:createCoupledFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture):createGeneratedFacilityBatch(input.review,generatedPublicSpaceExtension,options.observeEconomy);
  const world={...input,review:{...batch.review,plans:input.review.plans,bridgeReview:{...batch.review.bridgeReview!,hydrology:input.review.bridgeReview!.hydrology}}};
- if(trial?.mode==='terrain-trial')bindTerrainReviewInternal(world.review,trial.terrain!.at);
+ if(terrainHooks)bindTerrainReviewInternal(world.review,terrainHooks.at);
  const e=input.environment!,i=input.irrigation!,v=input.vegetation as CoupledVegetation;
  const cursor=annualLandSources(world.review),prefix=cursor.take(),index=incrementalIrrigationSources(world);index.append(prefix);
  const lifecycle=channelLifecycle(index.source,{systems:i.systems.map(s=>({...s,geometry:kernelGeometry(s.geometry)})),events:i.events,attempts:i.attempts,channel:e.current.channel??null},[],proposeIrrigation);
@@ -65,7 +68,7 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
   if(phase.confirmedAfter===through){if(!phase.pending)throw Error('Missing annual commit');record();return;}
   const year=phase.confirmedAfter;if(year!==through+1||phase.pending||year>10000)throw Error('Invalid annual ecology boundary');
   const delta=cursor.take();let vegetationEvents=delta.events;
-  if(trial?.mode==='terrain-trial'){const disturbances=trial.terrain!.disturbancesAt(year);if(disturbances.length)vegetationEvents=[...vegetationEvents,...disturbances];}
+  if(terrainHooks){const disturbances=terrainHooks.disturbancesAt(year);if(disturbances.length)vegetationEvents=[...vegetationEvents,...disturbances];}
   index.append(delta);uses.push(...delta.uses);events.push(...vegetationEvents);runner.append(delta.uses,vegetationEvents);
   const next=lifecycle.step(year),nextKey=[next.channel?.id,next.channel?.status,next.channel?.status==='active'?index.source.keyAt(year):0].join('/');
   prefixChannelEvents=next.events;
@@ -87,7 +90,7 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
 }
 export function runAnnualKernel(input:GeneratedBridgeReview,run:(batch:ReturnType<typeof createGeneratedFacilityBatch>,commit:(p:import('../story/generated-land-batch-internal.js').LandPhaseReceipt)=>void)=>void,options:GeneratedAdvanceOptions={},trial?:CoupledKernelHooks){const session=annualKernelSessionInternal(input,options,trial);run(session.batch,session.commit);return session.finish();}
 /** D4 alone may pause its private batch for an asynchronous terrain commitment. */
-export async function runAnnualTerrainKernelInternal(input:GeneratedBridgeReview,run:(batch:ReturnType<typeof createGeneratedFacilityBatch>,commit:(p:import('../story/generated-land-batch-internal.js').LandPhaseReceipt)=>void)=>Promise<void>,trial:CoupledKernelHooks){if(trial.mode!=='terrain-trial')throw Error('Asynchronous annual kernel requires terrain boundary');const session=annualKernelSessionInternal(input,{},trial);await run(session.batch,session.commit);return session.finish();}
+export async function runAnnualTerrainKernelInternal(input:GeneratedBridgeReview,run:(batch:ReturnType<typeof createGeneratedFacilityBatch>,commit:(p:import('../story/generated-land-batch-internal.js').LandPhaseReceipt)=>void)=>Promise<void>,trial:CoupledKernelHooks){if(trial.mode!=='terrain-trial'&&trial.mode!=='terrain-production')throw Error('Asynchronous annual kernel requires terrain boundary');const session=annualKernelSessionInternal(input,{},trial);await run(session.batch,session.commit);return session.finish();}
 export function advanceAnnualBaseline(input:GeneratedBridgeReview,years:number,choices:'stop'|'automatic'='automatic',options:GeneratedAdvanceOptions={}){
  if(!Number.isSafeInteger(years)||years<0||years>10000||input.review.state.year+years>10000||!['stop','automatic'].includes(choices))throw Error('Invalid annual baseline advance');
  return runAnnualKernel(input,(batch,commit)=>batch.advance(years,choices,options.stopAtNewRecord,commit),options);

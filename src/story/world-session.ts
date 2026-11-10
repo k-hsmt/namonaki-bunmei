@@ -31,7 +31,7 @@ export function generatedSession(review:GeneratedBridgeReview):BaselineGenerated
  if(review.review.reservationMode!=='field-only')throw Error('Unapproved session policy');return {mode:'generated',review,state:review.review.state};
 }
 export function restoreWorldSession(save:WorldSave):WorldSession {
- const valid=validateWorldSave(save);if(valid.version===7)return economicProductionSession(restoreEconomicProductionSave(valid));if(generatedWorld(valid))return generatedSession(restoreGeneratedWorld(valid));
+ const valid=validateWorldSave(save);if(valid.version===8)throw Error('Terrain v8 sessions require the terrain UI integration');if(valid.version===7)return economicProductionSession(restoreEconomicProductionSave(valid));if(generatedWorld(valid))return generatedSession(restoreGeneratedWorld(valid));
  if(!valid.state.history.length)throw Error('Missing legacy birth record');
  if(valid.state.memory){const memory=valid.state.memory;if(!memory.legacies||typeof memory.legacies!=='object'||Array.isArray(memory.legacies)||!Array.isArray(memory.log)||memory.log.some(e=>!e||!Number.isSafeInteger(e.year)||e.year<0||e.year>valid.state.year||!Object.hasOwn(legacyNames,e.kind)))throw Error('Invalid legacy memory');}
  return {mode:'legacy-fixed',template:valid,state:structuredClone(valid.state)};

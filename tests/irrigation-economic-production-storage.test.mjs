@@ -43,7 +43,7 @@ test('v7 reader rejects recomputed-checksum tampering in coefficients, sources, 
 test('versioned discovery stops on corrupt v7 and v7 writes preserve the old key',async()=>{
  const old=JSON.stringify(createGeneratedWorldSave(initial)),data=new Map([[IRRIGATED_WORLD_SAVE_KEY,old]]);
  await storeWorldSave({setItem:(k,v)=>data.set(k,v)},save);assert.equal(data.get(IRRIGATED_WORLD_SAVE_KEY),old);assert.ok(data.has(ECONOMIC_WORLD_SAVE_KEY));assert.equal((await findWorldSave(k=>data.get(k)??null)).version,7);
- await assert.rejects(()=>findWorldSave(k=>k===ECONOMIC_WORLD_SAVE_KEY?'broken':old));
+ await assert.rejects(()=>findWorldSave(k=>k==='namonaki-story-v8'?null:k===ECONOMIC_WORLD_SAVE_KEY?'broken':old));
  const failed=await storeWorldSave({setItem(){throw Error('quota');}},save);assert.equal(failed.status,'not-saved');assert.ok(failed.exportJson===plain);
  const envelope=JSON.parse((await encodeWorldSave(save)).json);for(const mutate of [p=>p.version=6,p=>p.mode='legacy-fixed',p=>p.uncompressedBytes--,p=>p.extra=1]){const bad=structuredClone(envelope);mutate(bad);await assert.rejects(()=>decodeWorldSave(JSON.stringify(bad)));}
 });
