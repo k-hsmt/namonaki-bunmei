@@ -50,6 +50,16 @@ jobs:
           name: h4d5-natural-placement
           path: artifacts/h4d5-siting/natural-placement.json
           if-no-files-found: warn
+      - name: Render Issue 35 D1 architecture prototype gallery
+        run: node scripts/preview-architecture.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: architecture35-d1-gallery
+          path: artifacts/architecture35-d1/*
+          if-no-files-found: error
 
   visual-browser:
     # Keep Chromium/WebKit dependencies stable across ubuntu-latest image rollouts.
