@@ -11,7 +11,7 @@ const selected=process.argv.indexOf('--seed'),cases=[];for(const row of audit.ca
  const world=restoreEconomicProductionSave(await decodeWorldSave(await readFile(root+`/seed${row.seed}-v7.json`,'utf8'))),history=await createTerrainHistory(world.review.terrain,10000);let observations=0;
  for(const year of [0,99,100,300,1000,2000,10000])for(let site=0;site<3;site++){
   const original=observeEconomicProductionScene(world,year,site),view=observeTerrainRevisionScene(original,resolveTerrainAtYear(history,year),world.review.state.housing);
-  assert.deepEqual({...view,ground:{...view.ground,terrain:history.initial}},original);observations++;
+  const ground={...view.ground,terrain:history.initial};assert.deepEqual(ground,original.ground);assert.deepEqual(view.snapshot,original.snapshot);assert.deepEqual({...view.composition,generatedGround:ground},original.composition);observations++;
  }
  cases.push({seed:row.seed,observations,initialHash:history.baseHash,referenceExact:true});console.log(JSON.stringify(cases.at(-1)));
 }
