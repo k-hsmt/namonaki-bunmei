@@ -1,5 +1,5 @@
 import {terrainProductionStoredMaxBytes} from '../terrain/terrain-production-contract-v1.js';
-import {TERRAIN_WORLD_SAVE_KEY,ECONOMIC_WORLD_SAVE_KEY,WORLD_SAVE_KEY,IRRIGATED_WORLD_SAVE_KEY,parseWorldSaveAsync,serializeWorldSave,type WorldSave} from './world-save.js';
+import {TERRAIN_WORLD_SAVE_KEY,ECONOMIC_WORLD_SAVE_KEY,WORLD_SAVE_KEY,IRRIGATED_WORLD_SAVE_KEY,parseWorldSaveAsync,serializeWorldSave,validateWorldSave,type WorldSave} from './world-save.js';
 import {CURRENT_SAVE_KEY,LEGACY_SAVE_KEYS} from './housing-persistence.js';
 import {base64,unbase64,bounded} from './compressed-save-draft-review.js';
 import {wireObject} from './generated-state-review.js';
@@ -28,4 +28,12 @@ export async function findWorldSave(read:(key:string)=>string|null):Promise<Worl
 }
 export async function storeWorldSave(storage:Pick<Storage,'setItem'>,save:WorldSave):Promise<{status:'saved'}|{status:'not-saved';exportJson:string}>{
  let encoded;try{encoded=await encodeWorldSave(save);}catch(error){if(save.version===8)return {status:'not-saved',exportJson:serializeWorldSave(save)};throw error;}try{storage.setItem(save.version===8?TERRAIN_WORLD_SAVE_KEY:save.version===7?ECONOMIC_WORLD_SAVE_KEY:IRRIGATED_WORLD_SAVE_KEY,encoded.json);return {status:'saved'};}catch{return {status:'not-saved',exportJson:encoded.plain};}
+}
+
+/** After a successful explicit save, these older-priority slots would shadow it.
+ * The selected complete world must be written before the caller removes any slot.
+ * Lower priority among these is removed first; old backups below the chosen key remain. */
+export function higherPriorityWorldSaveKeys(save:WorldSave):readonly string[]{
+ const valid=validateWorldSave(save),key=valid.version===8?TERRAIN_WORLD_SAVE_KEY:valid.version===7?ECONOMIC_WORLD_SAVE_KEY:IRRIGATED_WORLD_SAVE_KEY;
+ const order=[TERRAIN_WORLD_SAVE_KEY,ECONOMIC_WORLD_SAVE_KEY,IRRIGATED_WORLD_SAVE_KEY];return order.slice(0,order.indexOf(key)).reverse();
 }

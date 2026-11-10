@@ -83,6 +83,12 @@ jobs:
           name: environment34-terrain-production-browser
           path: artifacts/environment34-terrain-production-tests/*.png
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: environment34-terrain-ui-browser
+          path: artifacts/environment34-terrain-ui-tests/*.png
+          if-no-files-found: error
       - name: Capture D7-C natural public-space review
         run: node scripts/review-public-spaces.mjs
         env:
@@ -976,12 +982,26 @@ jobs:
         run: node scripts/check-terrain-production-capacity.mjs
       - name: Match 840 accepted preproduction RGBA frames and preserve observed packets
         run: node scripts/review-terrain-production-pixels.mjs
+      - name: Compare actual v7 and normal v8 history, scenery and land use
+        run: node scripts/review-terrain-production.mjs
+      - name: Draw six same-year normal terrain analysis layers
+        run: node scripts/review-terrain-production-layers.mjs
+      - name: Measure 46 normal observation and motion conditions
+        run: node scripts/benchmark-terrain-production-observation.mjs
+      - name: Record real normal UI, unchanged native export and mobile layout
+        run: node scripts/review-terrain-production-ui.mjs
+      - name: Verify normal comparison controls, downloads and offline viewing
+        run: node scripts/check-terrain-production-review.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: environment34-terrain-production
           retention-days: 14
-          path: artifacts/environment34-terrain-production/*.json
+          path: |
+            artifacts/environment34-terrain-production/*.json
+            artifacts/environment34-terrain-production/*.html
+            artifacts/environment34-terrain-production/*.png
+            artifacts/environment34-terrain-production/*.webm
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
