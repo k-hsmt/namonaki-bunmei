@@ -1,6 +1,6 @@
 import type {EnvironmentView} from '../environment/history-v1.js';
 /** D4-A saved ground contract; no legacy river polygons or generator calls. */
-import type {ValidatedTerrainRecord} from '../terrain/terrain-record.js';
+import {assertTerrainPhysicalYear,type TerrainPhysicalSource} from '../terrain/terrain-revision-v1.js';
 import type {RecordSite,RecordPoint} from '../terrain/terrain-record-types.js';
 import type {GroundPlot,GroundPurpose} from '../terrain/ground-access-review.js';
 import {reviewPhysicalPlot} from '../terrain/ground-access-review.js';
@@ -13,12 +13,13 @@ import {projectSceneComposition,type SceneComposition} from './composition.js';
 import type {VegetationPatchView} from '../vegetation/history-v1.js';
 export interface GeneratedSceneGround {
  readonly channelView?:import('../irrigation/production-types-v1.js').ChannelView;readonly vegetation?:readonly VegetationPatchView[];readonly environment?:EnvironmentView;readonly environmentAppearance?:'landscape-v2'|'landscape-v3';
- readonly terrain:ValidatedTerrainRecord;readonly site:RecordSite;
+ readonly terrain:TerrainPhysicalSource;readonly site:RecordSite;
  readonly primaryRoot:RecordPoint;
  readonly facilities:readonly {readonly id:string;readonly purpose:GroundPurpose;readonly plot:GroundPlot}[];
  readonly bridges:readonly ValidatedBridgeGeometry[];
 }
 export function verifyGeneratedSceneGround(s:SiteSnapshot,homes:readonly ResidentialBlock[],ground:GeneratedSceneGround):void {
+ assertTerrainPhysicalYear(ground.terrain,s.year);
  if(ground.site!==(['river-bank','hill-side','coast-inlet'] as const)[s.local?.index??0])throw Error('Generated scene site mismatch');
  const r=decodeRecordPhysics(ground.terrain.sites[ground.site].physics),occupied:{id:string;plot:GroundPlot}[]=[],ids=new Set<string>();
  const add=(id:string,plot:GroundPlot,purpose?:GroundPurpose)=>{
