@@ -44,7 +44,8 @@ test('Issue35 D1: native-scale, distinguishable culture and roof silhouettes, re
    return {distinct:Object.fromEntries(Object.entries(imageHashes).map(([k,v])=>[k,new Set(v).size])),duplicates,roofMasks:new Set(alphaMasks.roof).size};
   },cases);
   assert.equal(JSON.stringify(cases),before,'view-only code mutated comparison input');
-  for(const [family,n]of Object.entries(result.distinct))assert.equal(n,cases.filter(c=>c.family===family).length,'pixel identity in '+family+': '+JSON.stringify(result.duplicates[family]));
+  const duplicates=Object.fromEntries(Object.entries(result.duplicates).filter(([,pairs])=>pairs.length>0));
+  assert.deepEqual(duplicates,{},'D1 families with duplicate native pixels');
   assert.equal(result.roofMasks,8,'8 roofs must have distinct opaque silhouettes without colors');
  }finally{await browser?.close();server.kill();}
 });
