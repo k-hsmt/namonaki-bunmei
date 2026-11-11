@@ -45,6 +45,18 @@ export interface ChangeInputs {
  /** Facts of the window (year-24..year) for a district. */
  readonly facts:(site:ArchitectureSite,year:number)=>WindowFacts;
 }
+/** Contact of district `si` with each partner it shares a route with, in the window year-24..year (D3-a record). */
+export function contactsOf(interaction:InteractionLedger,si:number,year:number):{route:number;partner:ArchitectureSite;tradeYears:number;migrations:number;exposure:number}[] {
+ const out=[];
+ for(const [r,ends] of routeEnds.entries()){
+  if(ends.from!==si&&ends.to!==si)continue;
+  const partnerIndex=ends.from===si?ends.to:ends.from;
+  const tradeYears=interaction.trade.filter(x=>x[0]===r).reduce((n,[,a,b])=>n+Math.max(0,Math.min(b,year)-Math.max(a,year-CHANGE_PERIOD+1)+1),0);
+  const migrations=interaction.migrations.filter(([y,from,to])=>y>year-CHANGE_PERIOD&&y<=year&&from===partnerIndex&&to===si).reduce((n,m)=>n+m[3],0);
+  out.push({route:r,partner:SITES[partnerIndex]!,tradeYears,migrations,exposure:tradeYears/CHANGE_PERIOD+Math.min(1,migrations/200)});
+ }
+ return out;
+}
 const H=(...parts:(string|number)[])=>terrainHash(['architecture-change-v1',...parts]);
 const encode=(axis:ChangeAxis,v:unknown)=>axis==='ornaments'?[...(v as string[])].sort().join('+'):String(v);
 const decode=(axis:ChangeAxis,v:string)=>axis==='ornaments'?(v?v.split('+'):[]):v;
@@ -96,13 +108,8 @@ export function traditionChangesFor(input:ChangeInputs):TraditionChange[] {
    };
    // 1. transmission from each partner district actually in contact during the window
    let changed=false;
-   for(const [r,ends] of routeEnds.entries()){
+   for(const {partner,tradeYears,migrations,exposure} of contactsOf(interaction,si,year)){
     if(changed)break;
-    if(ends.from!==si&&ends.to!==si)continue;
-    const partnerIndex=ends.from===si?ends.to:ends.from,partner=SITES[partnerIndex]!;
-    const tradeYears=interaction.trade.filter(x=>x[0]===r).reduce((n,[,a,b])=>n+Math.max(0,Math.min(b,year)-Math.max(a,year-CHANGE_PERIOD+1)+1),0);
-    const migrations=interaction.migrations.filter(([y,from,to])=>y>year-CHANGE_PERIOD&&y<=year&&from===partnerIndex&&to===si).reduce((n,m)=>n+m[3],0);
-    const exposure=tradeYears/CHANGE_PERIOD+Math.min(1,migrations/200);
     if(exposure<=0)continue;
     const p=Math.min(changeRates.transmissionCap,Math.round(changeRates.transmissionPerExposure*exposure));
     if(h('accept',partner)%1000>=p)continue;
