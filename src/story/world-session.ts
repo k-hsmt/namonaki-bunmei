@@ -45,6 +45,8 @@ function architecture(session:WorldSession):session is ArchitectureGeneratedSess
 export function architectureProductionSession(world:ArchitectureProductionWorld):ArchitectureGeneratedSession{knownArchitectureWorld(world);return {mode:'generated',review:world.terrain,state:world.terrain.review.state,architecture:world};}
 const painters=new WeakMap<ArchitectureProductionWorld,GeneratedStructurePainter>();
 /** Read-only: the painter draws recorded birth styles and never changes the record (D2 §6.4). */
+/** The recorded-style painter of a v9 session (undefined otherwise). Read-only; used by every scene painter. */
+export function worldStructurePainter(session:WorldSession):GeneratedStructurePainter|undefined{return architecture(session)?painterOf(session.architecture):undefined;}
 function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{let p=painters.get(world);if(!p){p=createArchitecturePainter(world.architecture.births);painters.set(world,p);}return p;}
 function terrain(session:WorldSession):session is TerrainGeneratedSession {
  if(session.mode!=='generated'||session.review.format!=='terrain-production-world-v1')return false;
