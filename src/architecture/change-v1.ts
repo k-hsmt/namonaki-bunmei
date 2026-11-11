@@ -122,8 +122,9 @@ export function traditionChangesFor(input:ChangeInputs):TraditionChange[] {
     const axis=differing[h('accept-axis',partner)%differing.length]!;
     changed=tryChange(axis,current(other,axis),'transmission',{fromSite:partner,tradeYears,migrations});
    }
-   // 2. invention from local experience (disasters make builders reconsider)
-   if(!changed){
+   // 2. invention from local experience (disasters make builders reconsider). Design §3.2: only while
+   //    building or repair work goes on in the district (the D3-d audit found most inventions had none).
+   if(!changed&&f.experience>0){
     const p=Math.min(changeRates.inventionCap,changeRates.inventionBase+changeRates.inventionPerExperience*f.experience+(f.disasters?changeRates.disasterBonus:0));
     if(h('invent')%1000<p){
      const axis=AXES[h('invent-axis')%AXES.length]!,options=inventionCandidates(axis,t,grammar);

@@ -53,6 +53,9 @@ test('D3-b: 伝わる変化は実際の交流のあった相手からだけ。�
  assert.ok(none.length>0&&none.every(c=>c.cause!=='transmission'),'no contact, no transmission');
  const all=C.traditionChangesFor(inputs(a));
  assert.ok(all.some(c=>c.cause==='transmission'));
+ // design §3.2: invention only while building or repair work goes on
+ assert.ok(!C.traditionChangesFor(inputs(a,{facts:()=>({experience:0,records:[],disasters:1})})).some(c=>c.cause==='invention'));
+ for(const c of world.architecture.traditionChanges.filter(c=>c.cause==='invention'))assert.ok(c.sources.experience>0&&c.sources.records.length>0);
  for(const c of all.filter(c=>c.cause==='transmission'))assert.ok(c.sources.tradeYears>0||c.sources.migrations>0);
  for(const t of a.traditions){
   const mine=all.filter(c=>c.site===t.siteId);
