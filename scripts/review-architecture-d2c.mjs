@@ -13,7 +13,7 @@ import {chromium} from 'playwright';
 
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
 const worlds=JSON.parse(process.argv[2]??'[{"seed":7,"why":"baseline"}]');
-const years=[0,500,2000,5000,10000];
+const years=JSON.parse(process.env.REVIEW_YEARS??'[0,500,2000,5000,10000]');
 const types={'.js':'text/javascript','.mjs':'text/javascript'};
 const server=http.createServer(async(req,res)=>{try{const p=decodeURIComponent(req.url.split('?')[0]);const body=p==='/'?'<!doctype html><title>d2c</title>':await readFile(join(root,p));res.writeHead(200,{'content-type':types[extname(p)]??'text/html'});res.end(body);}catch{res.writeHead(404);res.end();}});
 await new Promise(r=>server.listen(0,r));
@@ -31,12 +31,22 @@ for(const w of worlds){
   let world=P.introduceArchitectureProduction((await createNewTerrainWorld(seed)).review);
   world=await P.advanceArchitectureWorld(world,10000,'automatic');
   const painter=createArchitecturePainter(world.architecture.births),reached=world.terrain.review.state.year;
-  const draw=(year,site,arch)=>{const c=document.createElement('canvas');c.width=320;c.height=180;drawGeneratedSceneReview(c,observeTerrainProductionScene(world.terrain,year,site),undefined,undefined,arch?painter:undefined);return c.toDataURL();};
+  const siteIds=['river-bank','hill-side','coast-inlet'];
+  // D2-c': a third image outlines the air space of births that needed a fallback (amber: stage 2-4, red: stage 5)
+  const draw=(year,site,arch,marks=false)=>{const c=document.createElement('canvas');c.width=320;c.height=180;const o=observeTerrainProductionScene(world.terrain,year,site);
+   drawGeneratedSceneReview(c,o,undefined,undefined,arch?painter:undefined);
+   if(marks){const x=c.getContext('2d'),mirror=o.ground.terrain.sites[o.ground.site].render.mirrorX;
+    for(const b of world.architecture.births){if(b.ref.siteId!==siteIds[site]||b.source.year>year||!(b.envelopeStage>1))continue;
+     const e=b.envelope,x0=mirror?320-e.x1:e.x0,w=e.x1-e.x0,h=Math.max(1,e.y1-e.y0);x.fillStyle=b.envelopeStage===5?'#d23c2c':'#e08a1e';
+     x.fillRect(x0,e.y0,w,1);x.fillRect(x0,e.y0+h-1,w,1);x.fillRect(x0,e.y0,1,h);x.fillRect(x0+w-1,e.y0,1,h);}}
+   return c.toDataURL();};
   const frames=[];
-  for(const year of years.filter(y=>y<=reached))for(const site of [0,1,2])frames.push({year,site,live:draw(year,site,false),arch:draw(year,site,true)});
+  for(const year of years.filter(y=>y<=reached))for(const site of [0,1,2])frames.push({year,site,live:draw(year,site,false),arch:draw(year,site,true),marked:draw(year,site,true,true)});
+  const fallbacks=world.architecture.births.filter(b=>b.envelopeStage>1).map(b=>({site:b.ref.siteId,id:b.ref.kind==='facility'?b.ref.id:b.ref.blockId,use:b.use,year:b.source.year,stage:b.envelopeStage,
+   changes:b.substitutions.filter(x=>x.reason==='envelope').map(x=>x.axis+' '+x.from+'→'+x.to)}));
   const t=world.architecture.traditions.map(x=>({site:x.siteId,...x.choices}));
   const b=world.architecture.births;
-  return {seed,why,reached,frames,traditions:t,shared:world.architecture.grammar.shared,
+  return {seed,why,reached,frames,fallbacks,traditions:t,shared:world.architecture.grammar.shared,
    counts:{births:b.length,civic:b.filter(x=>x.ref.kind==='facility'&&x.ref.civic).length,expanded:b.filter(x=>x.source.kind==='expanded').length}};
  },{...w,years}));
  console.error('seed',w.seed,'done',Math.round((Date.now()-started)/1000)+'s');
@@ -65,7 +75,8 @@ const html=`<!doctype html><meta charset="utf-8"><meta name="viewport" content="
 <h2>住宅の小さい版（H1）の一覧</h2><p>行：奥／中／手前。列：${catalogue.columns.map(esc).join('、')}</p><div class="scroll"><img src="${catalogue.png}" style="image-rendering:pixelated;width:${(16*14+8)*4}px" alt=""></div>
 ${results.map(r=>`<h2>seed ${r.seed}｜${esc(r.why)}</h2><p>到達年 ${r.reached}／記録 ${r.counts.births}件（共同建築 ${r.counts.civic}、増築 ${r.counts.expanded}）／世界共通：屋根 ${r.shared.roofFamily}・軒 ${r.shared.eaves}・勾配 ${r.shared.pitch}</p>
 <table><tr><th>地区</th><th>構造</th><th>壁</th><th>基礎</th><th>屋根材</th><th>窓</th><th>入口</th><th>配色</th></tr>${r.traditions.map(t=>`<tr><td>${esc(t.site)}</td><td>${t.structure}</td><td>${t.wall}</td><td>${t.foundation}</td><td>${t.roofMaterial}</td><td>${t.window}</td><td>${t.entrance}</td><td>${t.palette}</td></tr>`).join('')}</table>
-${r.frames.map(f=>`<h3>${f.year}年・${siteJa[f.site]}</h3><div class="pair"><figure>${img(f.live)}<figcaption>今の本番</figcaption></figure><figure>${img(f.arch)}<figcaption>建築文化</figcaption></figure></div>`).join('')}`).join('')}`;
+${r.fallbacks.length?`<p>上空に収まらず形を小さくした建物：${r.fallbacks.length}件</p><table><tr><th>地区</th><th>建物</th><th>用途</th><th>建設年</th><th>段階</th><th>変えたもの</th></tr>${r.fallbacks.map(f=>`<tr><td>${esc(f.site)}</td><td>${esc(f.id)}</td><td>${f.use}</td><td>${f.year}</td><td>${f.stage}</td><td>${esc(f.changes.join('、'))}</td></tr>`).join('')}</table>`:'<p>形を小さくした建物はない。</p>'}
+${r.frames.map(f=>`<h3>${f.year}年・${siteJa[f.site]}</h3><div class="pair"><figure>${img(f.live)}<figcaption>今の本番</figcaption></figure><figure>${img(f.arch)}<figcaption>建築文化</figcaption></figure><figure>${img(f.marked)}<figcaption>代替した建物の上空の範囲（橙：段階2〜4、赤：段階5）</figcaption></figure></div>`).join('')}`).join('')}`;
 await writeFile(join(out,'gallery.html'),html);
 await writeFile(join(out,'report.json'),JSON.stringify({status:'D2C_REVIEW_NOT_ACCEPTANCE',sourceHead:process.env.REVIEW_SOURCE_SHA??'local-unidentified',
  worlds:results.map(({frames,...r})=>({...r,frames:frames.length})),seconds:Math.round((Date.now()-started)/1000)},null,2));
