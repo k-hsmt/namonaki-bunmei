@@ -71,11 +71,13 @@ test('D2-c: 共同建築は敷地の幅で描き、住宅の部品は部品番�
  assert.ok(r.calls.some(k=>k[1]==='#777e79'),'live terraced roof drawn for the part without a birth');
 });
 
-test('D2-c: 本番の描画への差し替えは任意で、通常画面は使わない',async()=>{
+test('D2-c/D2-d: 本番の描画への差し替えは任意で、通常画面はv9のセッションを通してだけ使う',async()=>{
  const live=await readFile('src/scene/draw-generated-review.ts','utf8');
  assert.match(live,/\(painter\?\.residentialRoofs\?\?drawResidentialRoofs\)\(c,scene,depth\)/);
  assert.match(live,/if\(painter\?\.facility\?\.\(c,o,f\)\)return;/);
- for(const f of ['src/main.ts','src/story/world-session.ts','index.html'])assert.ok(!(await readFile(f,'utf8')).includes('architecture/'),f);
+ for(const f of ['src/main.ts','index.html'])assert.ok(!(await readFile(f,'utf8')).includes('architecture/'),f);
+ // the session passes the recorded painter only for v9 sessions (D2-d)
+ assert.match(await readFile('src/story/world-session.ts','utf8'),/architecture\(session\)\?painterOf\(session\.architecture\):undefined/);
 });
 
 // ---- D2-b2: air-space envelopes (Human decision A: only the excess over the minimal form counts) ----

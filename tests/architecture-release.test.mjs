@@ -1,7 +1,10 @@
 /** Issue #35 D2-d/D3 release (v0.7): the normal new world is v9; existing saves keep their own version. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdtemp,rm} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {createNewArchitectureWorld,createNewTerrainWorld} from '../dist/story/new-world.js';
 import {advanceWorldSession,advanceWorldSessionAsync,chooseWorldSessionAsync,prepareWorldSessionSave,restoreWorldSession,improveWorldEnvironment,slowWorldClimate,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,observeGeneratedWorldSession} from '../dist/story/world-session.js';
 import {ARCHITECTURE_WORLD_SAVE_KEY,TERRAIN_WORLD_SAVE_KEY,parseWorldSaveAsync,serializeWorldSave,validateWorldSave} from '../dist/story/world-save.js';
@@ -63,4 +66,16 @@ test('release: 通常画面は新しい世界をv9で作り、v0.7と説明を�
  assert.equal((main.match(/createNewArchitectureWorld/g)??[]).length,3);assert.ok(!main.includes('createNewTerrainWorld'));
  assert.ok(html.includes('A LIFE OF A CIVILIZATION · v0.7')&&html.includes('名もなき文明 / v0.7')&&!html.includes('v0.6'));
  assert.ok(html.includes('建物は建った年の伝統で建ち、その後に伝統が変わっても姿は変わりません。'));
+});
+
+test('release: v9の保存は、歴史を進めるコードを読み込まずに読める',async()=>{
+ const packet=await prepareWorldSessionSave(await advanceWorldSessionAsync(v9)),dir=await mkdtemp(join(tmpdir(),'architecture-native-')),file=join(dir,'world.json');
+ await writeFile(file,(await encodeWorldSave(packet)).json);
+ try{
+  const code=String.raw`import{registerHooks}from'node:module';import{readFileSync}from'node:fs';
+  registerHooks({resolve(s,c,n){const r=n(s,c);if(/(terrain-production-progression-v1|terrain-evolution-progression-internal|economic-production-progression-v1|annual-baseline-internal|environment\/progression-v1|vegetation\/initial-v1|terrain\/world-prototype|story\/new-world)\.js$/.test(r.url))throw Error('blocked producer '+r.url);return r;}});
+  const{decodeWorldSave}=await import(WORLD_STORAGE),{restoreArchitectureSave,prepareArchitectureSave}=await import(PRODUCTION);const p=await decodeWorldSave(readFileSync(process.argv[1],'utf8'));console.log(JSON.stringify(await prepareArchitectureSave(restoreArchitectureSave(p))).length);`;
+  const script=code.replace('WORLD_STORAGE',JSON.stringify(new URL('../dist/story/world-storage.js',import.meta.url).href)).replace('PRODUCTION',JSON.stringify(new URL('../dist/architecture/production-v1.js',import.meta.url).href));
+  assert.equal(Number(execFileSync(process.execPath,['--input-type=module','-e',script,file],{encoding:'utf8'}).trim()),JSON.stringify(packet).length);
+ }finally{await rm(dir,{recursive:true,force:true});}
 });

@@ -105,7 +105,7 @@ test('D2-a: 制約表は未確定の軸を含む部分指定でも、確定し�
  assert.equal(V.d2Inconsistencies({structure:'X1'}).length,1,'D2では高度構造を選ばない');
 });
 
-test('D2-a: 描画は src/architecture の1実装だけで、本編の年次・保存・描画にはまだ接続しない',async()=>{
+test('D2-a/D2-d: 描画は src/architecture の1実装だけで、本編とは決まった3つの入口からだけ接続する',async()=>{
  const samples=await readFile('scripts/lib/architecture-samples.mjs','utf8'),gallery=await readFile('scripts/preview-architecture.mjs','utf8');
  for(const m of (samples+gallery).matchAll(/from\s+'([^']+)'/g))
   assert.ok(!/\/(src|dist)\//.test(m[1])||/^\.\.\/\.\.\/dist\/architecture\//.test(m[1]),'gallery may import only dist/architecture: '+m[1]);
@@ -116,7 +116,9 @@ test('D2-a: 描画は src/architecture の1実装だけで、本編の年次・�
  for(const file of await walk('src')){
   const text=await readFile(file,'utf8');
   assert.ok(![...text.matchAll(/from\s+'([^']+)'/g)].some(m=>m[1].includes('scripts/')),file+' imports a script');
-  if(!file.startsWith('src/architecture/'))assert.ok(!/architecture\/[a-z-]+-v1\.js/.test(text),file+' connects D2-a code to the game before D2-b');
+  // D2-d/D3 release (v0.7): only new worlds, sessions and the common save reader connect to it
+  const gates=['src/story/new-world.ts','src/story/world-session.ts','src/story/world-save.ts'];
+  if(!file.startsWith('src/architecture/')&&!gates.includes(file))assert.ok(!/architecture\/[a-z-]+-v1\.js/.test(text),file+' connects architecture code outside the release gates');
   if(file.startsWith('src/architecture/'))assert.ok(!/Math\.random|Date\.now|performance\.now/.test(text),file);
  }
  assert.ok(!(await readFile('index.html','utf8')).includes('architecture'));

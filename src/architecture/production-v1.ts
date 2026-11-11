@@ -19,7 +19,8 @@
 import type {TerrainProductionWorld} from '../terrain/terrain-production-types-v1.js';
 import type {TerrainProductionSave} from '../terrain/terrain-production-wire-v1.js';
 import {knownTerrainProductionWorldInternal} from '../terrain/terrain-production-owned-internal.js';
-import {advanceTerrainProductionWorld,chooseTerrainProductionWorld} from '../terrain/terrain-production-progression-v1.js';
+// The v8 producers are loaded only when a world advances (D2-d): reading a save must not load them.
+const progression=()=>import('../terrain/terrain-production-progression-v1.js');
 import {prepareTerrainProductionSave} from '../terrain/terrain-production-storage-v1.js';
 import {validateTerrainProductionSave,restoreTerrainProductionSave} from '../terrain/terrain-production-history-v1.js';
 import {terrainProductionMaxBytes} from '../terrain/terrain-production-contract-v1.js';
@@ -234,10 +235,12 @@ function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorl
 }
 export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={}):Promise<ArchitectureProductionWorld>{
  knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
+ const {advanceTerrainProductionWorld}=await progression();
  return next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options,c=>{captures.push(c);}),captures);
 }
 export async function chooseArchitectureWorld(world:ArchitectureProductionWorld,index:number|'random'):Promise<ArchitectureProductionWorld>{
  knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
+ const {chooseTerrainProductionWorld}=await progression();
  return next(world,await chooseTerrainProductionWorld(world.terrain,index,undefined,c=>{captures.push(c);}),captures);
 }
 
