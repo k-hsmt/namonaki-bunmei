@@ -8,7 +8,7 @@
  *   (field excluded; civic halls are facilities with a civic attribute) and each housing `built` /
  *   `expanded` event. Births are derived from the recorded v8 history and the terrain of the
  *   construction year, then stored; the reader recomputes all of them and rejects any difference.
- * - D2-b2: every birth also records its air-space envelope (architecture-envelope-v1, from the D2-c
+ * - D2-b2: every birth also records its air-space envelope (architecture-envelope-v2, from the D2-c
  *   drawing geometry) and the fallback stage that made it fit. A construction is checked against the
  *   envelopes of constructions from EARLIER YEARS in its site, never the same year, so a construction
  *   added in an already recorded year (e.g. resolving a choice) cannot change an earlier record.

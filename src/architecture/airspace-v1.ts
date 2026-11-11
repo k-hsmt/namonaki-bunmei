@@ -1,5 +1,5 @@
 /**
- * Issue #35 D2-b2: the air-space envelope of a birth style (architecture-envelope-v1), derived from the
+ * Issue #35 D2-b2: the air-space envelope of a birth style (architecture-envelope-v2), derived from the
  * D2-c drawing geometry the Human accepted (PR #115):
  *  - facilities: the D1 drawing at D1 size, anchored like the live sprite (plot centre, 3px above its foot)
  *  - civic halls: the D1 hall widened to the civic plot (courtyard-hall: courtyard composition, height 15),
@@ -21,7 +21,7 @@ import {drawArchitecture,type ArchitectureSize} from './draw-v1.js';
 import {drawMiniature} from './miniature-v1.js';
 import type {ArchitectureSpec,PartialSpec,Use} from './vocab-v1.js';
 
-export const ENVELOPE_ID='architecture-envelope-v1';
+export const ENVELOPE_ID='architecture-envelope-v2';
 export const DEPTH_BAND=6;
 /** Absolute screen rectangle [x0,x1) × [y0,y1) plus the ground line used for depth bands. */
 export interface AirspaceRect {readonly x0:number;readonly x1:number;readonly y0:number;readonly y1:number;readonly ground:number;
