@@ -2,7 +2,7 @@
   "status": "D2B_AUDIT_NOT_ACCEPTANCE",
   "issue": 35,
   "stage": "D2-b2",
-  "sourceHead": "9f7918294f6f2c3b21b6395cdea10515a051840a",
+  "sourceHead": "717f607df2ecaa0a416e23b0237b09a9393c004e",
   "years": 10000,
   "limits": {
     "plainBytes": 16777216,
@@ -21,26 +21,26 @@
       "envelopeStages": {
         "1": 75,
         "2": 1,
-        "5": 5
+        "4": 5
       },
       "envelopeSubs": {
         "eaves": 6,
-        "pitch": 7,
-        "roofFamily": 10
+        "pitch": 5,
+        "roofFamily": 5
       },
       "sameYearExcessOverlaps": 0,
       "terrainCuts": 3,
       "bytes": {
-        "save": 9471576,
-        "architecture": 54099,
+        "save": 9471124,
+        "architecture": 53647,
         "v8": 9417390,
-        "saveGzip": 1062414,
-        "architectureGzip": 4558
+        "saveGzip": 1062403,
+        "architectureGzip": 4547
       },
       "ms": {
-        "advance10000WithArchitecture": 17309,
-        "recomputeArchitectureOnly": 26,
-        "validateV9Total": 12790
+        "advance10000WithArchitecture": 17695,
+        "recomputeArchitectureOnly": 30,
+        "validateV9Total": 12514
       }
     },
     {
@@ -62,13 +62,13 @@
         "save": 8488803,
         "architecture": 45212,
         "v8": 8443504,
-        "saveGzip": 995858,
-        "architectureGzip": 3451
+        "saveGzip": 995863,
+        "architectureGzip": 3455
       },
       "ms": {
-        "advance10000WithArchitecture": 17324,
-        "recomputeArchitectureOnly": 16,
-        "validateV9Total": 8412
+        "advance10000WithArchitecture": 16776,
+        "recomputeArchitectureOnly": 15,
+        "validateV9Total": 8039
       }
     },
     {
@@ -82,26 +82,26 @@
       },
       "envelopeStages": {
         "1": 64,
-        "4": 5,
-        "5": 3
+        "4": 7,
+        "5": 1
       },
       "envelopeSubs": {
-        "pitch": 11,
-        "roofFamily": 11
+        "pitch": 9,
+        "roofFamily": 9
       },
       "sameYearExcessOverlaps": 0,
       "terrainCuts": 2,
       "bytes": {
-        "save": 8468952,
-        "architecture": 48972,
+        "save": 8468506,
+        "architecture": 48526,
         "v8": 8419893,
-        "saveGzip": 1025784,
-        "architectureGzip": 4399
+        "saveGzip": 1025753,
+        "architectureGzip": 4366
       },
       "ms": {
-        "advance10000WithArchitecture": 14631,
-        "recomputeArchitectureOnly": 20,
-        "validateV9Total": 5664
+        "advance10000WithArchitecture": 14086,
+        "recomputeArchitectureOnly": 22,
+        "validateV9Total": 5452
       }
     },
     {
@@ -124,13 +124,13 @@
         "save": 9129929,
         "architecture": 48759,
         "v8": 9081083,
-        "saveGzip": 1050793,
-        "architectureGzip": 3811
+        "saveGzip": 1050797,
+        "architectureGzip": 3815
       },
       "ms": {
-        "advance10000WithArchitecture": 20936,
-        "recomputeArchitectureOnly": 17,
-        "validateV9Total": 11426
+        "advance10000WithArchitecture": 19681,
+        "recomputeArchitectureOnly": 20,
+        "validateV9Total": 10304
       }
     },
     {
@@ -146,26 +146,26 @@
       "envelopeStages": {
         "1": 83,
         "2": 3,
-        "5": 3
+        "4": 3
       },
       "envelopeSubs": {
         "eaves": 6,
         "pitch": 3,
-        "roofFamily": 6
+        "roofFamily": 3
       },
       "sameYearExcessOverlaps": 0,
       "terrainCuts": 1,
       "bytes": {
-        "save": 9082816,
-        "architecture": 59637,
+        "save": 9082618,
+        "architecture": 59439,
         "v8": 9023092,
-        "saveGzip": 1075449,
-        "architectureGzip": 5049
+        "saveGzip": 1075440,
+        "architectureGzip": 5042
       },
       "ms": {
-        "advance10000WithArchitecture": 18998,
-        "recomputeArchitectureOnly": 19,
-        "validateV9Total": 6991
+        "advance10000WithArchitecture": 19293,
+        "recomputeArchitectureOnly": 26,
+        "validateV9Total": 6999
       }
     },
     {
@@ -179,24 +179,25 @@
       },
       "envelopeStages": {
         "1": 88,
-        "5": 9
+        "4": 5,
+        "5": 4
       },
       "envelopeSubs": {
-        "roofFamily": 18
+        "roofFamily": 13
       },
       "sameYearExcessOverlaps": 0,
       "terrainCuts": 3,
       "bytes": {
-        "save": 9789722,
-        "architecture": 64281,
+        "save": 9789392,
+        "architecture": 63951,
         "v8": 9725354,
-        "saveGzip": 1116260,
-        "architectureGzip": 4848
+        "saveGzip": 1116275,
+        "architectureGzip": 4864
       },
       "ms": {
-        "advance10000WithArchitecture": 21634,
-        "recomputeArchitectureOnly": 28,
-        "validateV9Total": 6984
+        "advance10000WithArchitecture": 21128,
+        "recomputeArchitectureOnly": 22,
+        "validateV9Total": 7100
       }
     },
     {
@@ -222,13 +223,13 @@
         "save": 8739474,
         "architecture": 42755,
         "v8": 8696632,
-        "saveGzip": 1043102,
-        "architectureGzip": 3600
+        "saveGzip": 1043106,
+        "architectureGzip": 3605
       },
       "ms": {
-        "advance10000WithArchitecture": 15232,
-        "recomputeArchitectureOnly": 12,
-        "validateV9Total": 7095
+        "advance10000WithArchitecture": 15234,
+        "recomputeArchitectureOnly": 14,
+        "validateV9Total": 6716
       }
     },
     {
@@ -242,25 +243,26 @@
       },
       "envelopeStages": {
         "1": 74,
-        "5": 3
+        "4": 1,
+        "5": 2
       },
       "envelopeSubs": {
         "pitch": 3,
-        "roofFamily": 6
+        "roofFamily": 5
       },
       "sameYearExcessOverlaps": 0,
       "terrainCuts": 3,
       "bytes": {
-        "save": 9261028,
-        "architecture": 49760,
+        "save": 9260962,
+        "architecture": 49694,
         "v8": 9211181,
-        "saveGzip": 1079325,
-        "architectureGzip": 4109
+        "saveGzip": 1079331,
+        "architectureGzip": 4118
       },
       "ms": {
-        "advance10000WithArchitecture": 18471,
-        "recomputeArchitectureOnly": 21,
-        "validateV9Total": 11278
+        "advance10000WithArchitecture": 18308,
+        "recomputeArchitectureOnly": 17,
+        "validateV9Total": 10706
       }
     },
     {
@@ -275,27 +277,27 @@
       "envelopeStages": {
         "1": 71,
         "2": 1,
-        "4": 3,
-        "5": 6
+        "4": 5,
+        "5": 4
       },
       "envelopeSubs": {
         "eaves": 10,
         "pitch": 9,
-        "roofFamily": 15
+        "roofFamily": 13
       },
       "sameYearExcessOverlaps": 0,
       "terrainCuts": 3,
       "bytes": {
-        "save": 8289678,
-        "architecture": 58941,
+        "save": 8289470,
+        "architecture": 58733,
         "v8": 8230650,
-        "saveGzip": 985522,
-        "architectureGzip": 5168
+        "saveGzip": 985494,
+        "architectureGzip": 5144
       },
       "ms": {
-        "advance10000WithArchitecture": 15239,
-        "recomputeArchitectureOnly": 41,
-        "validateV9Total": 6316
+        "advance10000WithArchitecture": 14805,
+        "recomputeArchitectureOnly": 22,
+        "validateV9Total": 6487
       }
     },
     {
@@ -310,26 +312,27 @@
       "envelopeStages": {
         "1": 49,
         "2": 3,
-        "5": 5
+        "4": 1,
+        "5": 4
       },
       "envelopeSubs": {
         "eaves": 8,
-        "pitch": 10,
-        "roofFamily": 10
+        "pitch": 9,
+        "roofFamily": 9
       },
       "sameYearExcessOverlaps": 0,
       "terrainCuts": 4,
       "bytes": {
-        "save": 7591063,
-        "architecture": 41050,
+        "save": 7590936,
+        "architecture": 40923,
         "v8": 7549926,
-        "saveGzip": 933232,
-        "architectureGzip": 4045
+        "saveGzip": 933241,
+        "architectureGzip": 4053
       },
       "ms": {
-        "advance10000WithArchitecture": 13405,
-        "recomputeArchitectureOnly": 24,
-        "validateV9Total": 6383
+        "advance10000WithArchitecture": 12391,
+        "recomputeArchitectureOnly": 21,
+        "validateV9Total": 5972
       }
     }
   ]
