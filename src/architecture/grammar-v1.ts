@@ -6,7 +6,7 @@
  * Not yet connected to the annual batch, saves or the live renderer (D2-b / D2-c).
  */
 import {terrainHash} from '../terrain/terrain-hash-v1.js';
-import {d2Inconsistencies,eavesKinds,pitches,roofFamilies,ARCHITECTURE_VOCAB_ID,ARCHITECTURE_CONSTRAINTS_ID,
+import {d2Inconsistencies,advancedBirthInconsistencies,eavesKinds,pitches,roofFamilies,ARCHITECTURE_VOCAB_ID,ARCHITECTURE_CONSTRAINTS_ID,
  type ArchitectureSpec,type PartialSpec,type Use,type RoofFamily,type Eaves,type Pitch,type Structure,type WallMaterial,
  type Foundation,type RoofMaterial,type Window,type Entrance,type Ornament,type Palette} from './vocab-v1.js';
 import {measureArchitecture,type ArchitectureEnvelope} from './draw-v1.js';
@@ -40,6 +40,8 @@ export const regionalCandidates={
 const wallsFor:Readonly<Record<Exclude<Structure,'X1'|'X2'|'X3'>,readonly WallMaterial[]>>={
  S01:['wattle','plank','log'],S02:['plank','log'],S03:['earth','rammed','wattle'],S04:['rubble'],S05:['ashlar'],S06:['mixed'],S07:['plank','log','wattle'],
 };
+/** Whether a wall belongs to a vernacular structure in the D2 grammar (used by D3-b changes too). */
+export const wallFits=(structure:Structure,wall:WallMaterial)=>(wallsFor[structure as keyof typeof wallsFor]??[]).includes(wall);
 type RegionalAxis=keyof typeof regionalCandidates|'wall';
 const allWalls:readonly WallMaterial[]=['log','plank','wattle','earth','rammed','rubble','ashlar','mixed'];
 const ornamentIds:readonly Ornament[]=['O1','O2','O3','O4','O5','O6','O7','O8'];
@@ -98,6 +100,8 @@ export interface RegionalArchitecturalTradition {
   readonly window:Window;readonly entrance:Entrance;readonly palette:Palette};
  /** Second-choice values the tradition also allows for individual variation. */
  readonly alternates:{readonly window:Window;readonly roofMaterial:RoofMaterial|null};
+ /** D3-b: roof axes once this district's tradition has diverged from the world grammar. Absent at year 0. */
+ readonly shared?:WorldArchitecturalGrammar['shared'];
 }
 const sharedSpec=(g:WorldArchitecturalGrammar):PartialSpec=>({roofFamily:g.shared.roofFamily,eaves:g.shared.eaves,pitch:g.shared.pitch});
 /** Candidates that do not break any constraint already decided. */
@@ -166,14 +170,34 @@ export interface BirthHold {readonly status:'hold';readonly ref:BuildingRef;read
 export interface BirthInput {
  readonly grammar:WorldArchitecturalGrammar;readonly tradition:RegionalArchitecturalTradition;readonly ref:BuildingRef;readonly source:BirthSource;
  readonly use:Use;readonly plot:PlotAdaptationInputs;
+ /** D3-c: technologies the district holds in the construction year (architecture-technology-v1). Absent = none. */
+ readonly technologies?:readonly Technology[];
+}
+
+// ---- advanced technology (D3-c, Human decision 2: only what D1 drew; no 3+ storeys) ----
+/** T01+T07 large-span timber, T02+T04 masonry and arch, T05+T06+T09 metal support, glazing and skin. */
+export type Technology='timber-span'|'masonry-arch'|'metal-glass';
+export const technologies:readonly Technology[]=['timber-span','masonry-arch','metal-glass'];
+/** Uses where a held technology may be adopted. Houses and granaries stay vernacular (D1 A1-A3; design §3.3). */
+export const technologyUses:readonly Use[]=['hall','market','workshop'];
+/** Per-cent chance that one of these buildings adopts a held technology. Provisional (D3-d). */
+export const technologyAdoption=60;
+/** What a building adopting the technology changes (the D1 A1-A3 vocabulary). */
+function adoptTechnology(s:PartialSpec&{use:Use},t:Technology):void {
+ switch(t){
+  case 'timber-span':s.structure='X1';if(s.wall!=='plank'&&s.wall!=='log')s.wall='plank';break;
+  case 'masonry-arch':s.structure='X2';s.wall='ashlar';s.foundation=s.use==='workshop'?(s.foundation==='F5'?'F2':s.foundation):'F6';break;
+  case 'metal-glass':s.structure='X3';s.wall='metal';s.roofMaterial=s.use==='market'?'glazed':'metal';s.window='W7';s.foundation='F6';break;
+ }
 }
 const refKey=(ref:BuildingRef,source:BirthSource)=>JSON.stringify([ref.kind,ref.siteId,ref.kind==='facility'?ref.id:ref.blockId,ref.kind==='housing'?[ref.parts.from,ref.parts.to]:null,source.kind,source.year,source.seq??null]);
 
 /** Deterministic constraint repair. Each change is recorded; no change is silent. */
-function repair(s:PartialSpec&{use:Use},subs:Substitution[],reason:Substitution['reason']):void {
+function repair(s:PartialSpec&{use:Use},subs:Substitution[],reason:Substitution['reason'],advanced=false):void {
+ const check=advanced?advancedBirthInconsistencies:d2Inconsistencies;
  const set=<K extends keyof PartialSpec>(axis:K,to:NonNullable<PartialSpec[K]>)=>{subs.push({axis,from:String(s[axis]),to:String(to),reason});s[axis]=to;};
  for(let guard=0;guard<8;guard++){
-  const issues=d2Inconsistencies(s);if(!issues.length)return;
+  const issues=check(s);if(!issues.length)return;
   if(s.storeys===2&&issues.some(m=>m.includes('階')))set('storeys',1);
   else if(s.structure==='S07'&&s.foundation!=='F5')set('foundation','F5');
   else if(s.foundation==='F5'&&!['S01','S02','S07'].includes(s.structure!))set('foundation','F2');
@@ -232,14 +256,15 @@ export interface BirthFeatures {
  readonly status:'ok';readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly traditionSite:ArchitectureSite;
  readonly features:Omit<ArchitectureSpec,'use'|'faded'>;readonly adjustments:readonly string[];readonly substitutions:readonly Substitution[];
 }
-type Composed={spec:PartialSpec&{use:Use};adjustments:string[];subs:Substitution[]};
+type Composed={spec:PartialSpec&{use:Use};adjustments:string[];subs:Substitution[];advanced:boolean};
 function composeBirth(input:BirthInput):Composed|BirthHold {
  assertBirthInput(input);
  const {grammar,tradition,ref,source,use,plot}=input;
  const b=(...k:(string|number)[])=>H('architecture-birth-v1',grammar.seed,refKey(ref,source),...k);
  const c=tradition.choices,adjustments:string[]=[],subs:Substitution[]=[];
- const s:PartialSpec&{use:Use}={use,...sharedSpec(grammar),structure:c.structure,wall:c.wall,foundation:c.foundation,roofMaterial:c.roofMaterial,
-  window:c.window,entrance:c.entrance,palette:c.palette,ornaments:[...grammar.shared.ornaments],storeys:1};
+ const shared=tradition.shared??grammar.shared;
+ const s:PartialSpec&{use:Use}={use,roofFamily:shared.roofFamily,eaves:shared.eaves,pitch:shared.pitch,structure:c.structure,wall:c.wall,foundation:c.foundation,roofMaterial:c.roofMaterial,
+  window:c.window,entrance:c.entrance,palette:c.palette,ornaments:[...shared.ornaments],storeys:1};
  // individual variation inside what the tradition allows (D2 §3.5)
  if(b('pitch')%100<15){const i=pitches.indexOf(s.pitch!),j=Math.max(0,Math.min(2,i+(b('pitch-dir')%2?1:-1)));if(j!==i){s.pitch=pitches[j];adjustments.push('variation:pitch');}}
  if(b('window')%100<20){s.window=tradition.alternates.window;adjustments.push('variation:window');}
@@ -248,9 +273,13 @@ function composeBirth(input:BirthInput):Composed|BirthHold {
  // plot adaptation at the construction year (D2 §4.3)
  if(s.foundation==='F1'&&plot.grade>=500){s.foundation='F4';adjustments.push('plot:slope');}
  else if(s.foundation==='F1'&&plot.nearWater&&b('wet')%100<50){s.foundation='F3';adjustments.push('plot:water');}
+ // D3-c: a building of a technology use may adopt one technology its district holds in the construction year
+ const held=technologies.filter(t=>input.technologies?.includes(t));
+ const advanced=held.length>0&&technologyUses.includes(use)&&b('technology')%100<technologyAdoption;
+ if(advanced){const t=held[b('technology-pick')%held.length]!;adoptTechnology(s,t);adjustments.push('technology:'+t);}
  const ruled=applyUseRules(s,{hash:b('use')});Object.assign(s,ruled.spec);adjustments.push(...ruled.applied.map(a=>'use:'+a));
- try{repair(s,subs,'constraint');}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
- return {spec:s,adjustments,subs};
+ try{repair(s,subs,'constraint',advanced);}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
+ return {spec:s,adjustments,subs,advanced};
 }
 const featuresOf=(x:PartialSpec&{use:Use})=>{const {use:_,faded:__,...features}=x as ArchitectureSpec;return {...features,ornaments:[...features.ornaments]};};
 /** D2-b1: the recorded birth style. No envelope; the air-space contract is added in D2-b2 after D2-c fixes drawing geometry. */
@@ -267,7 +296,7 @@ const lowerRoof:Readonly<Record<RoofFamily,RoofFamily>>={R01:'R03',R02:'R03',R08
 export function deriveBirthStyle<E=ArchitectureEnvelope>(input:BirthInput,fits:(e:E)=>boolean,measure:(spec:PartialSpec&{use:Use})=>E=measureArchitecture as unknown as (spec:PartialSpec&{use:Use})=>E):BirthStyle<E>|BirthHold {
  if(typeof fits!=='function')throw Error('architecture: the envelope fit test is required');
  const composed=composeBirth(input);if('status' in composed)return composed;
- const {ref,source,use,tradition}=input,{spec:s,adjustments,subs}=composed;
+ const {ref,source,use,tradition}=input,{spec:s,adjustments,subs,advanced}=composed;
  // envelope fallback chain (architecture-envelope-v2, D2 §6.2). Stage 5 may still fail: fail closed.
  const stages:((x:PartialSpec&{use:Use})=>void)[]=[
   ()=>{},
@@ -282,7 +311,7 @@ export function deriveBirthStyle<E=ArchitectureEnvelope>(input:BirthInput,fits:(
  const work={...s};
  for(let stage=0;stage<stages.length;stage++){
   stages[stage]!(work);
-  try{repair(work,subs,'constraint');}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
+  try{repair(work,subs,'constraint',advanced);}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
   const envelope=measure(work);
   if(fits(envelope))return {status:'ok',ref,source,use,traditionSite:tradition.siteId,features:featuresOf(work),envelope,adjustments,substitutions:subs,envelopeStage:(stage+1) as 1|2|3|4|5};
  }

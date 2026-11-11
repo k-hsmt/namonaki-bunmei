@@ -11,6 +11,7 @@ import {captureTerrainProductionOriginInternal} from './terrain-origin-internal.
 import {ownTerrainProductionWorldInternal as own,knownTerrainProductionWorldInternal as known} from './terrain-production-owned-internal.js';
 import {terrainProductionRuntimeRules,terrainProductionEconomicRule} from './terrain-production-contract-v1.js';
 import type {TerrainProductionWorld,TerrainProductionLedger} from './terrain-production-types-v1.js';
+import type {InteractionObserverInternal} from '../story/economy-observer.js';
 import {terrainProductionProfile} from './terrain-profile-internal.js';
 import {progressTerrainEvolutionInternal,terrainAdvanceRunInternal,terrainChoiceRunInternal} from './terrain-evolution-progression-internal.js';
 export async function introduceTerrainProduction(input:EconomicProductionWorld|TerrainProductionWorld):Promise<TerrainProductionWorld>{
@@ -19,14 +20,15 @@ export async function introduceTerrainProduction(input:EconomicProductionWorld|T
  const packet=await prepareEconomicProductionSave(input),year=lastObservedYear(input.review.state),history=await createTerrainHistory(input.review.terrain,year),originHash=await terrainRevisionHash(packet),{economicPolicyBoundary:_,...review}=input.review;
  return own({...input,format:'terrain-production-world-v1',status:'production',review:{...review,terrainPolicyBoundary:terrainProductionBoundary},terrainHistory:history,terrainDevelopment:{schemaVersion:1,ruleId:terrainProductionBoundary,policy:'cut',runtimeRules:terrainProductionRuntimeRules,economicRule:terrainProductionEconomicRule,introducedYear:year,confirmedThrough:year,originHash,originPrefix:captureTerrainProductionOriginInternal(packet),decisions:[]}});
 }
-async function progress(input:TerrainProductionWorld,run:Parameters<typeof progressTerrainEvolutionInternal>[3]):Promise<TerrainProductionWorld>{
- known(input);const result=await progressTerrainEvolutionInternal(input,input.terrainDevelopment,terrainProductionProfile,run);
+async function progress(input:TerrainProductionWorld,run:Parameters<typeof progressTerrainEvolutionInternal>[3],observeInteraction?:InteractionObserverInternal):Promise<TerrainProductionWorld>{
+ known(input);const result=await progressTerrainEvolutionInternal(input,input.terrainDevelopment,terrainProductionProfile,run,observeInteraction);
  return own({...result.world,format:'terrain-production-world-v1',status:'production',review:{...result.world.review,terrainPolicyBoundary:terrainProductionBoundary},economicCoupling:result.economicCoupling,terrainHistory:result.terrainHistory,terrainDevelopment:result.ledger as TerrainProductionLedger});
 }
-export async function advanceTerrainProductionWorld(input:TerrainProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={}):Promise<TerrainProductionWorld>{
+/** `observeInteraction` (Issue #35 D3-a) is an optional read-only tap; v8's result is identical with or without it. */
+export async function advanceTerrainProductionWorld(input:TerrainProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={},observeInteraction?:InteractionObserverInternal):Promise<TerrainProductionWorld>{
  known(input);if(!Number.isSafeInteger(years)||years<0||input.review.state.year+years>10000||!['stop','automatic'].includes(choices)||Object.keys(options).some(k=>k!=='stopAtNewRecord')||options.stopAtNewRecord!==undefined&&typeof options.stopAtNewRecord!=='boolean')throw Error('Invalid terrain production advance');if(!years)return input;
- return progress(input,terrainAdvanceRunInternal(input,input.terrainDevelopment,years,choices,options));
+ return progress(input,terrainAdvanceRunInternal(input,input.terrainDevelopment,years,choices,options),observeInteraction);
 }
-export async function chooseTerrainProductionWorld(input:TerrainProductionWorld,index:number|'random',binding?:string):Promise<TerrainProductionWorld>{known(input);if(!input.review.state.pending||binding!==undefined&&binding!==coupledChoiceBinding(input.review.state))throw Error('Missing or stale terrain production choice');return progress(input,terrainChoiceRunInternal(index));}
+export async function chooseTerrainProductionWorld(input:TerrainProductionWorld,index:number|'random',binding?:string,observeInteraction?:InteractionObserverInternal):Promise<TerrainProductionWorld>{known(input);if(!input.review.state.pending||binding!==undefined&&binding!==coupledChoiceBinding(input.review.state))throw Error('Missing or stale terrain production choice');return progress(input,terrainChoiceRunInternal(index),observeInteraction);}
 export function improveTerrainProductionEnvironment(input:TerrainProductionWorld):TerrainProductionWorld{known(input);return input.environmentAppearance==='landscape-v3'?input:own({...input,environmentAppearance:'landscape-v3'});}
 export function slowTerrainProductionClimate(input:TerrainProductionWorld):TerrainProductionWorld{known(input);const e=input.environment!;if(e.climateRule==='environment-coupled-v2'||e.confirmedThrough>=10000)return input;return own({...input,environment:{...e,climateRule:'environment-coupled-v2',climateStart:(Math.floor(e.confirmedThrough/100)+1)*100}});}

@@ -31,24 +31,36 @@ import {architecturePolicy,createWorldGrammar,createRegionalTradition,deriveBirt
 import {ENVELOPE_ID,facilityAirspace,housingAirspace,airspaceConflict,minimalForm,withExcess,type AirspaceRect} from './airspace-v1.js';
 import type {ResidentialBlock} from '../story/housing-history.js';
 export type RecordedBirth=BirthStyle<AirspaceRect>;
+import {appendInteraction,emptyInteraction,verifyInteraction,interactionHash,type InteractionLedger} from './interaction-v1.js';
+import type {InteractionCaptureInternal} from '../story/economy-observer.js';
+import {TECHNOLOGY_ID,capabilityEventsFor,technologiesAt,type CapabilityEvent} from './technology-v1.js';
+import {CHANGE_ID,CHANGE_PERIOD,traditionChangesFor,traditionAt,type TraditionChange,type WindowFacts} from './change-v1.js';
 import type {Use} from './vocab-v1.js';
 
 export const ARCHITECTURE_WORLD_FORMAT='architecture-production-world-v1';
 const sites:readonly ArchitectureSite[]=['river-bank','hill-side','coast-inlet'];
 export interface ArchitectureLedger {
- readonly format:'architecture-ledger-v1';readonly schemaVersion:2;readonly policy:typeof architecturePolicy;
+ readonly format:'architecture-ledger-v1';readonly schemaVersion:5;readonly policy:typeof architecturePolicy;
  /** D2-b2: births carry their air-space envelope (schema 2; schema 1 of D2-b1 was never released). */
  readonly envelope:typeof ENVELOPE_ID;
  readonly grammar:WorldArchitecturalGrammar;readonly traditions:readonly RegionalArchitecturalTradition[];
  readonly births:readonly RecordedBirth[];
+ /** D3-a (schema 3): inter-district interaction observed while v8 advanced. Checked, not recomputed, on load. */
+ readonly interaction:InteractionLedger;
+ /** D3-b (schema 4): tradition changes every 25 years (architecture-change-v1). Recomputed on load. */
+ readonly change:typeof CHANGE_ID;readonly traditionChanges:readonly TraditionChange[];
+ /** D3-c (schema 5): district capabilities (architecture-technology-v1). Recomputed on load. */
+ readonly technology:typeof TECHNOLOGY_ID;readonly capabilityEvents:readonly CapabilityEvent[];
 }
 export interface ArchitectureProductionWorld {
  readonly format:typeof ARCHITECTURE_WORLD_FORMAT;readonly status:'production';
  readonly terrain:TerrainProductionWorld;readonly architecture:ArchitectureLedger;
 }
 export interface ArchitectureProductionSave {
- readonly format:'namonaki-world-save';readonly version:9;readonly schemaVersion:1;
+ readonly format:'namonaki-world-save';readonly version:9;readonly schemaVersion:2;
  readonly world:TerrainProductionSave;readonly architecture:ArchitectureLedger;
+ /** SHA-256 commitment over architecture.interaction (corruption check, like v8's payloadHash). */
+ readonly interactionHash:string;
 }
 
 const fail=(m:string):never=>{throw Error('architecture production: '+m);};
@@ -111,8 +123,10 @@ function grammarAndTraditions(world:TerrainProductionWorld){
  const traditions=sites.map(site=>createRegionalTradition(grammar,site,measureSiteAdaptation(readOwnedRecordPhysics(initial.sites[site].physics),vegetation.initial[site])));
  return {grammar,traditions};
 }
-function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction,earlier:readonly AirspaceRect[]):RecordedBirth {
- const tradition=traditions[sites.indexOf(c.ref.siteId)]!;
+function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction,earlier:readonly AirspaceRect[],changes:readonly TraditionChange[],capabilities:readonly CapabilityEvent[]):RecordedBirth {
+ // D3-b: the tradition in force in the construction year, not the year-0 tradition.
+ const initial=traditions[sites.indexOf(c.ref.siteId)]!,now=traditionAt(grammar,initial,changes,c.source.year);
+ const tradition:RegionalArchitecturalTradition={...initial,choices:now.choices,shared:now.shared as WorldArchitecturalGrammar['shared']};
  // Design §5.2 input 2: the confirmed terrain of the construction year, never the latest terrain.
  const raster=readOwnedRecordPhysics(terrainSitePhysics(resolveTerrainAtYear(world.terrainHistory,c.source.year),c.ref.siteId));
  const decks=(world.review.bridgeReview?.bridges??[]).filter(b=>b.geometry.siteId===c.ref.siteId&&b.builtYear<=c.source.year).map(b=>b.geometry.deck);
@@ -120,27 +134,62 @@ function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,
  const rectOf=(spec:Parameters<typeof facilityAirspace>[0])=>c.ref.kind==='housing'?housingAirspace(spec,c.block??fail('housing construction without its block')):facilityAirspace(spec,c.plot,civic);
  // Human decision A on D2-b2: only the excess over the minimal form is tested.
  const measure=(spec:Parameters<typeof facilityAirspace>[0])=>withExcess(rectOf(spec),rectOf(minimalForm(spec)));
- const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot)},
+ const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot),technologies:technologiesAt(capabilities,c.ref.siteId,c.source.year)},
   e=>airspaceConflict(e,{earlier,decks,raster,plot:c.plot})===null,measure);
  if(r.status!=='ok')return fail('birth HOLD ('+r.reason+') for '+JSON.stringify(c.ref)+': '+r.detail);
  return r;
 }
 /** Births in construction order. Each is checked against the envelopes of earlier years in its site. */
-function birthsFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[]):RecordedBirth[] {
+function birthsFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],changes:readonly TraditionChange[],capabilities:readonly CapabilityEvent[]):RecordedBirth[] {
  const out:RecordedBirth[]=[],bySite=new Map<string,{year:number;rect:AirspaceRect}[]>();
  for(const c of listConstructions(world)){
   const site=bySite.get(c.ref.siteId)??[];
-  const b=birthOf(world,grammar,traditions,c,site.filter(x=>x.year<c.source.year).map(x=>x.rect));
+  const b=birthOf(world,grammar,traditions,c,site.filter(x=>x.year<c.source.year).map(x=>x.rect),changes,capabilities);
   site.push({year:c.source.year,rect:b.envelope});bySite.set(c.ref.siteId,site);out.push(b);
  }
  return out;
 }
 /** The complete ledger the recorded v8 history implies. Pure in the v8 world; used by the writer and the reader. */
-export function expectedArchitectureLedger(world:TerrainProductionWorld):ArchitectureLedger {
+/** Hazards that reach each district, as v8's housing lifecycle applies them. */
+const hazardSites:Readonly<Record<string,readonly ArchitectureSite[]>>={earthquake:['river-bank','hill-side','coast-inlet'],flood:['river-bank'],fire:['river-bank'],storm:['coast-inlet']};
+/** Window facts per district from confirmed v8 records: constructions, repairs and disasters. */
+function factsOf(world:TerrainProductionWorld):(site:ArchitectureSite,year:number)=>WindowFacts {
+ const r=world.review,siteOf=new Map<string,ArchitectureSite>();
+ for(const p of r.placements)siteOf.set(p.objectId,p.site as ArchitectureSite);
+ for(const e of r.state.housing?.events??[])siteOf.set(e.blockId,e.after.siteId);
+ const events:{site:ArchitectureSite;year:number;id:string;kind:'work'|'disaster'}[]=[];
+ for(const c of listConstructions(world))events.push({site:c.ref.siteId,year:c.source.year,id:c.source.recordId??'',kind:'work'});
+ for(const h of r.state.history){
+  if((h.kind==='building-repaired'||h.kind==='housing-repaired')&&h.buildingId){const site=siteOf.get(h.buildingId);if(site)events.push({site,year:h.year,id:h.id,kind:'work'});}
+  else if(h.kind&&hazardSites[h.kind])for(const site of hazardSites[h.kind]!)events.push({site,year:h.year,id:h.id,kind:'disaster'});
+ }
+ return (site,year)=>{
+  const inWindow=events.filter(e=>e.site===site&&e.year>year-CHANGE_PERIOD&&e.year<=year);
+  const work=inWindow.filter(e=>e.kind==='work');
+  return {experience:work.length,records:work.map(e=>e.id).filter(Boolean),disasters:inWindow.filter(e=>e.kind==='disaster').length};
+ };
+}
+/** Tradition changes (D3-b) and capability events (D3-c) implied by the confirmed records. */
+function changesFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],interaction:InteractionLedger):{traditionChanges:TraditionChange[];capabilityEvents:CapabilityEvent[]} {
+ const seed=world.review.state.seed,confirmedThrough=interaction.confirmedThrough,facts=factsOf(world);
+ const traditionChanges=traditionChangesFor({seed,confirmedThrough,grammar,initial:traditions,interaction,facts});
+ // town condition: a market and a workshop built in the district (design §3.3 scale; see technology-v1)
+ const built=listConstructions(world).filter(c=>c.ref.kind==='facility');
+ const first=(site:ArchitectureSite,use:Use)=>built.find(c=>c.ref.siteId===site&&c.use===use)?.source.year??Infinity;
+ const townFrom=new Map(sites.map(site=>[site,Math.max(first(site,'market'),first(site,'workshop'))]));
+ const capabilityEvents=capabilityEventsFor({seed,confirmedThrough,grammar,initial:traditions,changes:traditionChanges,interaction,facts,town:(site,year)=>townFrom.get(site)!<=year});
+ return {traditionChanges,capabilityEvents};
+}
+/**
+ * The ledger the recorded v8 history implies, with the given observed interaction (which cannot be
+ * recomputed from the v8 world). Omitted, an empty interaction is used: callers that compare births only.
+ */
+export function expectedArchitectureLedger(world:TerrainProductionWorld,interaction:InteractionLedger=emptyInteraction(world.review.state.year)):ArchitectureLedger {
  knownTerrainProductionWorldInternal(world);
  const {grammar,traditions}=grammarAndTraditions(world);
- return {format:'architecture-ledger-v1',schemaVersion:2,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
-  births:birthsFor(world,grammar,traditions)};
+ const {traditionChanges,capabilityEvents}=changesFor(world,grammar,traditions,interaction);
+ return {format:'architecture-ledger-v1',schemaVersion:5,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
+  births:birthsFor(world,grammar,traditions,traditionChanges,capabilityEvents),interaction,change:CHANGE_ID,traditionChanges,technology:TECHNOLOGY_ID,capabilityEvents};
 }
 const sameLedger=(a:ArchitectureLedger,b:ArchitectureLedger)=>JSON.stringify(a)===JSON.stringify(b);
 
@@ -149,7 +198,7 @@ const sameLedger=(a:ArchitectureLedger,b:ArchitectureLedger)=>JSON.stringify(a)=
 export function introduceArchitectureProduction(terrain:TerrainProductionWorld):ArchitectureProductionWorld {
  knownTerrainProductionWorldInternal(terrain);
  if(terrain.review.state.year!==0||terrain.review.state.pending||terrain.terrainDevelopment.introducedYear!==0)fail('architecture starts only with a new world at year 0');
- return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:expectedArchitectureLedger(terrain)});
+ return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:expectedArchitectureLedger(terrain,emptyInteraction(0))});
 }
 /**
  * Design §5.3 update boundary: take the next v8 world as an immutable candidate, append births for
@@ -172,23 +221,30 @@ export function mergeBirths<B extends {readonly ref:BuildingRef;readonly source:
  }
  return recomputed;
 }
-function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorld):ArchitectureProductionWorld {
+function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorld,captures:readonly InteractionCaptureInternal[]):ArchitectureProductionWorld {
  if(terrain===previous.terrain)return previous;
  const old=previous.architecture,{grammar,traditions}=old;
- const recomputed=birthsFor(terrain,grammar,traditions);
- return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births:mergeBirths(old.births,recomputed)}});
+ const interactionNow=appendInteraction(old.interaction,captures),{traditionChanges,capabilityEvents}=changesFor(terrain,grammar,traditions,interactionNow);
+ // changes and capability events already recorded must reappear unchanged (decided only from confirmed years)
+ if(JSON.stringify(traditionChanges.slice(0,old.traditionChanges.length))!==JSON.stringify(old.traditionChanges))fail('a recorded tradition change changed');
+ if(JSON.stringify(capabilityEvents.slice(0,old.capabilityEvents.length))!==JSON.stringify(old.capabilityEvents))fail('a recorded capability event changed');
+ const recomputed=birthsFor(terrain,grammar,traditions,traditionChanges,capabilityEvents);
+ const interaction=interactionNow;verifyInteraction(interaction,terrain,0);
+ return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births:mergeBirths(old.births,recomputed),interaction,traditionChanges,capabilityEvents}});
 }
 export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={}):Promise<ArchitectureProductionWorld>{
- knownArchitectureWorld(world);return next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options));
+ knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
+ return next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options,c=>{captures.push(c);}),captures);
 }
 export async function chooseArchitectureWorld(world:ArchitectureProductionWorld,index:number|'random'):Promise<ArchitectureProductionWorld>{
- knownArchitectureWorld(world);return next(world,await chooseTerrainProductionWorld(world.terrain,index));
+ knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
+ return next(world,await chooseTerrainProductionWorld(world.terrain,index,undefined,c=>{captures.push(c);}),captures);
 }
 
 // ---- persistence (v9 envelope over a complete native v8 packet) ----
 export async function prepareArchitectureSave(world:ArchitectureProductionWorld):Promise<ArchitectureProductionSave>{
  knownArchitectureWorld(world);
- const packet:ArchitectureProductionSave={format:'namonaki-world-save',version:9,schemaVersion:1,world:await prepareTerrainProductionSave(world.terrain),architecture:world.architecture};
+ const packet:ArchitectureProductionSave={format:'namonaki-world-save',version:9,schemaVersion:2,world:await prepareTerrainProductionSave(world.terrain),architecture:world.architecture,interactionHash:await interactionHash(world.architecture.interaction)};
  if(new TextEncoder().encode(JSON.stringify(packet)).length>terrainProductionMaxBytes)fail('save exceeds 16MiB');
  packets.set(deepFreeze(packet),world);return packet;
 }
@@ -199,12 +255,15 @@ export async function validateArchitectureSave(raw:unknown):Promise<Architecture
  const d=JSON.parse(JSON.stringify(raw)) as Record<string,unknown>;
  if(new TextEncoder().encode(JSON.stringify(d)).length>terrainProductionMaxBytes)fail('save exceeds 16MiB');
  const keys=Object.keys(d).sort().join(',');
- if(keys!=='architecture,format,schemaVersion,version,world'||d.format!=='namonaki-world-save'||d.version!==9||d.schemaVersion!==1)fail('unknown v9 contract');
+ if(keys!=='architecture,format,interactionHash,schemaVersion,version,world'||d.format!=='namonaki-world-save'||d.version!==9||d.schemaVersion!==2)fail('unknown v9 contract');
  const v8=await validateTerrainProductionSave(d.world),terrain=restoreTerrainProductionSave(v8);
- const expected=expectedArchitectureLedger(terrain);
- if(!sameLedger(expected,d.architecture as ArchitectureLedger))fail('recorded architecture does not match the history it claims');
+ const saved=d.architecture as ArchitectureLedger,interaction=saved?.interaction??fail('missing interaction');
+ if(typeof d.interactionHash!=='string'||await interactionHash(interaction)!==d.interactionHash)fail('interaction commitment does not match');
+ verifyInteraction(interaction,terrain,0);
+ const expected=expectedArchitectureLedger(terrain,interaction);
+ if(!sameLedger(expected,saved))fail('recorded architecture does not match the history it claims');
  const world=own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:expected});
- const packet=deepFreeze({format:'namonaki-world-save',version:9,schemaVersion:1,world:v8,architecture:expected} as ArchitectureProductionSave);
+ const packet=deepFreeze({format:'namonaki-world-save',version:9,schemaVersion:2,world:v8,architecture:expected,interactionHash:d.interactionHash} as ArchitectureProductionSave);
  packets.set(packet,world);return packet;
 }
 export function restoreArchitectureSave(packet:ArchitectureProductionSave):ArchitectureProductionWorld {return packets.get(packet)??fail('use a validated architecture packet');}

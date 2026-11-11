@@ -74,8 +74,11 @@ const rules:readonly Rule[]=[
  {fields:['storeys','structure'],message:'複数階は整形石・混合・高度構造のみ',broken:s=>s.storeys>1&&!['S05','S06','X1','X2','X3'].includes(s.structure)},
 ];
 /** D2 rule (Human decision 6): two storeys only for halls. Not part of the D1 drawing check. */
-const d2Rules:readonly Rule[]=[
+const storeyRules:readonly Rule[]=[
  {fields:['storeys','use'],message:'D2では2階建ては会堂のみ',broken:s=>s.storeys>1&&s.use!=='hall'},
+];
+/** D2 limits on advanced technology. D3-c lifts them only for a building that adopted a technology its district holds. */
+const technologyBans:readonly Rule[]=[
  {fields:['structure'],message:'D2では高度構造を選ばない',broken:s=>isAdvancedStructure(s.structure)},
  {fields:['foundation'],message:'D2では大規模構造の基礎(F6)を選ばない',broken:s=>s.foundation==='F6'},
  {fields:['wall'],message:'D2では金属支持・複合外皮を選ばない',broken:s=>['metal','composite'].includes(s.wall)},
@@ -86,7 +89,13 @@ const evaluate=(list:readonly Rule[],s:PartialSpec)=>list.filter(r=>r.fields.eve
 /** D1 drawing constraints (architecture-constraints-v1). Accepts partial specs. */
 export function inconsistencies(s:PartialSpec):string[]{return evaluate(rules,s);}
 /** Constraints for D2 births: drawing constraints plus D2-only limits. */
-export function d2Inconsistencies(s:PartialSpec):string[]{return [...evaluate(rules,s),...evaluate(d2Rules,s)];}
+export function d2Inconsistencies(s:PartialSpec):string[]{return [...evaluate(rules,s),...evaluate(storeyRules,s),...evaluate(technologyBans,s)];}
+/**
+ * D3-c: constraints for a birth that adopted an advanced technology. The D1 drawing constraints and the
+ * storey limit still hold; only the technology bans are lifted (which technology is allowed is decided
+ * by the district's capability, not here).
+ */
+export function advancedBirthInconsistencies(s:PartialSpec):string[]{return [...evaluate(rules,s),...evaluate(storeyRules,s)];}
 
 /** Validates a normal-form spec. `roofFamily: 'R07'` and unknown IDs are rejected. */
 export function normalizeSpec(input:PartialSpec&{readonly use:Use}):ArchitectureSpec {

@@ -31,6 +31,27 @@ export interface CoupledReceiptCaptureInternal {
  readonly totals:Pick<EconomyCapture['totals'],'harvest'|'discarded'>;
 }
 export type CoupledReceiptObserverInternal=(capture:CoupledReceiptCaptureInternal)=>void;
+
+/**
+ * Issue #35 D3-a: a private, read-only tap of each year's inter-district interaction for the
+ * architecture layer. It receives detached frozen copies only, writes nothing to the world, and is
+ * never persisted by v8. Allowed next to the coupled receipt writer because it cannot change a value
+ * the writer records.
+ */
+export interface InteractionCaptureInternal {
+ readonly year:number;
+ readonly moves:readonly {readonly from:number;readonly to:number;readonly amount:number}[];
+ readonly traded:readonly number[];
+ readonly routes:readonly {readonly blocked:boolean;readonly originRecord:string|null;readonly agreementRecord:string|null;readonly closureRecord:string|null}[];
+ readonly recordIds:readonly string[];
+}
+export type InteractionObserverInternal=(capture:InteractionCaptureInternal)=>void;
+export function frozenInteractionCaptureInternal(year:number,totals:{readonly moves:readonly {from:number;to:number;amount:number}[];readonly traded:readonly number[]},
+ routes:readonly {readonly blocked:boolean;readonly originRecord:string|null;readonly agreementRecord:string|null;readonly closureRecord:string|null}[],recordIds:readonly string[]):InteractionCaptureInternal {
+ return Object.freeze({year,moves:Object.freeze(totals.moves.map(m=>Object.freeze({from:m.from,to:m.to,amount:m.amount}))),traded:Object.freeze([...totals.traded]),
+  routes:Object.freeze(routes.map(r=>Object.freeze({blocked:r.blocked,originRecord:r.originRecord,agreementRecord:r.agreementRecord,closureRecord:r.closureRecord}))),
+  recordIds:Object.freeze([...recordIds])});
+}
 export function frozenCoupledReceiptCaptureInternal(value:CoupledReceiptCaptureInternal):CoupledReceiptCaptureInternal {
  return Object.freeze({year:value.year,drought:value.drought,before:Object.freeze({people:Object.freeze([...value.before.people])}),
   conditions:Object.freeze({disruptionId:value.conditions.disruptionId,blockedRegions:Object.freeze([...value.conditions.blockedRegions]),...(value.conditions.granaries?{granaries:Object.freeze([...value.conditions.granaries])}:{})}),

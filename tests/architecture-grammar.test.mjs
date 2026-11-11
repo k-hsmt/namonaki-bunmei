@@ -153,9 +153,10 @@ test('D2-a: 文明の乱数・時刻・本編の年次処理を読まない',asy
   // and its terrain-at-year, but never the civilization RNG or the annual engine directly.
   // scene-v1 (D2-c, review only) paints into the live scene: it may read the live scene drawing only.
   const allowed=f==='scene-v1.ts'?/^\.\/|^\.\.\/scene\/(draw|draw-generated-review)\.js$/
+   :f==='interaction-v1.ts'?/^\.\/|^\.\.\/story\/(economy-observer|regional-economy)\.js$|^\.\.\/terrain\/(terrain-production-types-v1|terrain-revision-wire-v1)\.js$/
    :f==='airspace-v1.ts'?/^\.\/|^\.\.\/scene\/composition\.js$|^\.\.\/terrain\/terrain-record-raster-v1\.js$/
    :f==='production-v1.ts'
-   ?/^\.\/|^\.\.\/terrain\/(terrain-production-(types-v1|wire-v1|owned-internal|progression-v1|storage-v1|history-v1|contract-v1)|terrain-revision-v1|owned-record-physics)\.js$|^\.\.\/story\/housing-history\.js$/
+   ?/^\.\/|^\.\.\/terrain\/(terrain-production-(types-v1|wire-v1|owned-internal|progression-v1|storage-v1|history-v1|contract-v1)|terrain-revision-v1|owned-record-physics)\.js$|^\.\.\/story\/(housing-history|economy-observer)\.js$/
    :/^\.\/|^\.\.\/terrain\/(terrain-hash-v1|terrain-record-raster-v1)\.js$|^\.\.\/vegetation\/history-v1\.js$/;
   for(const m of text.matchAll(/from\s+'([^']+)'/g))assert.ok(allowed.test(m[1]),f+' imports '+m[1]);
   assert.ok(!/engine\/rng|story\/engine/.test(text),f+' touches the civilization RNG or engine');
