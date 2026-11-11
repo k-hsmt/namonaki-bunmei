@@ -17,7 +17,7 @@ export interface LayoutInput {
  /** Distance in pixels from (x, y) to the nearest water surface (Infinity when there is none). */
  readonly waterDistance:(x:number,y:number)=>number;
 }
-export const layoutThresholds=Object.freeze({minBuildings:3,waterReach:14,waterShare:.6,terraceShare:.4,courtyardShare:.5,
+export const layoutThresholds=Object.freeze({minBuildings:3,waterReach:30,waterShare:.5,terraceShare:.4,courtyardShare:.5,
  centreReach:70,centreShare:.6,centreGap:90,linearRatio:4});
 export const layoutNames:Readonly<Record<LayoutType,string>>={L01:'家々が散らばる',L02:'一筋に連なる',L03:'水辺沿いに並ぶ',L04:'中庭を囲む家が多い',
  L05:'斜面に段をなす',L06:'集会所と市場を囲む',L07:'いくつかの中心をもつ'};

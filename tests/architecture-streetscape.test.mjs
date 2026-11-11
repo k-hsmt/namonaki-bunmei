@@ -31,6 +31,8 @@ test('D5 #2: 街並みの型は、実在の建物・水・斜面・中心だけ�
  assert.equal(L.classifyLayout({buildings:[at(20,120,'block',{foundation:'F4'}),at(120,130,'block',{foundation:'F4'}),at(220,140),at(280,150)],waterDistance:far}),'L05','terraced');
  assert.equal(L.classifyLayout({buildings:[at(20,120,'block',{courtyard:true}),at(150,160,'block',{courtyard:true}),at(260,120,'block')],waterDistance:far}),'L04','courtyards');
  assert.equal(L.classifyLayout({buildings:[at(10,130),at(80,132),at(160,134),at(240,136),at(310,138)],waterDistance:far}),'L02','in a line');
+ // Human decision 1A on D5-a: half the buildings within 30 px of water (the first threshold, 60% within 14 px, never matched)
+ assert.equal(L.classifyLayout({buildings:[at(10,120),at(90,120),at(170,120),at(250,120,'house')],waterDistance:(x)=>x<200?25:60}),'L03','within 30 px');
  assert.equal(L.layoutLabel('L03',2),'水辺沿いに並ぶ町');
 });
 

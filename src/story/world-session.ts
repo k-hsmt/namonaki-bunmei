@@ -13,7 +13,7 @@ import {observeEconomicProductionScene} from '../scene/economic-production-scene
 import type {GeneratedSceneObservation} from '../scene/generated-scene-review.js';
 import {knownArchitectureWorld,advanceArchitectureWorld,chooseArchitectureWorld,prepareArchitectureSave,restoreArchitectureSave,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
 import {createArchitecturePainter} from '../architecture/scene-v1.js';
-import {classifyLayout,layoutLabel,type LayoutBuilding} from '../architecture/layout-v1.js';
+import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '../architecture/layout-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import type {GeneratedStructurePainter} from '../scene/draw-generated-review.js';
 import {assertProductionBoundary} from './trial-boundary.js';
@@ -63,7 +63,9 @@ export function worldStreetscapeAt(session:WorldSession,year:number,siteIndex:nu
   buildings.push({x:f.x+f.width/2,y:f.y+f.depth/2,kind:'block',courtyard:b.roofParts.some(p=>p.styleId==='courtyard'),...(fd?{foundation:fd}:{})});}
  for(const p of o.snapshot.publicSpaces??[])buildings.push({x:p.footprint.x+p.footprint.width/2,y:p.footprint.y+p.footprint.depth/2,kind:'public'});
  const raster=readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics);
- const waterDistance=(x:number,y:number)=>{let best=Infinity;for(let dy=-15;dy<=15;dy++)for(let dx=-15;dx<=15;dx++){const px=Math.round(x)+dx,py=Math.round(y)+dy;
+ // search as far as the classifier looks (layoutThresholds.waterReach); farther water counts as none
+ const reach=layoutThresholds.waterReach+1;
+ const waterDistance=(x:number,y:number)=>{let best=Infinity;for(let dy=-reach;dy<=reach;dy++)for(let dx=-reach;dx<=reach;dx++){const px=Math.round(x)+dx,py=Math.round(y)+dy;
   if(px<0||px>=320||py<0||py>=180)continue;const s=raster.surface[py*320+px];if(s===2||s===3)best=Math.min(best,Math.hypot(dx,dy));}return best;};
  return layoutLabel(classifyLayout({buildings,waterDistance}),o.composition.scale);
 }
