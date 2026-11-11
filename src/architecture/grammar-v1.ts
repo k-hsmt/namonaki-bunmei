@@ -98,6 +98,8 @@ export interface RegionalArchitecturalTradition {
   readonly window:Window;readonly entrance:Entrance;readonly palette:Palette};
  /** Second-choice values the tradition also allows for individual variation. */
  readonly alternates:{readonly window:Window;readonly roofMaterial:RoofMaterial|null};
+ /** D3-b: roof axes once this district's tradition has diverged from the world grammar. Absent at year 0. */
+ readonly shared?:WorldArchitecturalGrammar['shared'];
 }
 const sharedSpec=(g:WorldArchitecturalGrammar):PartialSpec=>({roofFamily:g.shared.roofFamily,eaves:g.shared.eaves,pitch:g.shared.pitch});
 /** Candidates that do not break any constraint already decided. */
@@ -238,8 +240,9 @@ function composeBirth(input:BirthInput):Composed|BirthHold {
  const {grammar,tradition,ref,source,use,plot}=input;
  const b=(...k:(string|number)[])=>H('architecture-birth-v1',grammar.seed,refKey(ref,source),...k);
  const c=tradition.choices,adjustments:string[]=[],subs:Substitution[]=[];
- const s:PartialSpec&{use:Use}={use,...sharedSpec(grammar),structure:c.structure,wall:c.wall,foundation:c.foundation,roofMaterial:c.roofMaterial,
-  window:c.window,entrance:c.entrance,palette:c.palette,ornaments:[...grammar.shared.ornaments],storeys:1};
+ const shared=tradition.shared??grammar.shared;
+ const s:PartialSpec&{use:Use}={use,roofFamily:shared.roofFamily,eaves:shared.eaves,pitch:shared.pitch,structure:c.structure,wall:c.wall,foundation:c.foundation,roofMaterial:c.roofMaterial,
+  window:c.window,entrance:c.entrance,palette:c.palette,ornaments:[...shared.ornaments],storeys:1};
  // individual variation inside what the tradition allows (D2 §3.5)
  if(b('pitch')%100<15){const i=pitches.indexOf(s.pitch!),j=Math.max(0,Math.min(2,i+(b('pitch-dir')%2?1:-1)));if(j!==i){s.pitch=pitches[j];adjustments.push('variation:pitch');}}
  if(b('window')%100<20){s.window=tradition.alternates.window;adjustments.push('variation:window');}

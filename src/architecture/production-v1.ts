@@ -33,18 +33,21 @@ import type {ResidentialBlock} from '../story/housing-history.js';
 export type RecordedBirth=BirthStyle<AirspaceRect>;
 import {appendInteraction,emptyInteraction,verifyInteraction,interactionHash,type InteractionLedger} from './interaction-v1.js';
 import type {InteractionCaptureInternal} from '../story/economy-observer.js';
+import {CHANGE_ID,CHANGE_PERIOD,traditionChangesFor,traditionAt,type TraditionChange,type WindowFacts} from './change-v1.js';
 import type {Use} from './vocab-v1.js';
 
 export const ARCHITECTURE_WORLD_FORMAT='architecture-production-world-v1';
 const sites:readonly ArchitectureSite[]=['river-bank','hill-side','coast-inlet'];
 export interface ArchitectureLedger {
- readonly format:'architecture-ledger-v1';readonly schemaVersion:3;readonly policy:typeof architecturePolicy;
+ readonly format:'architecture-ledger-v1';readonly schemaVersion:4;readonly policy:typeof architecturePolicy;
  /** D2-b2: births carry their air-space envelope (schema 2; schema 1 of D2-b1 was never released). */
  readonly envelope:typeof ENVELOPE_ID;
  readonly grammar:WorldArchitecturalGrammar;readonly traditions:readonly RegionalArchitecturalTradition[];
  readonly births:readonly RecordedBirth[];
  /** D3-a (schema 3): inter-district interaction observed while v8 advanced. Checked, not recomputed, on load. */
  readonly interaction:InteractionLedger;
+ /** D3-b (schema 4): tradition changes every 25 years (architecture-change-v1). Recomputed on load. */
+ readonly change:typeof CHANGE_ID;readonly traditionChanges:readonly TraditionChange[];
 }
 export interface ArchitectureProductionWorld {
  readonly format:typeof ARCHITECTURE_WORLD_FORMAT;readonly status:'production';
@@ -117,8 +120,10 @@ function grammarAndTraditions(world:TerrainProductionWorld){
  const traditions=sites.map(site=>createRegionalTradition(grammar,site,measureSiteAdaptation(readOwnedRecordPhysics(initial.sites[site].physics),vegetation.initial[site])));
  return {grammar,traditions};
 }
-function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction,earlier:readonly AirspaceRect[]):RecordedBirth {
- const tradition=traditions[sites.indexOf(c.ref.siteId)]!;
+function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction,earlier:readonly AirspaceRect[],changes:readonly TraditionChange[]):RecordedBirth {
+ // D3-b: the tradition in force in the construction year, not the year-0 tradition.
+ const initial=traditions[sites.indexOf(c.ref.siteId)]!,now=traditionAt(grammar,initial,changes,c.source.year);
+ const tradition:RegionalArchitecturalTradition={...initial,choices:now.choices,shared:now.shared as WorldArchitecturalGrammar['shared']};
  // Design §5.2 input 2: the confirmed terrain of the construction year, never the latest terrain.
  const raster=readOwnedRecordPhysics(terrainSitePhysics(resolveTerrainAtYear(world.terrainHistory,c.source.year),c.ref.siteId));
  const decks=(world.review.bridgeReview?.bridges??[]).filter(b=>b.geometry.siteId===c.ref.siteId&&b.builtYear<=c.source.year).map(b=>b.geometry.deck);
@@ -132,16 +137,38 @@ function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,
  return r;
 }
 /** Births in construction order. Each is checked against the envelopes of earlier years in its site. */
-function birthsFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[]):RecordedBirth[] {
+function birthsFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],changes:readonly TraditionChange[]):RecordedBirth[] {
  const out:RecordedBirth[]=[],bySite=new Map<string,{year:number;rect:AirspaceRect}[]>();
  for(const c of listConstructions(world)){
   const site=bySite.get(c.ref.siteId)??[];
-  const b=birthOf(world,grammar,traditions,c,site.filter(x=>x.year<c.source.year).map(x=>x.rect));
+  const b=birthOf(world,grammar,traditions,c,site.filter(x=>x.year<c.source.year).map(x=>x.rect),changes);
   site.push({year:c.source.year,rect:b.envelope});bySite.set(c.ref.siteId,site);out.push(b);
  }
  return out;
 }
 /** The complete ledger the recorded v8 history implies. Pure in the v8 world; used by the writer and the reader. */
+/** Hazards that reach each district, as v8's housing lifecycle applies them. */
+const hazardSites:Readonly<Record<string,readonly ArchitectureSite[]>>={earthquake:['river-bank','hill-side','coast-inlet'],flood:['river-bank'],fire:['river-bank'],storm:['coast-inlet']};
+/** Window facts per district from confirmed v8 records: constructions, repairs and disasters. */
+function factsOf(world:TerrainProductionWorld):(site:ArchitectureSite,year:number)=>WindowFacts {
+ const r=world.review,siteOf=new Map<string,ArchitectureSite>();
+ for(const p of r.placements)siteOf.set(p.objectId,p.site as ArchitectureSite);
+ for(const e of r.state.housing?.events??[])siteOf.set(e.blockId,e.after.siteId);
+ const events:{site:ArchitectureSite;year:number;id:string;kind:'work'|'disaster'}[]=[];
+ for(const c of listConstructions(world))events.push({site:c.ref.siteId,year:c.source.year,id:c.source.recordId??'',kind:'work'});
+ for(const h of r.state.history){
+  if((h.kind==='building-repaired'||h.kind==='housing-repaired')&&h.buildingId){const site=siteOf.get(h.buildingId);if(site)events.push({site,year:h.year,id:h.id,kind:'work'});}
+  else if(h.kind&&hazardSites[h.kind])for(const site of hazardSites[h.kind]!)events.push({site,year:h.year,id:h.id,kind:'disaster'});
+ }
+ return (site,year)=>{
+  const inWindow=events.filter(e=>e.site===site&&e.year>year-CHANGE_PERIOD&&e.year<=year);
+  const work=inWindow.filter(e=>e.kind==='work');
+  return {experience:work.length,records:work.map(e=>e.id).filter(Boolean),disasters:inWindow.filter(e=>e.kind==='disaster').length};
+ };
+}
+function changesFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],interaction:InteractionLedger):TraditionChange[] {
+ return traditionChangesFor({seed:world.review.state.seed,confirmedThrough:interaction.confirmedThrough,grammar,initial:traditions,interaction,facts:factsOf(world)});
+}
 /**
  * The ledger the recorded v8 history implies, with the given observed interaction (which cannot be
  * recomputed from the v8 world). Omitted, an empty interaction is used: callers that compare births only.
@@ -149,8 +176,9 @@ function birthsFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGramma
 export function expectedArchitectureLedger(world:TerrainProductionWorld,interaction:InteractionLedger=emptyInteraction(world.review.state.year)):ArchitectureLedger {
  knownTerrainProductionWorldInternal(world);
  const {grammar,traditions}=grammarAndTraditions(world);
- return {format:'architecture-ledger-v1',schemaVersion:3,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
-  births:birthsFor(world,grammar,traditions),interaction};
+ const traditionChanges=changesFor(world,grammar,traditions,interaction);
+ return {format:'architecture-ledger-v1',schemaVersion:4,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
+  births:birthsFor(world,grammar,traditions,traditionChanges),interaction,change:CHANGE_ID,traditionChanges};
 }
 const sameLedger=(a:ArchitectureLedger,b:ArchitectureLedger)=>JSON.stringify(a)===JSON.stringify(b);
 
@@ -185,9 +213,12 @@ export function mergeBirths<B extends {readonly ref:BuildingRef;readonly source:
 function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorld,captures:readonly InteractionCaptureInternal[]):ArchitectureProductionWorld {
  if(terrain===previous.terrain)return previous;
  const old=previous.architecture,{grammar,traditions}=old;
- const recomputed=birthsFor(terrain,grammar,traditions);
- const interaction=appendInteraction(old.interaction,captures);verifyInteraction(interaction,terrain,0);
- return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births:mergeBirths(old.births,recomputed),interaction}});
+ const interactionNow=appendInteraction(old.interaction,captures),traditionChanges=changesFor(terrain,grammar,traditions,interactionNow);
+ // tradition changes already recorded must reappear unchanged (decided only from confirmed years)
+ if(JSON.stringify(traditionChanges.slice(0,old.traditionChanges.length))!==JSON.stringify(old.traditionChanges))fail('a recorded tradition change changed');
+ const recomputed=birthsFor(terrain,grammar,traditions,traditionChanges);
+ const interaction=interactionNow;verifyInteraction(interaction,terrain,0);
+ return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births:mergeBirths(old.births,recomputed),interaction,traditionChanges}});
 }
 export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={}):Promise<ArchitectureProductionWorld>{
  knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
