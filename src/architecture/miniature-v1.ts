@@ -24,14 +24,16 @@ const lift:Readonly<Record<string,number>>={F1:0,F2:1,F3:1,F4:1,F5:2,F6:1};
 export function drawMiniature(g:RectTarget,input:PartialSpec&{readonly use:Use},x:number,y:number,depth:PartDepth):ArchitectureSpec {
  const s=normalizeSpec(input),{p,wall,roof}=architectureColors(s),{dark,light}=shade;
  const R=(a:number,b:number,w:number,h:number,c:string)=>{if(w>0&&h>0)g.rect(Math.round(a),Math.round(b),Math.round(w),Math.round(h),c);};
- const [w,h]=miniatureSizes[depth],left=x-Math.floor(w/2);
+ const [w,h0]=miniatureSizes[depth],left=x-Math.floor(w/2);
+ // D5: a second storey raises the wall (far 2, middle 3, near 4 px) and marks the floor line
+ const extra=s.storeys>1?{far:2,middle:3,near:4}[depth]:0,h=h0+extra;
  if(depth==='far'){
   // colour only: wall body and a roof band
   R(left,y-h+2,w,h-2,wall);R(left-1,y-h,w+2,2,roof);
   return s;
  }
  if(depth==='middle'){
-  const top=y-h+3;R(left,top,w,h-3,wall);
+  const top=y-h+3;R(left,top,w,h-3,wall);if(extra)R(left,top+extra,w,1,dark(wall,.3));
   const shape=middleShape(s);
   if(shape==='flat'){R(left-1,top-2,w+2,2,roof);}
   else if(shape==='shed'){for(let i=0;i<w+2;i++){const t=top-1-Math.round(3*(w+1-i)/(w+1));R(left-1+i,t,1,top-t,roof);}}
@@ -45,6 +47,7 @@ export function drawMiniature(g:RectTarget,input:PartialSpec&{readonly use:Use},
  else if(s.foundation==='F2'||s.foundation==='F4'){R(left-(s.foundation==='F4'?2:1),base,w+(s.foundation==='F4'?4:2),y-base,p.stone);}
  else if(s.foundation==='F3'){for(const dx of [2,w-3])R(left+dx,base,1,y-base,dark(p.timber,.2));}
  R(left,bodyTop,w,base-bodyTop,wall);
+ if(extra)R(left,bodyTop+extra+1,w,1,dark(wall,.3));
  if(s.wall==='plank'||s.wall==='log')for(let i=left+2;i<left+w;i+=3)R(i,bodyTop,1,base-bodyTop,dark(wall,.14));
  if(s.wall==='rubble'||s.wall==='ashlar')R(left,bodyTop+Math.floor((base-bodyTop)/2),w,1,dark(wall,.16));
  const texture=(i:number,d:number,c:string)=>s.roofMaterial==='thatch'?((i*7+d*3)%5===0?light(c,.2):c):s.roofMaterial==='tile'?(i%2?dark(c,.18):c):

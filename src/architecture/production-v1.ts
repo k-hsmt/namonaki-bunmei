@@ -31,6 +31,7 @@ import {architecturePolicy,createWorldGrammar,createRegionalTradition,deriveBirt
  type ArchitectureSite,type WorldArchitecturalGrammar,type RegionalArchitecturalTradition,type BirthStyle,type BuildingRef,type BirthSource} from './grammar-v1.js';
 import {ENVELOPE_ID,facilityAirspace,housingAirspace,airspaceConflict,minimalForm,withExcess,type AirspaceRect} from './airspace-v1.js';
 import type {ResidentialBlock} from '../story/housing-history.js';
+import {siteAt} from '../story/settlement-history.js';
 /** `rebuild` (D4): the generation (2 = first rebuild), the chosen way, and the v8 ruin it recovered from. */
 export type RecordedBirth=BirthStyle<AirspaceRect>&{readonly rebuild?:{readonly generation:number;readonly mode:RebuildMode;readonly changedAxes:number;readonly ruinRecordId:string}};
 import {appendInteraction,emptyInteraction,verifyInteraction,interactionHash,type InteractionLedger} from './interaction-v1.js';
@@ -43,7 +44,7 @@ import {REBUILD_ID,chooseRebuildMode,type RebuildMode} from './rebuild-v1.js';
 export const ARCHITECTURE_WORLD_FORMAT='architecture-production-world-v1';
 const sites:readonly ArchitectureSite[]=['river-bank','hill-side','coast-inlet'];
 export interface ArchitectureLedger {
- readonly format:'architecture-ledger-v1';readonly schemaVersion:6;readonly policy:typeof architecturePolicy;
+ readonly format:'architecture-ledger-v1';readonly schemaVersion:7;readonly policy:typeof architecturePolicy;
  /** D2-b2: births carry their air-space envelope (schema 2; schema 1 of D2-b1 was never released). */
  readonly envelope:typeof ENVELOPE_ID;
  readonly grammar:WorldArchitecturalGrammar;readonly traditions:readonly RegionalArchitecturalTradition[];
@@ -56,6 +57,8 @@ export interface ArchitectureLedger {
  readonly technology:typeof TECHNOLOGY_ID;readonly capabilityEvents:readonly CapabilityEvent[];
  /** D4 (schema 6): rebuilds at v8's recovery of ruins are births with source kind 'rebuilt' (architecture-rebuild-v1). */
  readonly rebuild:typeof REBUILD_ID;
+ /** D5 (schema 7): heights by settlement scale and the real town condition for technology. */
+ readonly streetscape:'architecture-scale-v1';
 }
 export interface ArchitectureProductionWorld {
  readonly format:typeof ARCHITECTURE_WORLD_FORMAT;readonly status:'production';
@@ -147,6 +150,10 @@ export function listConstructions(world:TerrainProductionWorld):Construction[] {
  return out.sort((a,b)=>{const x=key(a),y=key(b);for(let i=0;i<x.length;i++){if(x[i]!==y[i])return x[i]!<y[i]!?-1:1;}return 0;});
 }
 
+/** D5: the district's settlement scale in `year`, from v8's observation ledger (0 hamlet .. 3 city). */
+export function scaleAt(world:TerrainProductionWorld,site:ArchitectureSite,year:number):number {
+ return siteAt(world.review.state.observation?.sites,sites.indexOf(site),year)?.scale??0;
+}
 function grammarAndTraditions(world:TerrainProductionWorld){
  const initial=world.terrainHistory.initial,grammar=createWorldGrammar(world.review.state.seed);
  const vegetation=world.vegetation??fail('missing initial vegetation');
@@ -164,7 +171,7 @@ function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,
  const rectOf=(spec:Parameters<typeof facilityAirspace>[0])=>c.ref.kind==='housing'?housingAirspace(spec,c.block??fail('housing construction without its block')):facilityAirspace(spec,c.plot,civic);
  // Human decision A on D2-b2: only the excess over the minimal form is tested.
  const measure=(spec:Parameters<typeof facilityAirspace>[0])=>withExcess(rectOf(spec),rectOf(minimalForm(spec)));
- const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot),technologies:technologiesAt(capabilities,c.ref.siteId,c.source.year),...(inherit?{inherit}:{})},
+ const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot),technologies:technologiesAt(capabilities,c.ref.siteId,c.source.year),scale:scaleAt(world,c.ref.siteId,c.source.year),...(inherit?{inherit}:{})},
   e=>airspaceConflict(e,{earlier,decks,raster,plot:c.plot})===null,measure);
  if(r.status!=='ok')return fail('birth HOLD ('+r.reason+') for '+JSON.stringify(c.ref)+': '+r.detail);
  return r;
@@ -224,11 +231,8 @@ function factsOf(world:TerrainProductionWorld):(site:ArchitectureSite,year:numbe
 function changesFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],interaction:InteractionLedger):{traditionChanges:TraditionChange[];capabilityEvents:CapabilityEvent[]} {
  const seed=world.review.state.seed,confirmedThrough=interaction.confirmedThrough,facts=factsOf(world);
  const traditionChanges=traditionChangesFor({seed,confirmedThrough,grammar,initial:traditions,interaction,facts});
- // town condition: a market and a workshop built in the district (design §3.3 scale; see technology-v1)
- const built=listConstructions(world).filter(c=>c.ref.kind==='facility'&&c.source.kind==='built');
- const first=(site:ArchitectureSite,use:Use)=>built.find(c=>c.ref.siteId===site&&c.use===use)?.source.year??Infinity;
- const townFrom=new Map(sites.map(site=>[site,Math.max(first(site,'market'),first(site,'workshop'))]));
- const capabilityEvents=capabilityEventsFor({seed,confirmedThrough,grammar,initial:traditions,changes:traditionChanges,interaction,facts,town:(site,year)=>townFrom.get(site)!<=year});
+ // town condition (design §3.3; D5 Human decision #4): the district is a town or a city in that year
+ const capabilityEvents=capabilityEventsFor({seed,confirmedThrough,grammar,initial:traditions,changes:traditionChanges,interaction,facts,town:(site,year)=>scaleAt(world,site,year)>=2});
  return {traditionChanges,capabilityEvents};
 }
 /**
@@ -239,8 +243,8 @@ export function expectedArchitectureLedger(world:TerrainProductionWorld,interact
  knownTerrainProductionWorldInternal(world);
  const {grammar,traditions}=grammarAndTraditions(world);
  const {traditionChanges,capabilityEvents}=changesFor(world,grammar,traditions,interaction);
- return {format:'architecture-ledger-v1',schemaVersion:6,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
-  births:birthsFor(world,grammar,traditions,traditionChanges,capabilityEvents),interaction,change:CHANGE_ID,traditionChanges,technology:TECHNOLOGY_ID,capabilityEvents,rebuild:REBUILD_ID};
+ return {format:'architecture-ledger-v1',schemaVersion:7,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
+  births:birthsFor(world,grammar,traditions,traditionChanges,capabilityEvents),interaction,change:CHANGE_ID,traditionChanges,technology:TECHNOLOGY_ID,capabilityEvents,rebuild:REBUILD_ID,streetscape:'architecture-scale-v1'};
 }
 const sameLedger=(a:ArchitectureLedger,b:ArchitectureLedger)=>JSON.stringify(a)===JSON.stringify(b);
 

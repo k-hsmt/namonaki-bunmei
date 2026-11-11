@@ -100,7 +100,9 @@ test('D2-a/R07: 正規形は屋根の系統と軒の出に分かれ、R07を保�
 test('D2-a: 制約表は未確定の軸を含む部分指定でも、確定した軸の組だけで判定する',()=>{
  assert.deepEqual(V.inconsistencies({structure:'S07'}),[]);
  assert.equal(V.inconsistencies({structure:'S07',foundation:'F1'}).length,1);
- assert.equal(V.d2Inconsistencies({use:'house',storeys:2,structure:'S05'}).length,1,'D2では2階建ては会堂のみ');
+ // D5: towns and cities may build two-storey houses (decided by scale in grammar-v1); granaries stay one storey
+ assert.deepEqual(V.d2Inconsistencies({use:'house',storeys:2,structure:'S05'}),[]);
+ assert.equal(V.d2Inconsistencies({use:'granary',storeys:2,structure:'S05'}).length,1,'倉は1階');
  assert.deepEqual(V.d2Inconsistencies({use:'hall',storeys:2,structure:'S05'}),[]);
  assert.equal(V.d2Inconsistencies({structure:'X1'}).length,1,'D2では高度構造を選ばない');
 });

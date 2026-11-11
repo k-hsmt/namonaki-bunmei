@@ -13,6 +13,8 @@ import {observeEconomicProductionScene} from '../scene/economic-production-scene
 import type {GeneratedSceneObservation} from '../scene/generated-scene-review.js';
 import {knownArchitectureWorld,advanceArchitectureWorld,chooseArchitectureWorld,prepareArchitectureSave,restoreArchitectureSave,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
 import {createArchitecturePainter} from '../architecture/scene-v1.js';
+import {classifyLayout,layoutLabel,type LayoutBuilding} from '../architecture/layout-v1.js';
+import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import type {GeneratedStructurePainter} from '../scene/draw-generated-review.js';
 import {assertProductionBoundary} from './trial-boundary.js';
 import {introduceProductionIrrigation,slowProductionClimate} from '../irrigation/production-progression-v1.js';
@@ -44,6 +46,27 @@ function architecture(session:WorldSession):session is ArchitectureGeneratedSess
 }
 export function architectureProductionSession(world:ArchitectureProductionWorld):ArchitectureGeneratedSession{knownArchitectureWorld(world);return {mode:'generated',review:world.terrain,state:world.terrain.review.state,architecture:world};}
 const painters=new WeakMap<ArchitectureProductionWorld,GeneratedStructurePainter>();
+/**
+ * D5 (Human decisions #2, #3): the district's layout in `year` as text for the observation panel, e.g.
+ * 「水辺沿いに並ぶ町」. Classified from what stands there (architecture-layout-v1); read-only.
+ * Undefined for sessions without the architecture record.
+ */
+export function worldStreetscapeAt(session:WorldSession,year:number,siteIndex:number):string|undefined{
+ if(!architecture(session))return undefined;
+ const o=observeGeneratedWorldSession(session,year,siteIndex),siteId=(['river-bank','hill-side','coast-inlet'] as const)[siteIndex]!;
+ const births=session.architecture.architecture.births.filter(b=>b.ref.siteId===siteId&&b.source.year<=year);
+ const foundation=(id:string)=>births.filter(b=>(b.ref.kind==='facility'?b.ref.id:b.ref.blockId)===id).at(-1)?.features.foundation;
+ const kinds:Readonly<Record<string,LayoutBuilding['kind']>>={house:'house',hall:'hall',market:'market',workshop:'workshop',granary:'granary'};
+ const buildings:LayoutBuilding[]=[];
+ for(const b of o.snapshot.objects)if(b.condition!=='ruined'&&kinds[b.kind]){const f=foundation(b.id);buildings.push({x:b.x,y:b.y,kind:kinds[b.kind]!,...(f?{foundation:f}:{})});}
+ for(const b of o.composition.residentialBlocks??[])if(b.condition!=='ruined'){const f=b.footprint,fd=foundation(b.blockId);
+  buildings.push({x:f.x+f.width/2,y:f.y+f.depth/2,kind:'block',courtyard:b.roofParts.some(p=>p.styleId==='courtyard'),...(fd?{foundation:fd}:{})});}
+ for(const p of o.snapshot.publicSpaces??[])buildings.push({x:p.footprint.x+p.footprint.width/2,y:p.footprint.y+p.footprint.depth/2,kind:'public'});
+ const raster=readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics);
+ const waterDistance=(x:number,y:number)=>{let best=Infinity;for(let dy=-15;dy<=15;dy++)for(let dx=-15;dx<=15;dx++){const px=Math.round(x)+dx,py=Math.round(y)+dy;
+  if(px<0||px>=320||py<0||py>=180)continue;const s=raster.surface[py*320+px];if(s===2||s===3)best=Math.min(best,Math.hypot(dx,dy));}return best;};
+ return layoutLabel(classifyLayout({buildings,waterDistance}),o.composition.scale);
+}
 /** D4-c: a chronicle line for a v9 rebuild, shown right after the v8 record it rebuilt at. */
 export interface ArchitectureChronicleNote {readonly afterRecordId:string;readonly year:number;readonly title:string}
 const notes=new WeakMap<ArchitectureProductionWorld,readonly ArchitectureChronicleNote[]>();

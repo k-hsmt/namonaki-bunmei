@@ -71,3 +71,10 @@ test('release UI (D4-c): 年代記に「建て直される」を、元の記録�
   const next=items.slice(i+1).find(x=>!x.note);assert.match(next.text,/が(再利用|修繕)される/,'the v8 record follows (older below)');
  }
 });
+
+test('release UI (D5): 観測地点に街並みの型を表示し、v8の保存には出さない',async t=>{
+ const v9=await open(t,'namonaki-story-v9',v9json),v8=await open(t,'namonaki-story-v8',v8json);
+ assert.match(await v9.locator('#site-streetscape').textContent(),/^街並み：.+(集落|村|町|都市)$/);
+ assert.equal(await v9.locator('#site-streetscape').isHidden(),false);
+ assert.equal(await v8.locator('#site-streetscape').isHidden(),true);
+});

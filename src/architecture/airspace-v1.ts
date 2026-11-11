@@ -51,7 +51,9 @@ export function housingAirspace(spec:Spec,block:Parameters<typeof projectHousing
 
 /** The last fallback stage's form for the same spec (roof only changes; walls and foundation stay). */
 export function minimalForm<T extends Spec>(spec:T):T {
+ // D5: a second storey of a non-hall building is added by the town's scale, not guaranteed by the plot: it is tested
  return {...spec,roofFamily:'R05',eaves:'normal',pitch:'low',...(spec.roofMaterial==='thatch'?{roofMaterial:'shingle'}:{}),
+  ...((spec.storeys??1)>1&&spec.use!=='hall'?{storeys:1}:{}),
   ...(spec.entrance==='E3'?{entrance:spec.foundation==='F5'?'E5':'E1'}:{})};
 }
 /** Adds the excess pieces of `rect` over `baseline` (left, right, then top strip over the baseline span). */

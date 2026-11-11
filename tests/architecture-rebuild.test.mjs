@@ -14,7 +14,7 @@ const keyOf=b=>b.ref.kind==='facility'?b.ref.id:b.ref.blockId;
 test('D4-a: 建て直しは、v8で廃墟から立ち直った建物だけ（施設の再利用・住宅の廃墟からの修繕）。損傷からの修繕は含めない',async()=>{
  await ready;
  const a=world.architecture,state=world.terrain.review.state,records=new Map(state.history.map(h=>[h.id,h]));
- assert.equal(a.schemaVersion,6);assert.equal(a.rebuild,R.REBUILD_ID);
+ assert.equal(a.schemaVersion,7);assert.equal(a.rebuild,R.REBUILD_ID);
  const rebuilt=a.births.filter(b=>b.source.kind==='rebuilt');
  assert.ok(rebuilt.length>0);
  for(const b of rebuilt){

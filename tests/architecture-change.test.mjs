@@ -18,7 +18,7 @@ const spec=t=>({use:'house',...t.choices,roofFamily:t.shared.roofFamily,eaves:t.
 test('D3-b: 変化は25年の区切りで決まり、翌年から効き、前に建った建物の様式は変えない',async()=>{
  await ready;
  const a=world.architecture,changes=a.traditionChanges;
- assert.equal(a.schemaVersion,6,'D4');assert.equal(a.change,C.CHANGE_ID);
+ assert.equal(a.schemaVersion,7,'D5');assert.equal(a.change,C.CHANGE_ID);
  assert.ok(changes.length>0,'seed 11 changes within 1300 years');
  for(const c of changes){assert.equal(c.year%C.CHANGE_PERIOD,0);assert.equal(c.effectiveFrom,c.year+1);assert.notEqual(c.from,c.to);}
  const first=changes[0],site=first.site,initial=a.traditions.find(t=>t.siteId===site);
