@@ -24,20 +24,26 @@ const hex=/^#[0-9a-f]{6}$/i;
 const mix=(a:string,b:string,t:number)=>{if(!hex.test(a))return a;const p=[1,3,5].map(i=>parseInt(a.slice(i,i+2),16)),q=[1,3,5].map(i=>parseInt(b.slice(i,i+2),16));
  return '#'+p.map((n,i)=>Math.round(n+(q[i]!-n)*t).toString(16).padStart(2,'0')).join('');};
 /** Weathered: towards the dust of the ground, a little darker. Openings (very dark) stay as they are. */
-const weather=(c:string)=>{if(!hex.test(c))return c;const v=[1,3,5].map(i=>parseInt(c.slice(i,i+2),16));return v[0]!+v[1]!+v[2]!<200?c:mix(mix(c,'#8f8a76',.45),'#2c302c',.12);};
+const weather=(c:string)=>{if(!hex.test(c))return c;const v=[1,3,5].map(i=>parseInt(c.slice(i,i+2),16));return v[0]!+v[1]!+v[2]!<200?c:mix(mix(c,'#857f6c',.6),'#2c302c',.2);};
+const RUBBLE=['#6e695b','#7f7867','#5e5a4f'];
 const ruinHash=(key:string,n:number)=>{let h=2166136261;for(const ch of key+':'+n){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0)%100;};
 /**
- * Draws `draw` as a ruin: roof and upper walls are gone above a broken line (40-65% of the height,
- * in 3 px steps fixed per building), what remains is weathered. Deterministic, read-only.
+ * Draws `draw` as a ruin: roof and upper walls are gone above a broken line (20-45% of the height
+ * remains, in 3 px steps fixed per building), about a quarter of the steps have fallen almost to the
+ * ground, what remains is weathered, and rubble lies along the base. Human feedback on D4-b: the first
+ * version (40-65%) was not recognisable at a glance. Deterministic, read-only.
  */
 export function drawRuin(g:RectTarget,key:string,draw:(t:RectTarget)=>void):void {
  const rects:[number,number,number,number,string][]=[];draw({rect:(x,y,w,h,col)=>{rects.push([x,y,w,h,col]);}});
  if(!rects.length)return;
  const top=Math.min(...rects.map(r=>r[1])),base=Math.max(...rects.map(r=>r[1]+r[3])),height=base-top;
- const cut=(x:number)=>base-Math.round(height*(40+ruinHash(key,Math.floor(x/3))%26)/100);
+ const cut=(x:number)=>{const n=Math.floor(x/3),h=ruinHash(key,n);
+  return base-(h<25?Math.min(2,height):Math.round(height*(20+ruinHash(key+'~',n)%26)/100));};
  for(const [x,y,w,h,col] of rects)for(let xi=Math.floor(x);xi<x+w;xi++){
   const y0=Math.max(y,cut(xi)),y1=y+h;if(y1>y0)g.rect(xi,y0,1,y1-y0,weather(col));
  }
+ const left=Math.floor(Math.min(...rects.map(r=>r[0]))),right=Math.ceil(Math.max(...rects.map(r=>r[0]+r[2])));
+ for(let xi=left-1;xi<=right;xi++){const h=ruinHash(key+'#',xi);if(h<70)g.rect(xi,base-1-(h<20?1:0),1,1+(h<20?1:0),RUBBLE[h%3]!);}
 }
 
 export function createArchitecturePainter(births:readonly BirthFeatures[]):GeneratedStructurePainter {
