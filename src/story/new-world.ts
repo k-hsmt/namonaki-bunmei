@@ -32,7 +32,14 @@ export async function createNewEconomicWorld(seed:number):Promise<EconomicGenera
  const source=createNewIrrigatedWorld(seed);return economicProductionSession(await introduceEconomicProduction(source.review));
 }
 
-/** Current new-world default. The immutable v7 origin is generated once at the chosen seed. */
+/** Versioned v8 producer; retained for old saves, fixtures and the v9 origin. The immutable v7 origin is generated once at the chosen seed. */
 export async function createNewTerrainWorld(seed:number):Promise<TerrainGeneratedSession>{
  const source=await createNewEconomicWorld(seed);return terrainProductionSession(await introduceTerrainProduction(source.review));
+}
+
+import {introduceArchitectureProduction} from '../architecture/production-v1.js';
+import {architectureProductionSession,type ArchitectureGeneratedSession} from './world-session.js';
+/** Current new-world default (Issue #35 D2-d/D3, v0.7): the v8 world of the same seed with architecture recorded from year 0. */
+export async function createNewArchitectureWorld(seed:number):Promise<ArchitectureGeneratedSession>{
+ return architectureProductionSession(introduceArchitectureProduction((await createNewTerrainWorld(seed)).review));
 }

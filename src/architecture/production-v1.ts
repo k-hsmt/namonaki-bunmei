@@ -267,3 +267,5 @@ export async function validateArchitectureSave(raw:unknown):Promise<Architecture
  packets.set(packet,world);return packet;
 }
 export function restoreArchitectureSave(packet:ArchitectureProductionSave):ArchitectureProductionWorld {return packets.get(packet)??fail('use a validated architecture packet');}
+/** True only for packets this module prepared or validated (the common save envelope must not trust others). */
+export function knownArchitecturePacket(raw:unknown):raw is ArchitectureProductionSave {return !!raw&&typeof raw==='object'&&packets.has(raw);}

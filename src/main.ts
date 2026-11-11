@@ -188,7 +188,7 @@ function adopt(candidate:WorldSession,keepObservation=false,keepArchive=false){
 }
 async function restart(seed:number){
  if(busy)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='新しい土地を探しています。';
- try{await paintFeedback();const {createNewTerrainWorld:createNewWorld}=await import('./story/new-world.js');const candidate=await createNewWorld(seed);if(ticket!==operation||world!==source)return;adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
+ try{await paintFeedback();const {createNewArchitectureWorld:createNewWorld}=await import('./story/new-world.js');const candidate=await createNewWorld(seed);if(ticket!==operation||world!==source)return;adopt(candidate);el('feedback').textContent='新しい文明が生まれました。';}
  catch{if(ticket===operation)el('feedback').textContent='新しい文明を作れませんでした。現在の歴史はそのままです。';}
  finally{if(ticket===operation){setBusy(false);render();}}
 }
@@ -266,7 +266,7 @@ async function boot(){
  el('feedback').textContent='文明の記録を準備しています。';
  try{
   await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));
-  const world=saved?restoreWorldSession(saved):await (await import('./story/new-world.js')).createNewTerrainWorld(randomSeed());
+  const world=saved?restoreWorldSession(saved):await (await import('./story/new-world.js')).createNewArchitectureWorld(randomSeed());
   startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
  }catch{
   el('feedback').textContent='記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
@@ -278,7 +278,7 @@ async function boot(){
    catch{el('feedback').textContent='文明を開けませんでした。保存値は保持しています。';for(const id of recovery)(el(id) as HTMLButtonElement).disabled=false;}
    finally{bootBusy=false;}
   };
-  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewTerrainWorld(seed));
+  const fresh=(seed:number)=>recover(async()=>(await import('./story/new-world.js')).createNewArchitectureWorld(seed));
   el('restart').onclick=()=>void fresh(Number((el('seed') as HTMLInputElement).value)||randomSeed());el('random').onclick=()=>void fresh(randomSeed());
   const file=el('import-file') as HTMLInputElement;el('import').onclick=()=>file.click();file.onchange=()=>{const f=file.files?.[0];if(!f)return;void recover(async()=>{if(f.size>16*1024*1024)throw Error('File too large');return restoreWorldSession(await decodeWorldSave(await f.text()));});file.value='';};
  }finally{bootBusy=false;}
