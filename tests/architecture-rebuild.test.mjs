@@ -79,3 +79,18 @@ test('D4-a: 読込で建て直しの記録を照合し、改竄を拒否する�
  const key=b=>JSON.stringify([b.ref,b.source]),now=new Map(later.architecture.births.map(b=>[key(b),JSON.stringify(b)]));
  for(const b of world.architecture.births)assert.equal(now.get(key(b)),JSON.stringify(b));
 });
+
+test('D4-c: 年代記には、v8の再利用・修繕の記録の後に「建て直される」を、様式（と技術）とともに出す',async()=>{
+ await ready;
+ const {architectureProductionSession,worldArchitectureChronicle}=await import('../dist/story/world-session.js');
+ const session=architectureProductionSession(world),list=worldArchitectureChronicle(session);
+ const rebuilt=world.architecture.births.filter(b=>b.rebuild);
+ assert.equal(list.length,rebuilt.length);
+ const records=new Map(world.terrain.review.state.history.map(h=>[h.id,h]));
+ for(const n of list){
+  const r=records.get(n.afterRecordId);assert.ok(r&&['building-reused','housing-repaired'].includes(r.kind));assert.equal(n.year,r.year);
+  assert.match(n.title,/が建て直される（(もとの様式で|その時の様式で|もとの造りに、その時の様式を合わせて)(、(大スパンの木造|石造とアーチ|金属とガラス)で)?）$/);
+  assert.ok(n.title.startsWith(r.title.replace(/が(再利用|修繕)される$/,'')),n.title);
+ }
+ assert.equal(worldArchitectureChronicle(session),list,'cached, read-only');
+});
