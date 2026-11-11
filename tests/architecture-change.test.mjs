@@ -18,14 +18,16 @@ const spec=t=>({use:'house',...t.choices,roofFamily:t.shared.roofFamily,eaves:t.
 test('D3-b: 変化は25年の区切りで決まり、翌年から効き、前に建った建物の様式は変えない',async()=>{
  await ready;
  const a=world.architecture,changes=a.traditionChanges;
- assert.equal(a.schemaVersion,5,'D3-c');assert.equal(a.change,C.CHANGE_ID);
+ assert.equal(a.schemaVersion,6,'D4');assert.equal(a.change,C.CHANGE_ID);
  assert.ok(changes.length>0,'seed 11 changes within 1300 years');
  for(const c of changes){assert.equal(c.year%C.CHANGE_PERIOD,0);assert.equal(c.effectiveFrom,c.year+1);assert.notEqual(c.from,c.to);}
  const first=changes[0],site=first.site,initial=a.traditions.find(t=>t.siteId===site);
  const value=year=>{const s=spec(C.traditionAt(a.grammar,initial,changes,year))[first.axis];return Array.isArray(s)?[...s].sort().join('+'):String(s);};
  assert.equal(value(first.year),first.from);assert.equal(value(first.effectiveFrom),first.to);
  // the house built in the district reflects the tradition in force in its construction year
- const houses=a.births.filter(b=>b.ref.siteId===site&&b.status==='ok'&&b.use==='house'&&!b.adjustments.some(x=>x==='variation:'+first.axis));
+ // D4: a rebuild that reproduces the old style (or keeps structure, wall and foundation) keeps the previous values
+ const inherits=b=>b.rebuild&&(b.adjustments.includes('rebuild:old')||b.adjustments.includes('rebuild:mixed')&&['structure','wall','foundation'].includes(first.axis));
+ const houses=a.births.filter(b=>b.ref.siteId===site&&b.status==='ok'&&b.use==='house'&&!inherits(b)&&!b.adjustments.some(x=>x==='variation:'+first.axis));
  const before=houses.filter(b=>b.source.year<=first.year),after=houses.filter(b=>b.source.year>first.year&&b.source.year<(changes.find(c=>c!==first&&c.site===site&&c.axis===first.axis)?.effectiveFrom??Infinity));
  assert.ok(before.length&&after.length,'houses on both sides of the change');
  if(first.axis!=='ornaments'){

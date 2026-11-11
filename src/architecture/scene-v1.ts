@@ -19,26 +19,29 @@ const target=(c:CanvasRenderingContext2D):RectTarget=>({rect(x,y,w,h,col){c.fill
 const partSize={far:[5,4],middle:[9,7],near:[13,10]} as const;
 
 export function createArchitecturePainter(births:readonly BirthFeatures[]):GeneratedStructurePainter {
- const facilities=new Map<string,BirthFeatures>(),housing=new Map<string,BirthFeatures[]>();
+ // D4: a building may have several generations (rebuilds); the one shown is the latest built by the observed year
+ const facilities=new Map<string,BirthFeatures[]>(),housing=new Map<string,BirthFeatures[]>();
  for(const b of births){
-  if(b.ref.kind==='facility')facilities.set(b.ref.id,b);
-  else{const list=housing.get(b.ref.blockId)??[];list.push(b);housing.set(b.ref.blockId,list);}
+  const map=b.ref.kind==='facility'?facilities:housing,key=b.ref.kind==='facility'?b.ref.id:b.ref.blockId;
+  const list=map.get(key)??[];list.push(b);map.set(key,list);
  }
- const housingBirth=(blockId:string,index:number)=>housing.get(blockId)?.find(b=>b.ref.kind==='housing'&&b.ref.parts.from<=index&&index<b.ref.parts.to);
+ const latest=(list:readonly BirthFeatures[]|undefined,year:number,covers:(b:BirthFeatures)=>boolean=()=>true)=>{
+  let best:BirthFeatures|undefined;for(const b of list??[])if(b.source.year<=year&&covers(b)&&(!best||b.source.year>=best.source.year))best=b;return best;};
+ const housingBirth=(blockId:string,index:number,year:number)=>latest(housing.get(blockId),year,b=>b.ref.kind==='housing'&&b.ref.parts.from<=index&&index<b.ref.parts.to);
  return {
   residentialRoofs(c,scene,depth){
    const parts=scene.residentialBlocks.flatMap(b=>b.roofParts).filter(p=>p.depth===depth)
     .sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId));
    for(const p of parts){
-    const index=Number(p.partId.slice(p.partId.lastIndexOf(':')+1)),birth=Number.isSafeInteger(index)?housingBirth(p.blockId,index):undefined;
+    const index=Number(p.partId.slice(p.partId.lastIndexOf(':')+1)),birth=Number.isSafeInteger(index)?housingBirth(p.blockId,index,scene.year):undefined;
     if(!birth||p.condition==='ruined'){drawResidentialRoofs(c,{...scene,residentialBlocks:[{...scene.residentialBlocks[0]!,roofParts:[p]}]},depth);continue;}
     drawMiniature(target(c),{use:birth.use,...birth.features},p.x,p.y,depth);
     if(depth!=='far'&&p.condition==='damaged'){const [w,h]=partSize[depth];c.fillStyle='#4d504b';c.fillRect(Math.round(p.x-w/2),p.y-h+3,3,2);}
    }
   },
-  facility(c,o,plot){
+  facility(c,o,plot,year){
    if(o.kind==='field'||o.kind==='bridge'||o.condition==='ruined')return false;
-   const birth=facilities.get(o.id);if(!birth)return false;
+   const birth=latest(facilities.get(o.id),year);if(!birth)return false;
    const spec={use:birth.use,...birth.features};
    if(o.civic){
     if(o.civic.architectureStyle==='courtyard-hall')drawArchitecture(target(c),{...spec,use:'courtyard'},o.x,o.y,{width:plot.width,height:15});

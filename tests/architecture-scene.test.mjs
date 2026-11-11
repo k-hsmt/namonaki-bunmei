@@ -47,11 +47,11 @@ test('D2-c: 描き方の差し替えは、廃墟・field・記録のない建物
  const painter=createArchitecturePainter([birth({kind:'facility',siteId:'river-bank',id:'f1'},'house')]);
  const o=(id,kind,condition='intact')=>({id,kind,x:50,y:60,builtYear:5,condition});
  const plot={x:41,y:57,width:18,depth:7};
- assert.equal(painter.facility(ctx(),o('f1','house'),plot),true);
- assert.equal(painter.facility(ctx(),o('f1','house','ruined'),plot),false);
- assert.equal(painter.facility(ctx(),o('f2','house'),plot),false,'no birth recorded');
- assert.equal(painter.facility(ctx(),o('f1','field'),plot),false);
- const damaged=ctx();painter.facility(damaged,o('f1','house','damaged'),plot);
+ assert.equal(painter.facility(ctx(),o('f1','house'),plot,9999),true);
+ assert.equal(painter.facility(ctx(),o('f1','house','ruined'),plot,9999),false);
+ assert.equal(painter.facility(ctx(),o('f2','house'),plot,9999),false,'no birth recorded');
+ assert.equal(painter.facility(ctx(),o('f1','field'),plot,9999),false);
+ const damaged=ctx();painter.facility(damaged,o('f1','house','damaged'),plot,9999);
  assert.ok(damaged.calls.some(c=>c[1]==='#454e48'&&c[2]===44&&c[3]===58),'live damage mark kept');
 });
 
@@ -59,11 +59,11 @@ test('D2-c: 共同建築は敷地の幅で描き、住宅の部品は部品番�
  const civic={id:'civic-river-bank-40-great-hall',kind:'hall',x:60,y:80,builtYear:40,condition:'intact',civic:{architectureStyle:'great-hall',footprint:{x:38,y:63,width:44,depth:22},constructionRecordId:'40-1'}};
  const painter=createArchitecturePainter([birth({kind:'facility',siteId:'river-bank',id:civic.id,civic:{style:'great-hall',constructionRecordId:'40-1'}},'hall'),
   birth({kind:'housing',siteId:'river-bank',blockId:'b1',parts:{from:0,to:2}},'rowhouse',{...house,roofFamily:'R05',roofMaterial:'tile'})]);
- const c=ctx();assert.equal(painter.facility(c,civic,civic.civic.footprint),true);
+ const c=ctx();assert.equal(painter.facility(c,civic,civic.civic.footprint,9999),true);
  const xs=c.calls.filter(k=>k[0]==='fillRect').map(k=>[k[2],k[2]+k[4]]);
  assert.ok(Math.max(...xs.map(x=>x[1]))-Math.min(...xs.map(x=>x[0]))>=44);
  const part=(i,condition='sound')=>({partId:'b1:'+i,blockId:'b1',x:100+i*12,y:150,depth:'near',styleId:'terraced',variant:0,representedUnits:1,condition,use:'occupied'});
- const scene={residentialBlocks:[{blockId:'b1',roofParts:[part(0),part(1),part(2),part(0,'ruined')]}]};
+ const scene={year:9999,residentialBlocks:[{blockId:'b1',roofParts:[part(0),part(1),part(2),part(0,'ruined')]}]};
  const r=ctx();painter.residentialRoofs(r,scene,'near');
  assert.ok(r.calls.length>0);
  // part 2 has no birth and the ruined part keeps the live drawing: both use live colours
@@ -74,7 +74,7 @@ test('D2-c: 共同建築は敷地の幅で描き、住宅の部品は部品番�
 test('D2-c/D2-d: 本番の描画への差し替えは任意で、通常画面はv9のセッションを通してだけ使う',async()=>{
  const live=await readFile('src/scene/draw-generated-review.ts','utf8');
  assert.match(live,/\(painter\?\.residentialRoofs\?\?drawResidentialRoofs\)\(c,scene,depth\)/);
- assert.match(live,/if\(painter\?\.facility\?\.\(c,o,f\)\)return;/);
+ assert.match(live,/if\(painter\?\.facility\?\.\(c,o,f,s\.year\)\)return;/);
  for(const f of ['src/main.ts','index.html'])assert.ok(!(await readFile(f,'utf8')).includes('architecture/'),f);
  // the session passes the recorded painter only for v9 sessions (D2-d)
  assert.match(await readFile('src/story/world-session.ts','utf8'),/architecture\(session\)\?painterOf\(session\.architecture\):undefined/);

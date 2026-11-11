@@ -48,7 +48,7 @@ export type GeneratedSceneLayer='backdrop'|'structures';
  */
 export interface GeneratedStructurePainter {
  readonly residentialRoofs?:(c:CanvasRenderingContext2D,scene:GeneratedSceneObservation['composition'],depth:'far'|'middle'|'near')=>void;
- readonly facility?:(c:CanvasRenderingContext2D,o:GeneratedSceneObservation['snapshot']['objects'][number],plot:GroundPlot)=>boolean;
+ readonly facility?:(c:CanvasRenderingContext2D,o:GeneratedSceneObservation['snapshot']['objects'][number],plot:GroundPlot,year:number)=>boolean;
 }
 export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:GeneratedSceneObservation,layer?:GeneratedSceneLayer,paint?:ScenePaintProjection,painter?:GeneratedStructurePainter):void {
  if(layer!==undefined&&layer!=='backdrop'&&layer!=='structures')throw Error('Unknown scene layer');
@@ -83,7 +83,7 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
  if(layer!=='backdrop')for(const o of [...s.objects.filter(o=>o.civic),...s.objects.filter(o=>!o.civic&&o.kind!=='bridge')]){
   const f=ground.facilities.find(p=>p.id===o.id)!.plot;
   withinFootprint(c,f,()=>{
-   if(painter?.facility?.(c,o,f))return;
+   if(painter?.facility?.(c,o,f,s.year))return;
    if(o.civic){drawCivicArchitecture(c,o);return;}
    if(o.kind==='field'){
     if(vegetation&&o.condition==='ruined')return;

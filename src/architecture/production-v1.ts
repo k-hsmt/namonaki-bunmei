@@ -31,17 +31,19 @@ import {architecturePolicy,createWorldGrammar,createRegionalTradition,deriveBirt
  type ArchitectureSite,type WorldArchitecturalGrammar,type RegionalArchitecturalTradition,type BirthStyle,type BuildingRef,type BirthSource} from './grammar-v1.js';
 import {ENVELOPE_ID,facilityAirspace,housingAirspace,airspaceConflict,minimalForm,withExcess,type AirspaceRect} from './airspace-v1.js';
 import type {ResidentialBlock} from '../story/housing-history.js';
-export type RecordedBirth=BirthStyle<AirspaceRect>;
+/** `rebuild` (D4): the generation (2 = first rebuild), the chosen way, and the v8 ruin it recovered from. */
+export type RecordedBirth=BirthStyle<AirspaceRect>&{readonly rebuild?:{readonly generation:number;readonly mode:RebuildMode;readonly changedAxes:number;readonly ruinRecordId:string}};
 import {appendInteraction,emptyInteraction,verifyInteraction,interactionHash,type InteractionLedger} from './interaction-v1.js';
 import type {InteractionCaptureInternal} from '../story/economy-observer.js';
 import {TECHNOLOGY_ID,capabilityEventsFor,technologiesAt,type CapabilityEvent} from './technology-v1.js';
 import {CHANGE_ID,CHANGE_PERIOD,traditionChangesFor,traditionAt,type TraditionChange,type WindowFacts} from './change-v1.js';
 import type {Use} from './vocab-v1.js';
+import {REBUILD_ID,chooseRebuildMode,type RebuildMode} from './rebuild-v1.js';
 
 export const ARCHITECTURE_WORLD_FORMAT='architecture-production-world-v1';
 const sites:readonly ArchitectureSite[]=['river-bank','hill-side','coast-inlet'];
 export interface ArchitectureLedger {
- readonly format:'architecture-ledger-v1';readonly schemaVersion:5;readonly policy:typeof architecturePolicy;
+ readonly format:'architecture-ledger-v1';readonly schemaVersion:6;readonly policy:typeof architecturePolicy;
  /** D2-b2: births carry their air-space envelope (schema 2; schema 1 of D2-b1 was never released). */
  readonly envelope:typeof ENVELOPE_ID;
  readonly grammar:WorldArchitecturalGrammar;readonly traditions:readonly RegionalArchitecturalTradition[];
@@ -52,6 +54,8 @@ export interface ArchitectureLedger {
  readonly change:typeof CHANGE_ID;readonly traditionChanges:readonly TraditionChange[];
  /** D3-c (schema 5): district capabilities (architecture-technology-v1). Recomputed on load. */
  readonly technology:typeof TECHNOLOGY_ID;readonly capabilityEvents:readonly CapabilityEvent[];
+ /** D4 (schema 6): rebuilds at v8's recovery of ruins are births with source kind 'rebuilt' (architecture-rebuild-v1). */
+ readonly rebuild:typeof REBUILD_ID;
 }
 export interface ArchitectureProductionWorld {
  readonly format:typeof ARCHITECTURE_WORLD_FORMAT;readonly status:'production';
@@ -74,7 +78,9 @@ export function knownArchitectureWorld(world:ArchitectureProductionWorld):void {
 const facilityUse:Readonly<Record<string,Use>>={house:'house',hall:'hall',granary:'granary',workshop:'workshop',market:'market',civic:'hall'};
 const housingUse:Readonly<Record<string,Use>>={low:'house',terraced:'rowhouse',courtyard:'courtyard'};
 type Plot={readonly x:number;readonly y:number;readonly width:number;readonly depth:number};
-export interface Construction {readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly plot:Plot;readonly block?:ResidentialBlock}
+export interface Construction {readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly plot:Plot;readonly block?:ResidentialBlock;
+ /** D4: for a rebuild, the v8 record of the fall into ruin. */
+ readonly ruinRecordId?:string}
 /**
  * Lists every construction in the recorded history, in the fixed processing order of design §5.3:
  * year → site → facility before housing → id → seq. Inconsistent records fail closed.
@@ -103,9 +109,32 @@ export function listConstructions(world:TerrainProductionWorld):Construction[] {
   }
   out.push({ref:{kind:'facility',siteId:p.site as ArchitectureSite,id:p.objectId,...(civic?{civic}:{})},source:{kind:'built',year:p.builtYear,recordId:p.sourceRecordId},use,plot:p.plot});
  }
+ // D4: a facility reused after ruin is rebuilt (v8 reuses only ruined facilities, ruined only by abandonment)
+ const built=new Map(out.map(c=>[c.ref.kind==='facility'?c.ref.id:'',c]));
+ const history=state.history??[],records=new Map(history.map(h=>[h.id,h]));
+ for(const h of history){
+  if(h.kind!=='building-reused')continue;
+  // fields and bridges are reused too; only buildings with a recorded birth style are rebuilt
+  const kind=observed.flatMap(l=>l.buildingChanges).find(c=>c.building.id===h.buildingId)?.building.kind;
+  if(kind==='field'||kind==='bridge')continue;
+  const original=built.get(h.buildingId??'')??fail('reused facility without a recorded construction '+h.buildingId);
+  const ruin=records.get(h.relatedIds?.[0]??'');
+  if(!ruin||ruin.kind!=='building-abandoned'||ruin.buildingId!==h.buildingId||ruin.year>=h.year)fail('reused facility '+h.buildingId+' without its abandonment record');
+  if(h.year<=original.source.year)fail('facility '+h.buildingId+' reused before it was built');
+  out.push({...original,source:{kind:'rebuilt',year:h.year,recordId:h.id},ruinRecordId:ruin!.id});
+ }
  // Keyed by site and block so the check does not depend on block ids being unique across sites.
- const counts=new Map<string,number>();
+ const counts=new Map<string,number>(),conditions=new Map<string,string>();
  for(const e of state.housing?.events??[]){
+  const blockKey0=e.after.siteId+'\u0000'+e.blockId,wasRuined=conditions.get(blockKey0)==='ruined';conditions.set(blockKey0,e.after.condition);
+  // D4: a housing block repaired after ruin is rebuilt as a whole
+  if(e.kind==='repaired'&&wasRuined){
+   const ruin=[...history].reverse().find(h=>h.kind==='housing-ruined'&&h.buildingId===e.blockId&&h.year<e.year)??fail('rebuilt block '+e.blockId+' without its ruin record');
+   const use=housingUse[e.after.styleId]??fail('unknown housing style '+e.after.styleId);
+   if(!e.causeRecordId)fail('housing repair without its record '+e.blockId);
+   out.push({ref:{kind:'housing',siteId:e.after.siteId,blockId:e.blockId,parts:{from:0,to:e.after.housingCount}},source:{kind:'rebuilt',year:e.year,seq:e.seq,recordId:e.causeRecordId!},use,plot:e.after.footprint,block:e.after,ruinRecordId:ruin.id});
+   continue;
+  }
   if(e.kind!=='built'&&e.kind!=='expanded'){continue;}
   if(e.after.blockId!==e.blockId)fail('housing event block mismatch '+e.blockId);
   const blockKey=e.after.siteId+'\u0000'+e.blockId,before=counts.get(blockKey)??0,after=e.after.housingCount;
@@ -124,7 +153,7 @@ function grammarAndTraditions(world:TerrainProductionWorld){
  const traditions=sites.map(site=>createRegionalTradition(grammar,site,measureSiteAdaptation(readOwnedRecordPhysics(initial.sites[site].physics),vegetation.initial[site])));
  return {grammar,traditions};
 }
-function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction,earlier:readonly AirspaceRect[],changes:readonly TraditionChange[],capabilities:readonly CapabilityEvent[]):RecordedBirth {
+function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],c:Construction,earlier:readonly AirspaceRect[],changes:readonly TraditionChange[],capabilities:readonly CapabilityEvent[],inherit?:{features:RecordedBirth['features'];mode:RebuildMode}):RecordedBirth {
  // D3-b: the tradition in force in the construction year, not the year-0 tradition.
  const initial=traditions[sites.indexOf(c.ref.siteId)]!,now=traditionAt(grammar,initial,changes,c.source.year);
  const tradition:RegionalArchitecturalTradition={...initial,choices:now.choices,shared:now.shared as WorldArchitecturalGrammar['shared']};
@@ -135,18 +164,38 @@ function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,
  const rectOf=(spec:Parameters<typeof facilityAirspace>[0])=>c.ref.kind==='housing'?housingAirspace(spec,c.block??fail('housing construction without its block')):facilityAirspace(spec,c.plot,civic);
  // Human decision A on D2-b2: only the excess over the minimal form is tested.
  const measure=(spec:Parameters<typeof facilityAirspace>[0])=>withExcess(rectOf(spec),rectOf(minimalForm(spec)));
- const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot),technologies:technologiesAt(capabilities,c.ref.siteId,c.source.year)},
+ const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot),technologies:technologiesAt(capabilities,c.ref.siteId,c.source.year),...(inherit?{inherit}:{})},
   e=>airspaceConflict(e,{earlier,decks,raster,plot:c.plot})===null,measure);
  if(r.status!=='ok')return fail('birth HOLD ('+r.reason+') for '+JSON.stringify(c.ref)+': '+r.detail);
  return r;
 }
 /** Births in construction order. Each is checked against the envelopes of earlier years in its site. */
+const AXES=['structure','wall','foundation','roofMaterial','window','entrance','palette','roofFamily','eaves','pitch','ornaments'] as const;
+const flat=(t:ReturnType<typeof traditionAt>)=>AXES.map(k=>k in t.choices?String(t.choices[k as keyof typeof t.choices]):k==='ornaments'?[...t.shared.ornaments].sort().join('+'):String(t.shared[k as 'roofFamily'|'eaves'|'pitch']));
+/**
+ * Births in construction order. Each is checked against the envelopes of earlier years in its site that
+ * are still standing: a rebuild (D4) ends its building's earlier generations, which then stop counting.
+ */
 function birthsFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,traditions:readonly RegionalArchitecturalTradition[],changes:readonly TraditionChange[],capabilities:readonly CapabilityEvent[]):RecordedBirth[] {
- const out:RecordedBirth[]=[],bySite=new Map<string,{year:number;rect:AirspaceRect}[]>();
+ const out:RecordedBirth[]=[],bySite=new Map<string,{key:string;year:number;rect:AirspaceRect;alive:boolean}[]>();
+ const base=new Map<string,RecordedBirth>(),generations=new Map<string,number>();
  for(const c of listConstructions(world)){
-  const site=bySite.get(c.ref.siteId)??[];
-  const b=birthOf(world,grammar,traditions,c,site.filter(x=>x.year<c.source.year).map(x=>x.rect),changes,capabilities);
-  site.push({year:c.source.year,rect:b.envelope});bySite.set(c.ref.siteId,site);out.push(b);
+  const site=bySite.get(c.ref.siteId)??[],key=c.ref.kind==='facility'?'F:'+c.ref.id:'H:'+c.ref.blockId;
+  let inherit:{features:RecordedBirth['features'];mode:RebuildMode}|undefined,meta:RecordedBirth['rebuild'];
+  if(c.source.kind==='rebuilt'){
+   const prev=base.get(key)??fail('rebuild without a previous generation '+key);
+   const initial=traditions[sites.indexOf(c.ref.siteId)]!,before=flat(traditionAt(grammar,initial,changes,prev.source.year)),now=flat(traditionAt(grammar,initial,changes,c.source.year));
+   const changedAxes=before.filter((v,i)=>v!==now[i]).length,generation=(generations.get(key)??1)+1;
+   const mode=chooseRebuildMode(world.review.state.seed,key,c.source.year,changedAxes);
+   inherit={features:prev.features,mode};meta={generation,mode,changedAxes,ruinRecordId:c.ruinRecordId??fail('rebuild without its ruin record')};
+   generations.set(key,generation);
+  }
+  const earlier=site.filter(x=>x.alive&&x.year<c.source.year&&!(inherit&&x.key===key)).map(x=>x.rect);
+  const born=birthOf(world,grammar,traditions,c,earlier,changes,capabilities,inherit),b:RecordedBirth=meta?{...born,rebuild:meta}:born;
+  if(inherit)for(const x of site)if(x.key===key)x.alive=false;
+  site.push({key,year:c.source.year,rect:b.envelope,alive:true});bySite.set(c.ref.siteId,site);out.push(b);
+  // the generation a later rebuild inherits from: a facility's latest birth, a block's birth of part 0
+  if(c.ref.kind==='facility'||c.ref.parts.from===0)base.set(key,b);
  }
  return out;
 }
@@ -159,9 +208,10 @@ function factsOf(world:TerrainProductionWorld):(site:ArchitectureSite,year:numbe
  for(const p of r.placements)siteOf.set(p.objectId,p.site as ArchitectureSite);
  for(const e of r.state.housing?.events??[])siteOf.set(e.blockId,e.after.siteId);
  const events:{site:ArchitectureSite;year:number;id:string;kind:'work'|'disaster'}[]=[];
- for(const c of listConstructions(world))events.push({site:c.ref.siteId,year:c.source.year,id:c.source.recordId??'',kind:'work'});
+ for(const c of listConstructions(world))if(c.source.kind!=='rebuilt')events.push({site:c.ref.siteId,year:c.source.year,id:c.source.recordId??'',kind:'work'});
+ // repairs and (D4) reuse of ruined facilities, i.e. rebuilds, are building work too
  for(const h of r.state.history){
-  if((h.kind==='building-repaired'||h.kind==='housing-repaired')&&h.buildingId){const site=siteOf.get(h.buildingId);if(site)events.push({site,year:h.year,id:h.id,kind:'work'});}
+  if((h.kind==='building-repaired'||h.kind==='housing-repaired'||h.kind==='building-reused')&&h.buildingId){const site=siteOf.get(h.buildingId);if(site)events.push({site,year:h.year,id:h.id,kind:'work'});}
   else if(h.kind&&hazardSites[h.kind])for(const site of hazardSites[h.kind]!)events.push({site,year:h.year,id:h.id,kind:'disaster'});
  }
  return (site,year)=>{
@@ -175,7 +225,7 @@ function changesFor(world:TerrainProductionWorld,grammar:WorldArchitecturalGramm
  const seed=world.review.state.seed,confirmedThrough=interaction.confirmedThrough,facts=factsOf(world);
  const traditionChanges=traditionChangesFor({seed,confirmedThrough,grammar,initial:traditions,interaction,facts});
  // town condition: a market and a workshop built in the district (design §3.3 scale; see technology-v1)
- const built=listConstructions(world).filter(c=>c.ref.kind==='facility');
+ const built=listConstructions(world).filter(c=>c.ref.kind==='facility'&&c.source.kind==='built');
  const first=(site:ArchitectureSite,use:Use)=>built.find(c=>c.ref.siteId===site&&c.use===use)?.source.year??Infinity;
  const townFrom=new Map(sites.map(site=>[site,Math.max(first(site,'market'),first(site,'workshop'))]));
  const capabilityEvents=capabilityEventsFor({seed,confirmedThrough,grammar,initial:traditions,changes:traditionChanges,interaction,facts,town:(site,year)=>townFrom.get(site)!<=year});
@@ -189,8 +239,8 @@ export function expectedArchitectureLedger(world:TerrainProductionWorld,interact
  knownTerrainProductionWorldInternal(world);
  const {grammar,traditions}=grammarAndTraditions(world);
  const {traditionChanges,capabilityEvents}=changesFor(world,grammar,traditions,interaction);
- return {format:'architecture-ledger-v1',schemaVersion:5,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
-  births:birthsFor(world,grammar,traditions,traditionChanges,capabilityEvents),interaction,change:CHANGE_ID,traditionChanges,technology:TECHNOLOGY_ID,capabilityEvents};
+ return {format:'architecture-ledger-v1',schemaVersion:6,policy:architecturePolicy,envelope:ENVELOPE_ID,grammar,traditions,
+  births:birthsFor(world,grammar,traditions,traditionChanges,capabilityEvents),interaction,change:CHANGE_ID,traditionChanges,technology:TECHNOLOGY_ID,capabilityEvents,rebuild:REBUILD_ID};
 }
 const sameLedger=(a:ArchitectureLedger,b:ArchitectureLedger)=>JSON.stringify(a)===JSON.stringify(b);
 
