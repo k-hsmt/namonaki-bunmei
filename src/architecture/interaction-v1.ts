@@ -72,7 +72,14 @@ export function appendInteraction(l:InteractionLedger,captures:readonly Interact
 /** Checks the recorded interaction against what the v8 world still keeps. Throws on any difference. */
 export function verifyInteraction(l:InteractionLedger,world:TerrainProductionWorld,introducedYear:number):void {
  if(l.format!==INTERACTION_ID)fail('unknown format');
- const state=world.review.state,economy=state.economy??fail('missing economy');
+ const state=world.review.state;
+ // A world that has not run its first year has no economy yet (v8 creates it in year 1): only an empty
+ // record at the introduction year is consistent with that.
+ if(!state.economy){
+  if(state.year===introducedYear&&l.confirmedThrough===introducedYear&&!l.migrations.length&&!l.trade.length&&!l.routeStates.length&&!l.routeRecords.length)return;
+  fail('missing economy');
+ }
+ const economy=state.economy!;
  // While a choice is pending, v8 has entered the year but not yet run its economy: the economy (and so
  // the interaction record) is confirmed through the previous year.
  if(l.confirmedThrough!==state.year&&!(state.pending&&l.confirmedThrough===state.year-1))fail('recorded through '+l.confirmedThrough+' but the world is at '+state.year+(state.pending?' (pending)':''));

@@ -3,7 +3,7 @@ import {environmentAppearance} from '../environment/presentation-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {planWaterTracks,waterStrokeAt} from './water-motion.js';
 import type {GeneratedSceneObservation} from './generated-scene-review.js';
-import {drawGeneratedSceneReview,drawSceneTree,projectScenePaint} from './draw-generated-review.js';
+import {drawGeneratedSceneReview,drawSceneTree,projectScenePaint,type GeneratedStructurePainter} from './draw-generated-review.js';
 import {presentationPeopleCount} from './generated-presentation-review.js';
 import {planSceneMotion,journeyAt,sceneActivityCount} from './motion-plan.js';
 /** Equivalent paint/activities within one immutable terrain; ages remain in history. */
@@ -13,8 +13,9 @@ export function sceneMotionVisualKey(o:GeneratedSceneObservation):string {
   g.vegetation?.map(p=>[p.index,p.stage,p.stage===0&&p.disturbedYear!==null&&s.year-p.disturbedYear<15]),
   Math.floor(s.year/20),sceneActivityCount(c.population,c.scale),presentationPeopleCount(c.population,s.scars.includes('epidemic'))]);
 }
-export function prepareSceneMotion(o:GeneratedSceneObservation){
- const paint=projectScenePaint(o),backdrop=document.createElement('canvas'),structures=document.createElement('canvas');drawGeneratedSceneReview(backdrop,o,'backdrop',paint);drawGeneratedSceneReview(structures,o,'structures',paint);
+/** `painter` (v9) draws the recorded birth styles; omitted, buildings are drawn as before. */
+export function prepareSceneMotion(o:GeneratedSceneObservation,painter?:GeneratedStructurePainter){
+ const paint=projectScenePaint(o),backdrop=document.createElement('canvas'),structures=document.createElement('canvas');drawGeneratedSceneReview(backdrop,o,'backdrop',paint,painter);drawGeneratedSceneReview(structures,o,'structures',paint,painter);
  const plan=planSceneMotion(o,paint),pixels=backdrop.getContext('2d')!.getImageData(0,0,320,180).data;
  // Piers/decks are already in this layer: a shimmer can only replace blue water.
  const ripples=plan.ripples.filter(p=>{const x=plan.mirror?319-p.point[0]:p.point[0],i=(p.point[1]*320+x)*4;return pixels[i+2]!>pixels[i]!;});
