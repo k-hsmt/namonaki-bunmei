@@ -6,6 +6,7 @@ import * as P from '../dist/architecture/production-v1.js';
 import * as C from '../dist/architecture/change-v1.js';
 import * as I from '../dist/architecture/interaction-v1.js';
 import {d2Inconsistencies} from '../dist/architecture/vocab-v1.js';
+import {wallFits} from '../dist/architecture/grammar-v1.js';
 
 const SEED=11,YEARS=1300;
 let world;
@@ -58,6 +59,7 @@ test('D3-b: 伝わる変化は実際の交流のあった相手からだけ。�
   for(const c of mine){
    const prev=C.traditionAt(a.grammar,t,all,c.year),now=C.traditionAt(a.grammar,t,all,c.effectiveFrom);
    assert.deepEqual(d2Inconsistencies(spec(now)),[]);
+   assert.ok(wallFits(now.choices.structure,now.choices.wall),'structure-wall pairing of the D2 grammar: '+now.choices.structure+'/'+now.choices.wall);
    const diff=Object.keys(spec(now)).filter(k=>JSON.stringify(spec(now)[k])!==JSON.stringify(spec(prev)[k]));
    const sameYear=mine.filter(x=>x.year===c.year).length;
    assert.equal(sameYear,1,'one change per district per boundary');assert.deepEqual(diff,[c.axis]);

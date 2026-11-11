@@ -40,6 +40,8 @@ export const regionalCandidates={
 const wallsFor:Readonly<Record<Exclude<Structure,'X1'|'X2'|'X3'>,readonly WallMaterial[]>>={
  S01:['wattle','plank','log'],S02:['plank','log'],S03:['earth','rammed','wattle'],S04:['rubble'],S05:['ashlar'],S06:['mixed'],S07:['plank','log','wattle'],
 };
+/** Whether a wall belongs to a vernacular structure in the D2 grammar (used by D3-b changes too). */
+export const wallFits=(structure:Structure,wall:WallMaterial)=>(wallsFor[structure as keyof typeof wallsFor]??[]).includes(wall);
 type RegionalAxis=keyof typeof regionalCandidates|'wall';
 const allWalls:readonly WallMaterial[]=['log','plank','wattle','earth','rammed','rubble','ashlar','mixed'];
 const ornamentIds:readonly Ornament[]=['O1','O2','O3','O4','O5','O6','O7','O8'];

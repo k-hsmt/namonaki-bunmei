@@ -11,7 +11,7 @@
  */
 import {terrainHash} from '../terrain/terrain-hash-v1.js';
 import {d2Inconsistencies,roofFamilies,eavesKinds,pitches,type PartialSpec,type Ornament} from './vocab-v1.js';
-import {regionalCandidates,type ArchitectureSite,type RegionalArchitecturalTradition,type WorldArchitecturalGrammar} from './grammar-v1.js';
+import {regionalCandidates,wallFits,type ArchitectureSite,type RegionalArchitecturalTradition,type WorldArchitecturalGrammar} from './grammar-v1.js';
 import {routeEnds,type InteractionLedger} from './interaction-v1.js';
 
 export const CHANGE_ID='architecture-change-v1';
@@ -75,8 +75,12 @@ export function traditionAt(g:WorldArchitecturalGrammar,initial:RegionalArchitec
 }
 const asSpec=(t:EffectiveTradition):PartialSpec&{use:'house'}=>({use:'house',...t.choices,roofFamily:t.shared.roofFamily as PartialSpec['roofFamily'],
  eaves:t.shared.eaves as PartialSpec['eaves'],pitch:t.shared.pitch as PartialSpec['pitch'],ornaments:[...t.shared.ornaments] as Ornament[]});
-/** A change is allowed only if the whole tradition still satisfies the D2 constraints afterwards. */
-const valid=(t:EffectiveTradition)=>d2Inconsistencies(asSpec(t)).length===0;
+/**
+ * A change is allowed only if the whole tradition still satisfies the D2 constraints afterwards,
+ * including the grammar's structure-wall pairing (D3-d audit: without it, e.g. a timber frame S01 took
+ * a rubble wall by transmission).
+ */
+const valid=(t:EffectiveTradition)=>d2Inconsistencies(asSpec(t)).length===0&&wallFits(t.choices.structure,t.choices.wall);
 
 /** Candidate values an invention may move an axis to (neighbouring values, never advanced technology). */
 function inventionCandidates(axis:ChangeAxis,t:EffectiveTradition,g:WorldArchitecturalGrammar):string[] {
