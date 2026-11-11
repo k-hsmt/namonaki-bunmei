@@ -7,7 +7,8 @@ const places = [
   { name: '入り江', land: 38000, yield: 1.15 },
 ] as const;
 
-const links = regions.flatMap((region, from) => region.neighbors.flatMap(id => {
+/** Exported for Issue #35 D3-a (architecture reads which districts a route joins). */
+export const links = regions.flatMap((region, from) => region.neighbors.flatMap(id => {
   const to = regions.findIndex(candidate => candidate.id === id);
   return from < to ? [{ from, to }] : [];
 }));

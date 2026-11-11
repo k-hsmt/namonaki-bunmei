@@ -32,6 +32,8 @@ export interface CoupledKernelHooks {
  readonly introducedYear:number;readonly policy:EconomyPolicy;readonly prepared:PreparedCoupledEffect|null;
  readonly capture:(capture:CoupledReceiptCaptureInternal,prepared:PreparedCoupledEffect)=>void;
  readonly checkpoint?:(year:number,review:GeneratedBridgeReview['review'],phaseCount:number)=>void;
+ /** Issue #35 D3-a: production terrain only. Read-only interaction tap; nothing is recorded by v8. */
+ readonly observeInteraction?:import('../story/economy-observer.js').InteractionObserverInternal;
 }
 
 function annualKernelSessionInternal(input:GeneratedBridgeReview,options:GeneratedAdvanceOptions={},trial?:CoupledKernelHooks){
@@ -42,7 +44,8 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
  validateGeneratedBridgeLedger(input.review);validateGeneratedPublicSpaceLedger(input.review,lastObservedYear(input.review.state));
  let prepare:()=>CoupledAnnualModifier=()=>{throw Error('Annual prefix not initialized');},prepared=trial?.prepared??null;
  const capture=(c:CoupledReceiptCaptureInternal)=>{if(!trial||!prepared)throw Error('Missing prepared economy effect');trial.capture(c,prepared);};
- const batch=terrainMode?(trial!.mode==='terrain-production'?createTerrainProductionFacilityBatch:createTerrainChangeFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture,terrainHooks!.at):trial?(trial.mode==='production'?createEconomicProductionFacilityBatch:createCoupledFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture):createGeneratedFacilityBatch(input.review,generatedPublicSpaceExtension,options.observeEconomy);
+ if(trial?.observeInteraction!==undefined&&(trial.mode!=='terrain-production'||typeof trial.observeInteraction!=='function'))throw Error('Interaction observation is production-terrain only');
+ const batch=terrainMode?(trial!.mode==='terrain-production'?createTerrainProductionFacilityBatch(input.review,generatedPublicSpaceExtension,()=>prepare(),capture,terrainHooks!.at,trial!.observeInteraction):createTerrainChangeFacilityBatch(input.review,generatedPublicSpaceExtension,()=>prepare(),capture,terrainHooks!.at)):trial?(trial.mode==='production'?createEconomicProductionFacilityBatch:createCoupledFacilityBatch)(input.review,generatedPublicSpaceExtension,()=>prepare(),capture):createGeneratedFacilityBatch(input.review,generatedPublicSpaceExtension,options.observeEconomy);
  const world={...input,review:{...batch.review,plans:input.review.plans,bridgeReview:{...batch.review.bridgeReview!,hydrology:input.review.bridgeReview!.hydrology}}};
  if(terrainHooks)bindTerrainReviewInternal(world.review,terrainHooks.at);
  const e=input.environment!,i=input.irrigation!,v=input.vegetation as CoupledVegetation;

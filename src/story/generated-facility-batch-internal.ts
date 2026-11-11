@@ -3,7 +3,7 @@ import {runGeneratedLandBatch,type LandPhaseObserver} from './generated-land-bat
 import {assertProductionBoundary,coupledTrialBoundary,economicProductionBoundary,terrainChangeTrialBoundary,terrainProductionBoundary} from './trial-boundary.js';
 import type {CoupledAnnualModifier} from './coupled-economy-policy-internal.js';
 import {coupledChoiceBinding} from './coupled-choice-binding-internal.js';
-import type {CoupledReceiptObserverInternal,EconomyObserver} from './economy-observer.js';
+import type {CoupledReceiptObserverInternal,EconomyObserver,InteractionObserverInternal} from './economy-observer.js';
 /** D3-A independent ordinary-facility progression. Not a v5 save or live UI mode. */
 import {createHousingCivilization} from './housing-persistence.js';
 import {choose,chooseAutomatically,lastObservedYear,type CivilizationState,type ReviewLandProgression} from './engine.js';
@@ -151,7 +151,7 @@ export function chooseAutomaticallyGeneratedFacilityReview(input:GeneratedFacili
 }
 
 /** Production terrain owns a separate land boundary, sharing only the private batch mechanics. */
-export function createTerrainProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal,terrainAt:TerrainReviewProvider){
+export function createTerrainProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal,terrainAt:TerrainReviewProvider,observeInteraction?:InteractionObserverInternal){
  const review=mutableCopy(input,'terrain-production');bindTerrainReviewInternal(review,terrainAt);const base=policyFor(review,extension);
- return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'terrain-production-v1',coupledEconomy:prepare},prepare);
+ return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'terrain-production-v1',coupledEconomy:prepare,...(observeInteraction?{observeInteractionInternal:observeInteraction}:{})},prepare);
 }
