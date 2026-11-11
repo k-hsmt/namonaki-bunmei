@@ -1,6 +1,6 @@
 /**
  * Issue #35 D2-a: world grammar, regional traditions and birth-time styles
- * (architecture-policy-v1 / architecture-use-rules-v1 / architecture-envelope-v1).
+ * (architecture-policy-v1 / architecture-use-rules-v1 / architecture-envelope-v2).
  * Pure and deterministic. Uses its own hash stream (terrainHash with architecture namespaces) and
  * never the civilization RNG, so adding architecture cannot change social, economic or terrain history.
  * Not yet connected to the annual batch, saves or the live renderer (D2-b / D2-c).
@@ -14,7 +14,7 @@ import {sitePercentiles,type SiteAdaptationInputs,type PlotAdaptationInputs} fro
 import {ADAPTATION_REFERENCE_ID} from './adaptation-reference-v1.js';
 
 export const architecturePolicy=Object.freeze({id:'architecture-policy-v1',vocab:ARCHITECTURE_VOCAB_ID,constraints:ARCHITECTURE_CONSTRAINTS_ID,
- useRules:'architecture-use-rules-v1',envelope:'architecture-envelope-v1',adaptation:'architecture-adaptation-v1',adaptationReference:ADAPTATION_REFERENCE_ID,introducedYear:0} as const);
+ useRules:'architecture-use-rules-v1',envelope:'architecture-envelope-v2',adaptation:'architecture-adaptation-v1',adaptationReference:ADAPTATION_REFERENCE_ID,introducedYear:0} as const);
 export type ArchitectureSite='river-bank'|'hill-side'|'coast-inlet';
 
 const H=(...parts:(string|number)[])=>terrainHash(parts);
@@ -157,9 +157,9 @@ export type BuildingRef=
  |{readonly kind:'housing';readonly siteId:ArchitectureSite;readonly blockId:string;readonly parts:{readonly from:number;readonly to:number}};
 export interface BirthSource {readonly kind:'built'|'expanded';readonly year:number;readonly seq?:number;readonly recordId?:string}
 export interface Substitution {readonly axis:string;readonly from:string|number;readonly to:string|number;readonly reason:'constraint'|'envelope'}
-export interface BirthStyle {
+export interface BirthStyle<E=ArchitectureEnvelope> {
  readonly status:'ok';readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly traditionSite:ArchitectureSite;
- readonly features:Omit<ArchitectureSpec,'use'|'faded'>;readonly envelope:ArchitectureEnvelope;
+ readonly features:Omit<ArchitectureSpec,'use'|'faded'>;readonly envelope:E;
  readonly adjustments:readonly string[];readonly substitutions:readonly Substitution[];readonly envelopeStage:1|2|3|4|5;
 }
 export interface BirthHold {readonly status:'hold';readonly ref:BuildingRef;readonly source:BirthSource;readonly reason:'envelope'|'constraint';readonly detail:string}
@@ -258,24 +258,32 @@ export function deriveBirthFeatures(input:BirthInput):BirthFeatures|BirthHold {
  const composed=composeBirth(input);if('status' in composed)return composed;
  return {status:'ok',ref:input.ref,source:input.source,use:input.use,traditionSite:input.tradition.siteId,features:featuresOf(composed.spec),adjustments:composed.adjustments,substitutions:composed.subs};
 }
-/** Full birth with the air-space fallback chain (D2-b2). `fits` is required. */
-export function deriveBirthStyle(input:BirthInput,fits:(e:ArchitectureEnvelope)=>boolean):BirthStyle|BirthHold {
+const lowerRoof:Readonly<Record<RoofFamily,RoofFamily>>={R01:'R03',R02:'R03',R08:'R03',R03:'R05',R04:'R05',R06:'R05',R05:'R05'};
+/**
+ * Full birth with the air-space fallback chain (D2-b2). `fits` is required. `measure` turns a candidate
+ * spec into its envelope; the default is the relative D1 bounds, production passes the absolute
+ * air-space geometry of airspace-v1.
+ */
+export function deriveBirthStyle<E=ArchitectureEnvelope>(input:BirthInput,fits:(e:E)=>boolean,measure:(spec:PartialSpec&{use:Use})=>E=measureArchitecture as unknown as (spec:PartialSpec&{use:Use})=>E):BirthStyle<E>|BirthHold {
  if(typeof fits!=='function')throw Error('architecture: the envelope fit test is required');
  const composed=composeBirth(input);if('status' in composed)return composed;
  const {ref,source,use,tradition}=input,{spec:s,adjustments,subs}=composed;
- // envelope fallback chain (architecture-envelope-v1, D2 §6.2). Stage 5 may still fail: fail closed.
+ // envelope fallback chain (architecture-envelope-v2, D2 §6.2). Stage 5 may still fail: fail closed.
  const stages:((x:PartialSpec&{use:Use})=>void)[]=[
   ()=>{},
   x=>{if(x.eaves==='deep'){subs.push({axis:'eaves',from:'deep',to:'normal',reason:'envelope'});x.eaves='normal';}},
   x=>{const i=pitches.indexOf(x.pitch!);if(i>0){subs.push({axis:'pitch',from:x.pitch!,to:pitches[i-1]!,reason:'envelope'});x.pitch=pitches[i-1];}},
-  x=>{const to:RoofFamily=x.roofFamily==='R04'?'R05':'R04';subs.push({axis:'roofFamily',from:x.roofFamily!,to,reason:'envelope'});x.roofFamily=to;},
+  // Stage 4 (Human decision on D2-c', architecture-envelope-v2): the nearest LOWER roof of the same
+  // character. Peaked roofs (gable, steep gable, composite) become a hip roof, which keeps a peaked
+  // outline but rises less; stepped, hip and shed roofs become flat. Flat stays flat.
+  x=>{const to:RoofFamily=lowerRoof[x.roofFamily!];if(to!==x.roofFamily){subs.push({axis:'roofFamily',from:x.roofFamily!,to,reason:'envelope'});x.roofFamily=to;}},
   x=>{for(const [axis,to] of [['roofFamily','R05'],['eaves','normal'],['pitch','low']] as const)if(x[axis]!==to){subs.push({axis,from:String(x[axis]),to,reason:'envelope'});(x as Record<string,unknown>)[axis]=to;}},
  ];
  const work={...s};
  for(let stage=0;stage<stages.length;stage++){
   stages[stage]!(work);
   try{repair(work,subs,'constraint');}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
-  const envelope=measureArchitecture(work);
+  const envelope=measure(work);
   if(fits(envelope))return {status:'ok',ref,source,use,traditionSite:tradition.siteId,features:featuresOf(work),envelope,adjustments,substitutions:subs,envelopeStage:(stage+1) as 1|2|3|4|5};
  }
  return {status:'hold',ref,source,reason:'envelope',detail:'no fallback stage fits the air above the plot'};

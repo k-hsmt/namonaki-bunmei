@@ -74,7 +74,7 @@ function footprint(kind:SiteObject['kind']):ComposedStructure['footprint'] {
  * 描画の屋根部品は住宅数の正本ではない。1部品で複数住戸を表せる。
  * 座標は固定敷地とstyleSeedだけで決まり、規模変更で並び替わらない。
  */
-function projectHousingBlock(b:ReturnType<typeof housingAt>['blocks'][number],generated=false):ComposedHousingBlock{
+export function projectHousingBlock(b:ReturnType<typeof housingAt>['blocks'][number],generated=false):ComposedHousingBlock{
  const {footprint:f}=b;
  const depth=f.y<106?'far' as const:f.y<132?'middle' as const:'near' as const;
  const step=depth==='far'?6:depth==='middle'?9:12;

@@ -152,8 +152,10 @@ test('D2-a: 文明の乱数・時刻・本編の年次処理を読まない',asy
   // The culture modules stay strict. production-v1 (D2-b1) may read the owned v8 production world
   // and its terrain-at-year, but never the civilization RNG or the annual engine directly.
   // scene-v1 (D2-c, review only) paints into the live scene: it may read the live scene drawing only.
-  const allowed=f==='scene-v1.ts'?/^\.\/|^\.\.\/scene\/(draw|draw-generated-review)\.js$/:f==='production-v1.ts'
-   ?/^\.\/|^\.\.\/terrain\/(terrain-production-(types-v1|wire-v1|owned-internal|progression-v1|storage-v1|history-v1|contract-v1)|terrain-revision-v1|owned-record-physics)\.js$/
+  const allowed=f==='scene-v1.ts'?/^\.\/|^\.\.\/scene\/(draw|draw-generated-review)\.js$/
+   :f==='airspace-v1.ts'?/^\.\/|^\.\.\/scene\/composition\.js$|^\.\.\/terrain\/terrain-record-raster-v1\.js$/
+   :f==='production-v1.ts'
+   ?/^\.\/|^\.\.\/terrain\/(terrain-production-(types-v1|wire-v1|owned-internal|progression-v1|storage-v1|history-v1|contract-v1)|terrain-revision-v1|owned-record-physics)\.js$|^\.\.\/story\/housing-history\.js$/
    :/^\.\/|^\.\.\/terrain\/(terrain-hash-v1|terrain-record-raster-v1)\.js$|^\.\.\/vegetation\/history-v1\.js$/;
   for(const m of text.matchAll(/from\s+'([^']+)'/g))assert.ok(allowed.test(m[1]),f+' imports '+m[1]);
   assert.ok(!/engine\/rng|story\/engine/.test(text),f+' touches the civilization RNG or engine');
@@ -226,4 +228,23 @@ test('D2-a/A02（案3）: 同じ地形の値でも地区の種類が傾向を変
  const hill=share('hill-side',stone),river=share('river-bank',stone);
  assert.ok(hill>river,`stone on hills ${hill} vs river ${river}`);
  assert.ok(hill<300&&river>0,'site kind shifts odds but never decides');
+});
+
+test("D2-c'/段階4: 山形の屋根は寄棟、段状・寄棟・片流れは平屋根へ下げる（元の系統に近い低い屋根）",()=>{
+ const expect={R01:'R03',R02:'R03',R08:'R03',R03:'R05',R04:'R05',R06:'R05'};
+ const seen=new Set();
+ for(let seed=1;seed<=400&&seen.size<6;seed++){
+  const g=G.createWorldGrammar(seed),from=g.shared.roofFamily;if(from==='R05'||seen.has(from))continue;
+  const t=G.createRegionalTradition(g,'river-bank',flat);
+  // measure returns the candidate spec itself; only the stage-4 roof (or later) fits
+  const r=G.deriveBirthStyle({grammar:g,tradition:t,use:'house',plot,ref:{kind:'facility',siteId:'river-bank',id:'s4'},source:{kind:'built',year:3}},
+   spec=>spec.roofFamily===expect[from]&&spec.pitch==='low',spec=>({...spec}));
+  if(r.status!=='ok')continue;
+  seen.add(from);
+  assert.equal(r.features.roofFamily,expect[from],from);
+  // a peaked roof keeps a peaked outline (hip) instead of falling to flat at the last stage
+  if(expect[from]==='R03')assert.ok(r.envelopeStage<=4,'peaked roofs stop at the hip roof');
+ }
+ assert.ok(seen.size>=4,'covered roof families: '+[...seen]);
+ assert.equal(G.architecturePolicy.envelope,'architecture-envelope-v2');
 });

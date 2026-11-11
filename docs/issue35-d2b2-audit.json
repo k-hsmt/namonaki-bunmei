@@ -1,0 +1,339 @@
+{
+  "status": "D2B_AUDIT_NOT_ACCEPTANCE",
+  "issue": 35,
+  "stage": "D2-b2",
+  "sourceHead": "717f607df2ecaa0a416e23b0237b09a9393c004e",
+  "years": 10000,
+  "limits": {
+    "plainBytes": 16777216,
+    "gzipStoredBytes": 4194304
+  },
+  "rows": [
+    {
+      "seed": 7,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 81,
+      "kinds": {
+        "facility:built": 27,
+        "housing:built": 54
+      },
+      "envelopeStages": {
+        "1": 75,
+        "2": 1,
+        "4": 5
+      },
+      "envelopeSubs": {
+        "eaves": 6,
+        "pitch": 5,
+        "roofFamily": 5
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 3,
+      "bytes": {
+        "save": 9471124,
+        "architecture": 53647,
+        "v8": 9417390,
+        "saveGzip": 1062403,
+        "architectureGzip": 4547
+      },
+      "ms": {
+        "advance10000WithArchitecture": 17695,
+        "recomputeArchitectureOnly": 30,
+        "validateV9Total": 12514
+      }
+    },
+    {
+      "seed": 21,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 74,
+      "kinds": {
+        "facility:built": 24,
+        "housing:built": 50
+      },
+      "envelopeStages": {
+        "1": 74
+      },
+      "envelopeSubs": {},
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 4,
+      "bytes": {
+        "save": 8488803,
+        "architecture": 45212,
+        "v8": 8443504,
+        "saveGzip": 995863,
+        "architectureGzip": 3455
+      },
+      "ms": {
+        "advance10000WithArchitecture": 16776,
+        "recomputeArchitectureOnly": 15,
+        "validateV9Total": 8039
+      }
+    },
+    {
+      "seed": 198,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 72,
+      "kinds": {
+        "facility:built": 27,
+        "housing:built": 45
+      },
+      "envelopeStages": {
+        "1": 64,
+        "4": 7,
+        "5": 1
+      },
+      "envelopeSubs": {
+        "pitch": 9,
+        "roofFamily": 9
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 2,
+      "bytes": {
+        "save": 8468506,
+        "architecture": 48526,
+        "v8": 8419893,
+        "saveGzip": 1025753,
+        "architectureGzip": 4366
+      },
+      "ms": {
+        "advance10000WithArchitecture": 14086,
+        "recomputeArchitectureOnly": 22,
+        "validateV9Total": 5452
+      }
+    },
+    {
+      "seed": 1,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 77,
+      "kinds": {
+        "facility:built": 25,
+        "housing:built": 51,
+        "facility:civic:built": 1
+      },
+      "envelopeStages": {
+        "1": 77
+      },
+      "envelopeSubs": {},
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 3,
+      "bytes": {
+        "save": 9129929,
+        "architecture": 48759,
+        "v8": 9081083,
+        "saveGzip": 1050797,
+        "architectureGzip": 3815
+      },
+      "ms": {
+        "advance10000WithArchitecture": 19681,
+        "recomputeArchitectureOnly": 20,
+        "validateV9Total": 10304
+      }
+    },
+    {
+      "seed": 3,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 89,
+      "kinds": {
+        "facility:built": 25,
+        "housing:built": 63,
+        "facility:civic:built": 1
+      },
+      "envelopeStages": {
+        "1": 83,
+        "2": 3,
+        "4": 3
+      },
+      "envelopeSubs": {
+        "eaves": 6,
+        "pitch": 3,
+        "roofFamily": 3
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 1,
+      "bytes": {
+        "save": 9082618,
+        "architecture": 59439,
+        "v8": 9023092,
+        "saveGzip": 1075440,
+        "architectureGzip": 5042
+      },
+      "ms": {
+        "advance10000WithArchitecture": 19293,
+        "recomputeArchitectureOnly": 26,
+        "validateV9Total": 6999
+      }
+    },
+    {
+      "seed": 56,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 97,
+      "kinds": {
+        "facility:built": 27,
+        "housing:built": 70
+      },
+      "envelopeStages": {
+        "1": 88,
+        "4": 5,
+        "5": 4
+      },
+      "envelopeSubs": {
+        "roofFamily": 13
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 3,
+      "bytes": {
+        "save": 9789392,
+        "architecture": 63951,
+        "v8": 9725354,
+        "saveGzip": 1116275,
+        "architectureGzip": 4864
+      },
+      "ms": {
+        "advance10000WithArchitecture": 21128,
+        "recomputeArchitectureOnly": 22,
+        "validateV9Total": 7100
+      }
+    },
+    {
+      "seed": 66,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 67,
+      "kinds": {
+        "facility:built": 24,
+        "housing:built": 43
+      },
+      "envelopeStages": {
+        "1": 65,
+        "4": 2
+      },
+      "envelopeSubs": {
+        "pitch": 2,
+        "roofFamily": 2
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 2,
+      "bytes": {
+        "save": 8739474,
+        "architecture": 42755,
+        "v8": 8696632,
+        "saveGzip": 1043106,
+        "architectureGzip": 3605
+      },
+      "ms": {
+        "advance10000WithArchitecture": 15234,
+        "recomputeArchitectureOnly": 14,
+        "validateV9Total": 6716
+      }
+    },
+    {
+      "seed": 162,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 77,
+      "kinds": {
+        "facility:built": 27,
+        "housing:built": 50
+      },
+      "envelopeStages": {
+        "1": 74,
+        "4": 1,
+        "5": 2
+      },
+      "envelopeSubs": {
+        "pitch": 3,
+        "roofFamily": 5
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 3,
+      "bytes": {
+        "save": 9260962,
+        "architecture": 49694,
+        "v8": 9211181,
+        "saveGzip": 1079331,
+        "architectureGzip": 4118
+      },
+      "ms": {
+        "advance10000WithArchitecture": 18308,
+        "recomputeArchitectureOnly": 17,
+        "validateV9Total": 10706
+      }
+    },
+    {
+      "seed": 4,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 81,
+      "kinds": {
+        "facility:built": 27,
+        "housing:built": 54
+      },
+      "envelopeStages": {
+        "1": 71,
+        "2": 1,
+        "4": 5,
+        "5": 4
+      },
+      "envelopeSubs": {
+        "eaves": 10,
+        "pitch": 9,
+        "roofFamily": 13
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 3,
+      "bytes": {
+        "save": 8289470,
+        "architecture": 58733,
+        "v8": 8230650,
+        "saveGzip": 985494,
+        "architectureGzip": 5144
+      },
+      "ms": {
+        "advance10000WithArchitecture": 14805,
+        "recomputeArchitectureOnly": 22,
+        "validateV9Total": 6487
+      }
+    },
+    {
+      "seed": 134,
+      "year": 10000,
+      "v8Identical": true,
+      "births": 57,
+      "kinds": {
+        "facility:built": 24,
+        "housing:built": 33
+      },
+      "envelopeStages": {
+        "1": 49,
+        "2": 3,
+        "4": 1,
+        "5": 4
+      },
+      "envelopeSubs": {
+        "eaves": 8,
+        "pitch": 9,
+        "roofFamily": 9
+      },
+      "sameYearExcessOverlaps": 0,
+      "terrainCuts": 4,
+      "bytes": {
+        "save": 7590936,
+        "architecture": 40923,
+        "v8": 7549926,
+        "saveGzip": 933241,
+        "architectureGzip": 4053
+      },
+      "ms": {
+        "advance10000WithArchitecture": 12391,
+        "recomputeArchitectureOnly": 21,
+        "validateV9Total": 5972
+      }
+    }
+  ]
+}
