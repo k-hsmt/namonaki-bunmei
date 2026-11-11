@@ -43,15 +43,21 @@ test('D2-c/H1: 手前は屋根の系統の輪郭が違い、中は3つの形、�
 
 const birth=(ref,use,features=house)=>{const {use:_,...f}=features;return {status:'ok',ref,source:{kind:'built',year:5},use,traditionSite:'river-bank',features:{eaves:'normal',window:'W1',entrance:'E1',ornaments:[],storeys:1,wall:'wattle',...f},adjustments:[],substitutions:[]};};
 
-test('D2-c: 描き方の差し替えは、廃墟・field・記録のない建物では本番の絵に戻す',()=>{
+test('D2-c/D4-b: 描き方の差し替えは、field・記録のない建物では本番の絵に戻し、廃墟はその世代の様式の廃墟で描く',()=>{
  const painter=createArchitecturePainter([birth({kind:'facility',siteId:'river-bank',id:'f1'},'house')]);
  const o=(id,kind,condition='intact')=>({id,kind,x:50,y:60,builtYear:5,condition});
  const plot={x:41,y:57,width:18,depth:7};
- assert.equal(painter.facility(ctx(),o('f1','house'),plot),true);
- assert.equal(painter.facility(ctx(),o('f1','house','ruined'),plot),false);
- assert.equal(painter.facility(ctx(),o('f2','house'),plot),false,'no birth recorded');
- assert.equal(painter.facility(ctx(),o('f1','field'),plot),false);
- const damaged=ctx();painter.facility(damaged,o('f1','house','damaged'),plot);
+ assert.equal(painter.facility(ctx(),o('f1','house'),plot,9999),true);
+ // D4-b: a ruin keeps its own style: only lower parts remain, weathered, and the same building always breaks alike
+ const whole=ctx(),ruin=ctx(),again=ctx();painter.facility(whole,o('f1','house'),plot,9999);
+ assert.equal(painter.facility(ruin,o('f1','house','ruined'),plot,9999),true);painter.facility(again,o('f1','house','ruined'),plot,9999);
+ const top=c=>Math.min(...c.calls.filter(k=>k[0]==='fillRect').map(k=>k[3]));
+ assert.ok(top(ruin)>top(whole),'roof and upper walls are gone');
+ assert.deepEqual(ruin.calls,again.calls,'deterministic');
+ assert.ok(ruin.calls.length>0&&!ruin.calls.some(k=>k[1]==='#857a66'),'not the live, culture-free ruin');
+ assert.equal(painter.facility(ctx(),o('f2','house'),plot,9999),false,'no birth recorded');
+ assert.equal(painter.facility(ctx(),o('f1','field'),plot,9999),false);
+ const damaged=ctx();painter.facility(damaged,o('f1','house','damaged'),plot,9999);
  assert.ok(damaged.calls.some(c=>c[1]==='#454e48'&&c[2]===44&&c[3]===58),'live damage mark kept');
 });
 
@@ -59,22 +65,22 @@ test('D2-c: 共同建築は敷地の幅で描き、住宅の部品は部品番�
  const civic={id:'civic-river-bank-40-great-hall',kind:'hall',x:60,y:80,builtYear:40,condition:'intact',civic:{architectureStyle:'great-hall',footprint:{x:38,y:63,width:44,depth:22},constructionRecordId:'40-1'}};
  const painter=createArchitecturePainter([birth({kind:'facility',siteId:'river-bank',id:civic.id,civic:{style:'great-hall',constructionRecordId:'40-1'}},'hall'),
   birth({kind:'housing',siteId:'river-bank',blockId:'b1',parts:{from:0,to:2}},'rowhouse',{...house,roofFamily:'R05',roofMaterial:'tile'})]);
- const c=ctx();assert.equal(painter.facility(c,civic,civic.civic.footprint),true);
+ const c=ctx();assert.equal(painter.facility(c,civic,civic.civic.footprint,9999),true);
  const xs=c.calls.filter(k=>k[0]==='fillRect').map(k=>[k[2],k[2]+k[4]]);
  assert.ok(Math.max(...xs.map(x=>x[1]))-Math.min(...xs.map(x=>x[0]))>=44);
  const part=(i,condition='sound')=>({partId:'b1:'+i,blockId:'b1',x:100+i*12,y:150,depth:'near',styleId:'terraced',variant:0,representedUnits:1,condition,use:'occupied'});
- const scene={residentialBlocks:[{blockId:'b1',roofParts:[part(0),part(1),part(2),part(0,'ruined')]}]};
+ const scene={year:9999,residentialBlocks:[{blockId:'b1',roofParts:[part(0),part(1),part(2),part(0,'ruined')]}]};
  const r=ctx();painter.residentialRoofs(r,scene,'near');
  assert.ok(r.calls.length>0);
- // part 2 has no birth and the ruined part keeps the live drawing: both use live colours
- assert.ok(r.calls.some(k=>k[1]==='#857a66'),'live ruin drawn');
+ // part 2 has no birth: live drawing. D4-b: the ruined part is the ruin of its own style, not the live ruin
+ assert.ok(!r.calls.some(k=>k[1]==='#857a66'),'no culture-free live ruin');
  assert.ok(r.calls.some(k=>k[1]==='#777e79'),'live terraced roof drawn for the part without a birth');
 });
 
 test('D2-c/D2-d: 本番の描画への差し替えは任意で、通常画面はv9のセッションを通してだけ使う',async()=>{
  const live=await readFile('src/scene/draw-generated-review.ts','utf8');
  assert.match(live,/\(painter\?\.residentialRoofs\?\?drawResidentialRoofs\)\(c,scene,depth\)/);
- assert.match(live,/if\(painter\?\.facility\?\.\(c,o,f\)\)return;/);
+ assert.match(live,/if\(painter\?\.facility\?\.\(c,o,f,s\.year\)\)return;/);
  for(const f of ['src/main.ts','index.html'])assert.ok(!(await readFile(f,'utf8')).includes('architecture/'),f);
  // the session passes the recorded painter only for v9 sessions (D2-d)
  assert.match(await readFile('src/story/world-session.ts','utf8'),/architecture\(session\)\?painterOf\(session\.architecture\):undefined/);

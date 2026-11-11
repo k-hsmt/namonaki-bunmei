@@ -174,7 +174,7 @@ test('D2-a/§5.2: 建設時様式の入口で、履歴なしに分かる参照�
  const g=G.createWorldGrammar(5),t=G.createRegionalTradition(g,'river-bank',flat);
  const call=(ref,source,use='house',p=plot)=>()=>G.deriveBirthStyle({grammar:g,tradition:t,use,plot:p,ref,source},anyFit);
  const fac={kind:'facility',siteId:'river-bank',id:'f'},blk=parts=>({kind:'housing',siteId:'river-bank',blockId:'b',parts});
- assert.throws(call(fac,{kind:'expanded',year:10}),/facility birth must come from its built source/);
+ assert.throws(call(fac,{kind:'expanded',year:10}),/facility birth must come from its built or rebuilt source/);
  assert.throws(call(fac,{kind:'built',year:10},'rowhouse'),/not a facility use/);
  assert.throws(call({...fac,civic:{style:'great-hall',constructionRecordId:'r'}},{kind:'built',year:1},'house'),/civic attribute only on halls/);
  assert.throws(call({...fac,civic:{style:'castle',constructionRecordId:'r'}},{kind:'built',year:1},'hall'),/invalid civic/);

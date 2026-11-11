@@ -2,7 +2,7 @@ import {environmentLabel} from './environment/presentation-v1.js';
 import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave,higherPriorityWorldSaveKeys} from './story/world-storage.js';
-import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSessionAsync,chooseWorldSessionAsync,observeWorldSession,drawWorldSession,type WorldSession} from './story/world-session.js';
+import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSessionAsync,chooseWorldSessionAsync,observeWorldSession,drawWorldSession,worldArchitectureChronicle,type WorldSession} from './story/world-session.js';
 import {serializeWorldSave} from './story/world-save.js';
 import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
@@ -160,7 +160,11 @@ function render(){
  el('cohesion').textContent=historicalStats?'観測年の記録なし':label(state.cohesion,'比較的安定','分かれつつある');
  el('knowledge').textContent=historicalStats?'観測年の記録なし':label(state.knowledge,'蓄積されている','伝承の途中');
  const records=expanded?confirmedRecords:confirmedRecords.slice(-5);const ol=el('timeline');ol.replaceChildren();
- for(const e of [...records].reverse()){const li=document.createElement('li');li.tabIndex=0;li.classList.toggle('active',viewingPast&&active.id===e.id);const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  ${e.tag}`;li.append(time,document.createTextNode(e.title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
+ // D4-c: v9 rebuild lines follow the v8 record they rebuilt at (newest first, so they come just above it)
+ const rebuilds=new Map<string,string[]>();for(const n of worldArchitectureChronicle(world))rebuilds.set(n.afterRecordId,[...(rebuilds.get(n.afterRecordId)??[]),n.title]);
+ for(const e of [...records].reverse()){
+  for(const title of rebuilds.get(e.id)??[]){const li=document.createElement('li');li.tabIndex=0;li.className='architecture-note';const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  建築`;li.append(time,document.createTextNode(title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
+  const li=document.createElement('li');li.tabIndex=0;li.classList.toggle('active',viewingPast&&active.id===e.id);const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  ${e.tag}`;li.append(time,document.createTextNode(e.title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
  el('toggle-all').textContent=expanded?'最近の5件だけ見る −':`過去の記録をすべて見る ＋（${confirmedRecords.length}件）`;
 }
 async function forward(){

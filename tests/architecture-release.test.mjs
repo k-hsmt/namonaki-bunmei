@@ -61,10 +61,11 @@ test('release: 既存のv8の保存はv8のまま開き、変換しない',async
  assert.equal((await advanceWorldSessionAsync(back)).architecture,undefined);
 });
 
-test('release: 通常画面は新しい世界をv9で作り、v0.7と説明を表示する',async()=>{
+test('release: 通常画面は新しい世界をv9で作り、版（v0.8）と説明を表示する',async()=>{
  const main=await readFile('src/main.ts','utf8'),html=await readFile('index.html','utf8');
  assert.equal((main.match(/createNewArchitectureWorld/g)??[]).length,3);assert.ok(!main.includes('createNewTerrainWorld'));
- assert.ok(html.includes('A LIFE OF A CIVILIZATION · v0.7')&&html.includes('名もなき文明 / v0.7')&&!html.includes('v0.6'));
+ assert.ok(html.includes('A LIFE OF A CIVILIZATION · v0.8')&&html.includes('名もなき文明 / v0.8')&&!html.includes('v0.7')&&!html.includes('v0.6'),'D4: v0.8');
+ assert.ok(html.includes('廃墟になった建物は、暮らしが戻るとその土地で建て直され、もとの様式で再現されることも、その時の様式や新しい技術で建て直されることもあります。'));
  assert.ok(html.includes('建物は建った年の伝統で建ち、その後に伝統が変わっても姿は変わりません。'));
 });
 

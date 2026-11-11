@@ -44,6 +44,23 @@ function architecture(session:WorldSession):session is ArchitectureGeneratedSess
 }
 export function architectureProductionSession(world:ArchitectureProductionWorld):ArchitectureGeneratedSession{knownArchitectureWorld(world);return {mode:'generated',review:world.terrain,state:world.terrain.review.state,architecture:world};}
 const painters=new WeakMap<ArchitectureProductionWorld,GeneratedStructurePainter>();
+/** D4-c: a chronicle line for a v9 rebuild, shown right after the v8 record it rebuilt at. */
+export interface ArchitectureChronicleNote {readonly afterRecordId:string;readonly year:number;readonly title:string}
+const notes=new WeakMap<ArchitectureProductionWorld,readonly ArchitectureChronicleNote[]>();
+const modeText:Readonly<Record<string,string>>={old:'もとの様式で',current:'その時の様式で',mixed:'もとの造りに、その時の様式を合わせて'};
+const techText:Readonly<Record<string,string>>={'timber-span':'大スパンの木造で','masonry-arch':'石造とアーチで','metal-glass':'金属とガラスで'};
+/** Read-only: v9 rebuild lines for the chronicle (empty for other sessions). */
+export function worldArchitectureChronicle(session:WorldSession):readonly ArchitectureChronicleNote[]{
+ if(!architecture(session))return [];
+ const world=session.architecture,cached=notes.get(world);if(cached)return cached;
+ const titles=new Map(world.terrain.review.state.history.map(h=>[h.id,h.title]));
+ const list=world.architecture.births.filter(b=>b.rebuild&&b.source.recordId).map(b=>{
+  const base=(titles.get(b.source.recordId!)??'建物').replace(/が(再利用|修繕)される$/,'')+'が建て直される';
+  const mode=b.adjustments.find(x=>/^rebuild:(old|current|mixed)$/.test(x))?.slice(8)??'current',tech=b.adjustments.find(x=>x.startsWith('technology:'))?.slice(11);
+  return {afterRecordId:b.source.recordId!,year:b.source.year,title:`${base}（${modeText[mode]}${tech&&techText[tech]?'、'+techText[tech]:''}）`};
+ });
+ notes.set(world,list);return list;
+}
 /** Read-only: the painter draws recorded birth styles and never changes the record (D2 §6.4). */
 /** The recorded-style painter of a v9 session (undefined otherwise). Read-only; used by every scene painter. */
 export function worldStructurePainter(session:WorldSession):GeneratedStructurePainter|undefined{return architecture(session)?painterOf(session.architecture):undefined;}

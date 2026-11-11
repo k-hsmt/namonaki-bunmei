@@ -28,14 +28,24 @@ async function run(from,to){
    const diff=(x,y)=>AXES.filter(k=>x[k]!==y[k]);
    const births=a.births.filter(b=>b.ref.siteId===site);
    const lastBuilt=births.length?Math.max(...births.map(b=>b.source.year)):0;
-   // visible: births built under a tradition that already differs from year 0, and on which axes
-   const changedBirths=births.filter(b=>diff(at(b.source.year),initial).length>0);
-   const visibleAxes=[...new Set(changedBirths.flatMap(b=>diff(at(b.source.year),initial)))];
+   // visible: the axes in which a birth shows a tradition other than year 0. D4: an old-style rebuild
+   // shows the tradition of the generation it reproduces; a mixed one keeps structure, wall, foundation.
+   const styleYears=new Map(),shown=new Map();
+   for(const b of births){
+    const k=(b.ref.kind==='facility'?'F:':'H:')+(b.ref.kind==='facility'?b.ref.id:b.ref.blockId),prev=styleYears.get(k);
+    const mode=b.adjustments.find(x=>/^rebuild:(old|current|mixed)$/.test(x))?.slice(8);
+    const years=Object.fromEntries(AXES.map(x=>[x,mode==='old'?prev[x]:mode==='mixed'&&['structure','wall','foundation'].includes(x)?prev[x]:b.source.year]));
+    shown.set(b,AXES.filter(x=>at(years[x])[x]!==initial[x]));
+    if(b.ref.kind==='facility'||b.ref.parts.from===0)styleYears.set(k,years);
+   }
+   const changedBirths=births.filter(b=>shown.get(b).length>0);
+   const visibleAxes=[...new Set(changedBirths.flatMap(b=>shown.get(b)))];
    sites[site]={
     record:Object.fromEntries(CHECKPOINTS.filter(y=>y<=YEARS).map(y=>[y,diff(at(y),initial).length])),
     recordAxes10000:diff(at(YEARS),initial),
     births:births.length,lastBuilt,changedBirths:changedBirths.length,visibleAxes,
-    visibleByCheckpoint:Object.fromEntries(CHECKPOINTS.filter(y=>y<=YEARS).map(y=>[y,[...new Set(changedBirths.filter(b=>b.source.year<=y).flatMap(b=>diff(at(b.source.year),initial)))].length])),
+    visibleByCheckpoint:Object.fromEntries(CHECKPOINTS.filter(y=>y<=YEARS).map(y=>[y,[...new Set(changedBirths.filter(b=>b.source.year<=y).flatMap(b=>shown.get(b)))].length])),
+    rebuilds:births.filter(b=>b.rebuild).length,
    };
   }
   // back-and-forth: a non-revival change to a value the district held before on that axis
@@ -45,7 +55,8 @@ async function run(from,to){
    changes:changes.map(c=>({y:c.year,s:c.site,a:c.axis,c:c.cause,e:c.sources.experience??null})),reverts,
    inventionsWithoutWork:changes.filter(c=>c.cause==='invention'&&!c.sources.experience).length,
    capability:a.capabilityEvents.map(e=>({y:e.year,s:e.site,t:e.technology,o:e.op})),
-   advancedBirths:a.births.filter(b=>b.adjustments.some(x=>x.startsWith('technology:'))).length};
+   advancedBirths:a.births.filter(b=>/^X/.test(b.features.structure)).length,
+   rebuildModes:a.births.filter(b=>b.rebuild).reduce((m,b)=>{const k=b.adjustments.find(x=>/^rebuild:(old|current|mixed)$/.test(x)).slice(8);m[k]=(m[k]??0)+1;return m;},{})};
   process.stdout.write(JSON.stringify(out)+'\n');
   console.error('seed',seed,Math.round(out.ms/1000)+'s');
  }
@@ -83,7 +94,9 @@ async function summary(files){
    changedBirths:worlds.reduce((k,w)=>k+SITES.reduce((j,s)=>j+w.sites[s].changedBirths,0),0),births:worlds.reduce((k,w)=>k+SITES.reduce((j,s)=>j+w.sites[s].births,0),0)},
   capability:{worldsWithAny:pct(worlds.filter(w=>w.capability.length).length),byOp:dist(cap.map(e=>e.o)),byTechnology:dist(cap.map(e=>e.t)),
    heldAtEnd:worlds.reduce((k,w)=>{const h=new Set();for(const e of w.capability){const key=e.s+e.t;if(e.o==='lose')h.delete(key);else h.add(key);}return k+h.size;},0),
-   advancedBirths:worlds.reduce((k,w)=>k+w.advancedBirths,0)},
+   advancedBirths:worlds.reduce((k,w)=>k+w.advancedBirths,0),worldsWithAdvanced:pct(worlds.filter(w=>w.advancedBirths>0).length)},
+  rebuild:{total:worlds.reduce((k,w)=>k+SITES.reduce((j,s)=>j+(w.sites[s].rebuilds??0),0),0),
+   modes:worlds.reduce((m,w)=>{for(const [k,v] of Object.entries(w.rebuildModes??{}))m[k]=(m[k]??0)+v;return m;},{})},
   msPerWorld:Math.round(worlds.reduce((k,w)=>k+w.ms,0)/n),
  };
 }

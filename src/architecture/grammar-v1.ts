@@ -6,7 +6,7 @@
  * Not yet connected to the annual batch, saves or the live renderer (D2-b / D2-c).
  */
 import {terrainHash} from '../terrain/terrain-hash-v1.js';
-import {d2Inconsistencies,advancedBirthInconsistencies,eavesKinds,pitches,roofFamilies,ARCHITECTURE_VOCAB_ID,ARCHITECTURE_CONSTRAINTS_ID,
+import {d2Inconsistencies,advancedBirthInconsistencies,isAdvancedStructure,eavesKinds,pitches,roofFamilies,ARCHITECTURE_VOCAB_ID,ARCHITECTURE_CONSTRAINTS_ID,
  type ArchitectureSpec,type PartialSpec,type Use,type RoofFamily,type Eaves,type Pitch,type Structure,type WallMaterial,
  type Foundation,type RoofMaterial,type Window,type Entrance,type Ornament,type Palette} from './vocab-v1.js';
 import {measureArchitecture,type ArchitectureEnvelope} from './draw-v1.js';
@@ -159,7 +159,8 @@ export function applyUseRules(spec:PartialSpec&{readonly use:Use},ctx:UseRuleCon
 export type BuildingRef=
  |{readonly kind:'facility';readonly siteId:ArchitectureSite;readonly id:string;readonly civic?:{readonly style:'great-hall'|'courtyard-hall';readonly constructionRecordId:string}}
  |{readonly kind:'housing';readonly siteId:ArchitectureSite;readonly blockId:string;readonly parts:{readonly from:number;readonly to:number}};
-export interface BirthSource {readonly kind:'built'|'expanded';readonly year:number;readonly seq?:number;readonly recordId?:string}
+/** 'rebuilt' (D4): v9's rebuild at v8's recovery of a ruin (facility reused / housing repaired after ruin). */
+export interface BirthSource {readonly kind:'built'|'expanded'|'rebuilt';readonly year:number;readonly seq?:number;readonly recordId?:string}
 export interface Substitution {readonly axis:string;readonly from:string|number;readonly to:string|number;readonly reason:'constraint'|'envelope'}
 export interface BirthStyle<E=ArchitectureEnvelope> {
  readonly status:'ok';readonly ref:BuildingRef;readonly source:BirthSource;readonly use:Use;readonly traditionSite:ArchitectureSite;
@@ -172,6 +173,12 @@ export interface BirthInput {
  readonly use:Use;readonly plot:PlotAdaptationInputs;
  /** D3-c: technologies the district holds in the construction year (architecture-technology-v1). Absent = none. */
  readonly technologies?:readonly Technology[];
+ /**
+  * D4 (rebuild): the previous generation's features and the chosen way of rebuilding (D0 A14-A16).
+  * 'old' reproduces them, 'mixed' keeps structure, wall and foundation, 'current' builds anew. An
+  * advanced structure is kept only if the district still holds a technology for it.
+  */
+ readonly inherit?:{readonly features:Omit<ArchitectureSpec,'use'|'faded'>;readonly mode:'old'|'current'|'mixed'};
 }
 
 // ---- advanced technology (D3-c, Human decision 2: only what D1 drew; no 3+ storeys) ----
@@ -182,6 +189,8 @@ export const technologies:readonly Technology[]=['timber-span','masonry-arch','m
 export const technologyUses:readonly Use[]=['hall','market','workshop'];
 /** Per-cent chance that one of these buildings adopts a held technology. Provisional (D3-d). */
 export const technologyAdoption=60;
+/** The technology an advanced structure needs (D1 A1-A3). */
+export const structureTechnology:Readonly<Record<'X1'|'X2'|'X3',Technology>>={X1:'timber-span',X2:'masonry-arch',X3:'metal-glass'};
 /** What a building adopting the technology changes (the D1 A1-A3 vocabulary). */
 function adoptTechnology(s:PartialSpec&{use:Use},t:Technology):void {
  switch(t){
@@ -226,9 +235,10 @@ export function assertBirthInput(input:BirthInput):void {
  if(!Number.isSafeInteger(source.year)||source.year<0)fail('invalid birth year');
  if(source.seq!==undefined&&(!Number.isSafeInteger(source.seq)||source.seq<0))fail('invalid source seq');
  if(source.recordId!==undefined&&!nonEmpty(source.recordId))fail('invalid source record id');
+ if((source.kind==='rebuilt')!==(input.inherit!==undefined))fail('a rebuild needs its previous generation, and only a rebuild has one');
  if(ref.kind==='facility'){
   if(!nonEmpty(ref.id))fail('facility id required');
-  if(source.kind!=='built')fail('a facility birth must come from its built source');
+  if(source.kind!=='built'&&source.kind!=='rebuilt')fail('a facility birth must come from its built or rebuilt source');
   if(!facilityUses.includes(use))fail('use '+use+' is not a facility use');
   if(ref.civic){
    if(use!=='hall')fail('civic attribute only on halls');
@@ -238,9 +248,9 @@ export function assertBirthInput(input:BirthInput):void {
   if(!nonEmpty(ref.blockId))fail('housing block id required');
   const {from,to}=ref.parts??{};
   if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from!<0||from!>=to!)fail('housing parts must be integers with 0 <= from < to');
-  if(source.kind==='built'&&from!==0)fail('a built block starts at part 0');
+  if((source.kind==='built'||source.kind==='rebuilt')&&from!==0)fail('a built or rebuilt block starts at part 0');
   if(source.kind==='expanded'&&from===0)fail('an expansion adds parts after existing ones');
-  if(source.kind!=='built'&&source.kind!=='expanded')fail('unknown housing source');
+  if(source.kind!=='built'&&source.kind!=='expanded'&&source.kind!=='rebuilt')fail('unknown housing source');
   if(!housingUses.includes(use))fail('use '+use+' is not a housing use');
  }else fail('unknown building reference');
  if(!Number.isSafeInteger(plot?.grade)||plot.grade<0||plot.grade>1000||typeof plot.nearWater!=='boolean')fail('invalid plot inputs');
@@ -273,13 +283,29 @@ function composeBirth(input:BirthInput):Composed|BirthHold {
  // plot adaptation at the construction year (D2 §4.3)
  if(s.foundation==='F1'&&plot.grade>=500){s.foundation='F4';adjustments.push('plot:slope');}
  else if(s.foundation==='F1'&&plot.nearWater&&b('wet')%100<50){s.foundation='F3';adjustments.push('plot:water');}
- // D3-c: a building of a technology use may adopt one technology its district holds in the construction year
+ // D4 rebuild: the way of rebuilding is settled first; an advanced structure is reproduced only while
+ // its technology is still held, otherwise the rebuild is current
+ const keep=(st:Structure)=>!isAdvancedStructure(st)||(input.technologies??[]).includes(structureTechnology[st as 'X1'|'X2'|'X3']);
+ let mode=input.inherit?.mode;
+ if(input.inherit&&mode!=='current'&&!keep(input.inherit.features.structure)){adjustments.push('rebuild:'+mode+'-technology-lost');mode='current';}
+ // D3-c: a building of a technology use may adopt one technology its district holds in the construction
+ // year (a rebuild only when it builds anew)
  const held=technologies.filter(t=>input.technologies?.includes(t));
- const advanced=held.length>0&&technologyUses.includes(use)&&b('technology')%100<technologyAdoption;
+ const advanced=held.length>0&&technologyUses.includes(use)&&(mode===undefined||mode==='current')&&b('technology')%100<technologyAdoption;
  if(advanced){const t=held[b('technology-pick')%held.length]!;adoptTechnology(s,t);adjustments.push('technology:'+t);}
  const ruled=applyUseRules(s,{hash:b('use')});Object.assign(s,ruled.spec);adjustments.push(...ruled.applied.map(a=>'use:'+a));
- try{repair(s,subs,'constraint',advanced);}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
- return {spec:s,adjustments,subs,advanced};
+ // D4 rebuild: carry over the previous generation where the chosen way asks for it
+ let rebuiltAdvanced=false;
+ if(input.inherit){
+  const prev=input.inherit.features;
+  if(mode==='old'){Object.assign(s,{...prev,ornaments:[...prev.ornaments]});}
+  else if(mode==='mixed'){s.structure=prev.structure;s.wall=prev.wall;s.foundation=prev.foundation;if(s.storeys!>1&&!['S05','S06','X1','X2','X3'].includes(s.structure))s.storeys=1;}
+  rebuiltAdvanced=isAdvancedStructure(s.structure!);
+  adjustments.push('rebuild:'+mode);
+ }
+ const anyAdvanced=advanced||rebuiltAdvanced;
+ try{repair(s,subs,'constraint',anyAdvanced);}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
+ return {spec:s,adjustments,subs,advanced:anyAdvanced};
 }
 const featuresOf=(x:PartialSpec&{use:Use})=>{const {use:_,faded:__,...features}=x as ArchitectureSpec;return {...features,ornaments:[...features.ornaments]};};
 /** D2-b1: the recorded birth style. No envelope; the air-space contract is added in D2-b2 after D2-c fixes drawing geometry. */

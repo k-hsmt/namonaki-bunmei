@@ -102,7 +102,7 @@ test('D3-c: 技術の習得は交流のある相手からだけ。金属＋ガ�
 test('D3-c: 本番の記録に技術の出来事を持ち、読込で照合する（seed 5、1100年）',async()=>{
  const w=await P.advanceArchitectureWorld(P.introduceArchitectureProduction((await createNewTerrainWorld(5)).review),1100,'automatic');
  const a=w.architecture;
- assert.equal(a.schemaVersion,5);assert.equal(a.technology,T.TECHNOLOGY_ID);
+ assert.equal(a.schemaVersion,6);assert.equal(a.technology,T.TECHNOLOGY_ID);
  assert.ok(a.capabilityEvents.length>0,'seed 5 establishes a technology before 1100');
  for(const b of a.births){
   const tech=b.adjustments.find(x=>x.startsWith('technology:'));

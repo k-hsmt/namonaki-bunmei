@@ -57,3 +57,17 @@ test('release UI: 動きのある表示の建物の層も、記録された様�
  assert.notEqual(result.withPainter,result.without,'the moving structures layer uses the recorded styles');
  assert.equal(result.withPainter,result.again,'deterministic');
 });
+
+test('release UI (D4-c): 年代記に「建て直される」を、元の記録の上に表示する',async t=>{
+ // seed 24 has no rebuild by 1100; seed 7 has 34 by 3000
+ const rebuilt=architectureProductionSession(await advanceArchitectureWorld((await createNewArchitectureWorld(7)).architecture,3000,'automatic'));
+ const page=await open(t,'namonaki-story-v9',(await encodeWorldSave(await prepareWorldSessionSave(rebuilt))).json);
+ await page.locator('#toggle-all').click();
+ const items=await page.locator('#timeline li').evaluateAll(ls=>ls.map(l=>({note:l.classList.contains('architecture-note'),text:l.textContent})));
+ const notes=items.filter(i=>i.note);
+ assert.ok(notes.length>0,'rebuild lines shown');
+ for(const [i,item] of items.entries())if(item.note){
+  assert.match(item.text,/建築.*が建て直される（/);
+  const next=items.slice(i+1).find(x=>!x.note);assert.match(next.text,/が(再利用|修繕)される/,'the v8 record follows (older below)');
+ }
+});
