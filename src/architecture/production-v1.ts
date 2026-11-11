@@ -12,7 +12,8 @@
  *   drawing geometry) and the fallback stage that made it fit. A construction is checked against the
  *   envelopes of constructions from EARLIER YEARS in its site, never the same year, so a construction
  *   added in an already recorded year (e.g. resolving a choice) cannot change an earlier record.
- *   If even the last stage does not fit, the advance fails closed (HOLD) and the old root is kept.
+ *   Only the excess over the minimal form is tested (Human decision A), so the last stage always fits;
+ *   a constraint HOLD still fails the advance closed and the old root is kept.
  * - Not connected to the common world-save dispatch, browser keys or UI (D2-d, together with D3).
  */
 import type {TerrainProductionWorld} from '../terrain/terrain-production-types-v1.js';
@@ -27,7 +28,7 @@ import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {measureSiteAdaptation,measurePlotAdaptation} from './adaptation-v1.js';
 import {architecturePolicy,createWorldGrammar,createRegionalTradition,deriveBirthStyle,
  type ArchitectureSite,type WorldArchitecturalGrammar,type RegionalArchitecturalTradition,type BirthStyle,type BuildingRef,type BirthSource} from './grammar-v1.js';
-import {ENVELOPE_ID,facilityAirspace,housingAirspace,airspaceConflict,type AirspaceRect} from './airspace-v1.js';
+import {ENVELOPE_ID,facilityAirspace,housingAirspace,airspaceConflict,minimalForm,withExcess,type AirspaceRect} from './airspace-v1.js';
 import type {ResidentialBlock} from '../story/housing-history.js';
 export type RecordedBirth=BirthStyle<AirspaceRect>;
 import type {Use} from './vocab-v1.js';
@@ -116,7 +117,9 @@ function birthOf(world:TerrainProductionWorld,grammar:WorldArchitecturalGrammar,
  const raster=readOwnedRecordPhysics(terrainSitePhysics(resolveTerrainAtYear(world.terrainHistory,c.source.year),c.ref.siteId));
  const decks=(world.review.bridgeReview?.bridges??[]).filter(b=>b.geometry.siteId===c.ref.siteId&&b.builtYear<=c.source.year).map(b=>b.geometry.deck);
  const civic=c.ref.kind==='facility'?c.ref.civic?.style:undefined;
- const measure=(spec:Parameters<typeof facilityAirspace>[0])=>c.ref.kind==='housing'?housingAirspace(spec,c.block??fail('housing construction without its block')):facilityAirspace(spec,c.plot,civic);
+ const rectOf=(spec:Parameters<typeof facilityAirspace>[0])=>c.ref.kind==='housing'?housingAirspace(spec,c.block??fail('housing construction without its block')):facilityAirspace(spec,c.plot,civic);
+ // Human decision A on D2-b2: only the excess over the minimal form is tested.
+ const measure=(spec:Parameters<typeof facilityAirspace>[0])=>withExcess(rectOf(spec),rectOf(minimalForm(spec)));
  const r=deriveBirthStyle({grammar,tradition,ref:c.ref,source:c.source,use:c.use,plot:measurePlotAdaptation(raster,c.plot)},
   e=>airspaceConflict(e,{earlier,decks,raster,plot:c.plot})===null,measure);
  if(r.status!=='ok')return fail('birth HOLD ('+r.reason+') for '+JSON.stringify(c.ref)+': '+r.detail);

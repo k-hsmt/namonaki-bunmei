@@ -8,9 +8,12 @@
  * Only the part above the plot's top edge counts as air space; the ground rows are the land ledger's
  * business (and are clipped to the plot for facilities, as in the live scene).
  *
- * Conflicts (design §6.2): an earlier envelope in the same depth band (ground lines within 6px) that
- * overlaps; a bridge deck under the envelope; water directly beside the plot in its lowest two rows.
- * Front/back overlaps between different depth bands are allowed, as in the live scene.
+ * Conflicts (design §6.2, as revised by Human decision A on D2-b2): only the EXCESS over the minimal
+ * form (the last fallback stage: flat roof, normal eaves, low pitch) is tested. Whatever the minimal form
+ * already covers is accepted, as the live scene already lets facility sprites overlap their neighbours.
+ * The excess conflicts with an earlier envelope in the same depth band (ground lines within 6px), a bridge
+ * deck, or water directly beside the plot in its lowest two rows. Front/back overlaps between different
+ * depth bands are allowed, as in the live scene. The minimal form therefore always fits (no envelope HOLD).
  */
 import {projectHousingBlock} from '../scene/composition.js';
 import type {RecordRaster} from '../terrain/terrain-record-raster-v1.js';
@@ -21,7 +24,9 @@ import type {ArchitectureSpec,PartialSpec,Use} from './vocab-v1.js';
 export const ENVELOPE_ID='architecture-envelope-v1';
 export const DEPTH_BAND=6;
 /** Absolute screen rectangle [x0,x1) × [y0,y1) plus the ground line used for depth bands. */
-export interface AirspaceRect {readonly x0:number;readonly x1:number;readonly y0:number;readonly y1:number;readonly ground:number}
+export interface AirspaceRect {readonly x0:number;readonly x1:number;readonly y0:number;readonly y1:number;readonly ground:number;
+ /** Parts of the rectangle outside the minimal form's rectangle; only these are tested for conflicts. */
+ readonly excess?:readonly {readonly x0:number;readonly x1:number;readonly y0:number;readonly y1:number}[]}
 type Plot={readonly x:number;readonly y:number;readonly width:number;readonly depth:number};
 type Spec=PartialSpec&{readonly use:Use};
 
@@ -44,6 +49,20 @@ export function housingAirspace(spec:Spec,block:Parameters<typeof projectHousing
  return above(b,block.footprint,block.footprint.y+block.footprint.depth);
 }
 
+/** The last fallback stage's form for the same spec (roof only changes; walls and foundation stay). */
+export function minimalForm<T extends Spec>(spec:T):T {
+ return {...spec,roofFamily:'R05',eaves:'normal',pitch:'low',...(spec.roofMaterial==='thatch'?{roofMaterial:'shingle'}:{}),
+  ...(spec.entrance==='E3'?{entrance:spec.foundation==='F5'?'E5':'E1'}:{})};
+}
+/** Adds the excess pieces of `rect` over `baseline` (left, right, then top strip over the baseline span). */
+export function withExcess(rect:AirspaceRect,baseline:AirspaceRect):AirspaceRect {
+ const pieces:{x0:number;x1:number;y0:number;y1:number}[]=[],push=(x0:number,x1:number,y0:number,y1:number)=>{if(x1>x0&&y1>y0)pieces.push({x0,x1,y0,y1});};
+ push(rect.x0,Math.min(rect.x1,baseline.x0),rect.y0,rect.y1);
+ push(Math.max(rect.x0,baseline.x1),rect.x1,rect.y0,rect.y1);
+ push(Math.max(rect.x0,baseline.x0),Math.min(rect.x1,baseline.x1),rect.y0,Math.min(rect.y1,baseline.y0));
+ return {...rect,excess:pieces};
+}
+
 export interface AirspaceContext {
  /** Envelopes already recorded in this site, in construction order. */
  readonly earlier:readonly AirspaceRect[];
@@ -56,15 +75,18 @@ export interface AirspaceContext {
 const overlap=(a:{x0:number;x1:number;y0:number;y1:number},b:{x0:number;x1:number;y0:number;y1:number})=>a.x0<b.x1&&b.x0<a.x1&&a.y0<b.y1&&b.y0<a.y1;
 /** Why an envelope does not fit, or null when it fits. */
 export function airspaceConflict(e:AirspaceRect,ctx:AirspaceContext):string|null {
- if(e.y1<=e.y0)return null;
- for(const o of ctx.earlier)if(Math.abs(o.ground-e.ground)<=DEPTH_BAND&&overlap(e,o))return 'neighbour';
- for(const d of ctx.decks)if(overlap(e,{x0:d.x,x1:d.x+d.width,y0:d.y,y1:d.y+d.depth}))return 'bridge';
- const {plot,raster}=ctx;
- for(let y=Math.max(96,plot.y+plot.depth-2);y<Math.min(180,plot.y+plot.depth);y++)
-  for(let x=Math.max(0,e.x0);x<Math.min(320,e.x1);x++){
-   if(x>=plot.x&&x<plot.x+plot.width)continue;
-   const s=raster.surface[y*320+x];if(s===2||s===3)return 'water';
-  }
+ const pieces=e.excess??[e];
+ for(const piece of pieces){
+  if(piece.y1<=piece.y0)continue;
+  for(const o of ctx.earlier)if(Math.abs(o.ground-e.ground)<=DEPTH_BAND&&overlap(piece,o))return 'neighbour';
+  for(const d of ctx.decks)if(overlap(piece,{x0:d.x,x1:d.x+d.width,y0:d.y,y1:d.y+d.depth}))return 'bridge';
+  const {plot,raster}=ctx;
+  for(let y=Math.max(96,plot.y+plot.depth-2);y<Math.min(180,plot.y+plot.depth);y++)
+   for(let x=Math.max(0,piece.x0);x<Math.min(320,piece.x1);x++){
+    if(x>=plot.x&&x<plot.x+plot.width)continue;
+    const s=raster.surface[y*320+x];if(s===2||s===3)return 'water';
+   }
+ }
  return null;
 }
 export type {ArchitectureSpec};

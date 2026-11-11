@@ -77,3 +77,40 @@ test('D2-c: 本番の描画への差し替えは任意で、通常画面は使�
  assert.match(live,/if\(painter\?\.facility\?\.\(c,o,f\)\)return;/);
  for(const f of ['src/main.ts','src/story/world-session.ts','index.html'])assert.ok(!(await readFile(f,'utf8')).includes('architecture/'),f);
 });
+
+// ---- D2-b2: air-space envelopes (Human decision A: only the excess over the minimal form counts) ----
+import * as AS from '../dist/architecture/airspace-v1.js';
+const raster=(water=[])=>{const n=320*180,r={surface:new Uint8Array(n).fill(1),grade:new Uint8Array(n),bearing:new Uint8Array(n),elevation:new Uint8Array(n)};for(const [x,y] of water)r.surface[y*320+x]=2;return r;};
+const plot={x:100,y:150,width:18,depth:7};
+const deep={...house,use:'market',eaves:'deep',roofFamily:'R01',pitch:'high',roofMaterial:'shingle'};
+const env=spec=>AS.withExcess(AS.facilityAirspace(spec,plot),AS.facilityAirspace(AS.minimalForm(spec),plot));
+
+test('D2-b2: 施設の上空の範囲は今と同じ基準点で、敷地の上端より上だけを数える',()=>{
+ const e=AS.facilityAirspace({...house,use:'house'},plot);
+ assert.equal(e.y1,plot.y);assert.equal(e.ground,plot.y+plot.depth);
+ assert.ok(e.x0<plot.x+9&&e.x1>plot.x+9,'centred on the live anchor');
+ const civic=AS.facilityAirspace({...house,use:'hall'},{x:100,y:120,width:44,depth:22},'great-hall');
+ assert.ok(civic.x1-civic.x0>=44,'civic widened to its plot');
+});
+
+test('D2-b2/決定A: 最も小さい形が重なる部分は受け入れ、文化で増えた張り出しだけを判定する',()=>{
+ const e=env(deep),base=AS.facilityAirspace(AS.minimalForm(deep),plot);
+ assert.ok(e.excess.length>0,'deep eaves and a high roof add excess');
+ // a neighbour that only overlaps the minimal form is accepted
+ const neighbourOnBase={x0:base.x0+2,x1:base.x1-2,y0:base.y1-3,y1:base.y1,ground:plot.y+plot.depth};
+ const top=e.excess.find(p=>p.y1<=base.y0)??e.excess[0];
+ const neighbourOnExcess={x0:top.x0,x1:top.x1,y0:top.y0,y1:top.y1,ground:plot.y+plot.depth+3};
+ const ctx=earlier=>({earlier,decks:[],raster:raster(),plot});
+ assert.equal(AS.airspaceConflict(e,ctx([neighbourOnBase])),null);
+ assert.equal(AS.airspaceConflict(e,ctx([neighbourOnExcess])),'neighbour');
+ assert.equal(AS.airspaceConflict(e,ctx([{...neighbourOnExcess,ground:plot.y+plot.depth+20}])),null,'other depth bands may overlap');
+ // the minimal form never conflicts
+ assert.equal(AS.airspaceConflict(env(AS.minimalForm(deep)),ctx([neighbourOnExcess,neighbourOnBase])),null);
+});
+
+test('D2-b2: 文化で増えた張り出しが橋の床や敷地の横の水面にかかれば代替の対象になる',()=>{
+ const e=env(deep),p=e.excess[0];
+ assert.equal(AS.airspaceConflict(e,{earlier:[],decks:[{x:p.x0,y:p.y0,width:p.x1-p.x0,depth:p.y1-p.y0}],raster:raster(),plot}),'bridge');
+ const side=e.excess.find(q=>q.x1<=plot.x||q.x0>=plot.x+plot.width);
+ if(side){const x=side.x1<=plot.x?side.x1-1:side.x0;assert.equal(AS.airspaceConflict(e,{earlier:[],decks:[],raster:raster([[x,plot.y+plot.depth-1]]),plot}),'water');}
+});
