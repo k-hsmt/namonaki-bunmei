@@ -111,6 +111,17 @@ jobs:
           name: biome47-b1a-plant-gallery
           path: artifacts/biome47-b1a/*
           if-no-files-found: error
+      # Issue 47 B1c: initial climate distribution audit (pure Node, no build or game history needed).
+      - name: Audit Issue 47 B1c initial climate distribution
+        run: node scripts/audit-climate-distribution.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biome47-b1c-climate-distribution
+          path: artifacts/biome47-b1c/*
+          if-no-files-found: error
 
   visual-browser:
     needs: scope
