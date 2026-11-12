@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {generateClimateBaseline,BIOME_KINDS} from '../dist/climate/initial-climate-v1.js';
-import {CLIMATE_WORLD_SAVE_KEY,PreClimateWorldError,validateClimateWorldSave,prepareClimateWorldSave,knownClimateWorldPacket} from '../dist/climate/climate-world-v1.js';
+import {CLIMATE_WORLD_SAVE_KEY,PreClimateWorldError,OutdatedWorldSaveError,validateClimateWorldSave,prepareClimateWorldSave,knownClimateWorldPacket} from '../dist/climate/climate-world-v1.js';
 import {createNewArchitectureWorld} from '../dist/story/new-world.js';
 import {advanceArchitectureWorld,prepareArchitectureSave} from '../dist/architecture/production-v1.js';
 import {architectureProductionSession,advanceWorldSessionAsync,prepareWorldSessionSave,restoreWorldSession} from '../dist/story/world-session.js';
@@ -64,9 +64,12 @@ test('B2a: a changed, missing or unknown climate record is rejected',async()=>{
   p=>{delete p.climate;},
   p=>{p.climate=null;},
   p=>{p.extra=1;},
-  p=>{p.schemaVersion=2;},
+  p=>{p.schemaVersion=3;},
  ];
  for(const change of variants){const p=JSON.parse(JSON.stringify(packet));change(p);await assert.rejects(validateClimateWorldSave(p),/Invalid v10 world|Invalid/,change.toString());}
+ // v10 from B2a (schemaVersion 1, no flora) is an earlier version: reported, not opened.
+ const b2a=JSON.parse(JSON.stringify(packet));b2a.schemaVersion=1;delete b2a.flora;
+ await assert.rejects(validateClimateWorldSave(b2a),OutdatedWorldSaveError);
  // A climate copied from another seed does not fit this world.
  const other=JSON.parse(JSON.stringify(packet));other.climate=JSON.parse(JSON.stringify(generateClimateBaseline(43)));
  await assert.rejects(validateClimateWorldSave(other),/does not match the world seed/);

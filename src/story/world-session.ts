@@ -12,7 +12,8 @@ import {restoreEconomicProductionSave} from '../irrigation/economic-production-h
 import {observeEconomicProductionScene} from '../scene/economic-production-scene-v1.js';
 import type {GeneratedSceneObservation} from '../scene/generated-scene-review.js';
 import {knownArchitectureWorld,advanceArchitectureWorld,chooseArchitectureWorld,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
-import {prepareClimateWorldSave,restoreClimateWorldSave,worldClimate} from '../climate/climate-world-v1.js';
+import {prepareClimateWorldSave,restoreClimateWorldSave,worldClimate,worldFlora} from '../climate/climate-world-v1.js';
+import type {LocalFlora} from '../flora/local-flora-v1.js';
 import type {WorldClimateBaseline} from '../climate/initial-climate-v1.js';
 import {createArchitecturePainter} from '../architecture/scene-v1.js';
 import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '../architecture/layout-v1.js';
@@ -41,14 +42,16 @@ export type TerrainGeneratedSession={mode:'generated';review:TerrainProductionWo
  */
 export type ArchitectureGeneratedSession=TerrainGeneratedSession&{architecture:ArchitectureProductionWorld;
  /** Issue #47 B2a: the world's initial climate, a pure function of its seed; saved and checked in v10. */
- climate:WorldClimateBaseline};
+ climate:WorldClimateBaseline;
+ /** Issue #47 B2b: each patch's local habitat and initial plant community; saved and checked in v10. */
+ flora:LocalFlora};
 export type WorldSession=BaselineGeneratedSession|EconomicGeneratedSession|TerrainGeneratedSession|ArchitectureGeneratedSession|{mode:'legacy-fixed';template:LegacyWorldSave;state:CivilizationState};
 function architecture(session:WorldSession):session is ArchitectureGeneratedSession {
  if(!('architecture' in session)||!session.architecture)return false;
  knownArchitectureWorld(session.architecture);
  if(session.review!==session.architecture.terrain||session.state!==session.architecture.terrain.review.state)throw Error('Architecture session differs from its owned world');return true;
 }
-export function architectureProductionSession(world:ArchitectureProductionWorld):ArchitectureGeneratedSession{knownArchitectureWorld(world);return {mode:'generated',review:world.terrain,state:world.terrain.review.state,architecture:world,climate:worldClimate(world)};}
+export function architectureProductionSession(world:ArchitectureProductionWorld):ArchitectureGeneratedSession{knownArchitectureWorld(world);return {mode:'generated',review:world.terrain,state:world.terrain.review.state,architecture:world,climate:worldClimate(world),flora:worldFlora(world)};}
 const painters=new WeakMap<ArchitectureProductionWorld,GeneratedStructurePainter>();
 /**
  * D5 (Human decisions #2, #3): the district's layout in `year` as text for the observation panel, e.g.
