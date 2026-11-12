@@ -11,6 +11,7 @@ import type {GeneratedSceneObservation} from './generated-scene-review.js';
 import {drawBuildingSprite,drawCivicArchitecture,drawHousingPlotSurface,drawResidentialRoofs,drawConfirmedPublicSpaces} from './draw.js';
 import {projectGeneratedPresentation} from './generated-presentation-review.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
+import {prepareSceneFlora,type SceneFloraSource,type StructureLayerDrawer} from './flora-draw.js';
 /** Ground-level paint is clipped to the actual footprint; upper roofs may overhang. */
 function withinFootprint(c:CanvasRenderingContext2D,p:GroundPlot,draw:()=>void){
  c.save();c.beginPath();c.rect(0,0,320,p.y);c.rect(p.x,p.y,p.width,p.depth);c.clip();draw();c.restore();
@@ -40,6 +41,19 @@ export function projectScenePaint(observation:GeneratedSceneObservation){
  return {observation,presentation:mask?{...presentation,trees:presentation.trees.filter(p=>clear(p)),wear:presentation.wear.filter(([x,y])=>clearChannelRoot(mask,x,y,1,1)),people:presentation.people.filter(([x,y])=>clearChannelRoot(mask,x,y))}:presentation,vegetation:mask&&raw?{...raw,grass:raw.grass.filter(p=>clear(p)),shrubs:raw.shrubs.filter(p=>clear(p,3)),trees:raw.trees.filter(p=>clear(p))}:raw};
 }
 export type ScenePaintProjection=ReturnType<typeof projectScenePaint>;
+/** Issue #47 B2d: with the world's flora, the landscape-v3 grass, shrubs and trees are not drawn (fields keep their #32 rule). */
+export function withoutLandscapePlants(paint:ScenePaintProjection):ScenePaintProjection {
+ return {...paint,presentation:{...paint.presentation,trees:[]},vegetation:paint.vegetation?{...paint.vegetation,grass:[],shrubs:[],trees:[]}:null};
+}
+function drawClouds(c:CanvasRenderingContext2D,presentation:ScenePaintProjection['presentation']){for(const {x,y} of presentation.clouds){c.fillStyle=presentation.drought?'#c4c3aa':'#e9e1cb';c.fillRect(x+4,y,19,3);c.fillRect(x,y+3,31,5);c.fillRect(x+8,y-3,10,4);}}
+function drawPeople(c:CanvasRenderingContext2D,presentation:ScenePaintProjection['presentation']){for(const [i,[x,y]] of presentation.people.entries()){
+ c.fillStyle='#d2b894';c.fillRect(x,y-6,2,2);c.fillStyle=['#66594f','#b29b74','#667a70'][i%3]!;c.fillRect(x,y-4,2,3);c.fillStyle='#454e48';c.fillRect(x,y-1,2,2);
+}}
+/** Draws a structure-only layer of a filtered observation with one scene's presentation (for the plant/structure Y order). */
+export function sceneStructureDrawer(paint:ScenePaintProjection,painter?:GeneratedStructurePainter):StructureLayerDrawer {
+ const p=paint.presentation;
+ return (canvas,o,marks)=>drawGeneratedSceneReview(canvas,o,'structures',{observation:o,presentation:{...p,trees:[],festival:marks.festival?p.festival:null,fire:marks.fire?p.fire:null,cart:marks.cart?p.cart:null},vegetation:paint.vegetation},painter);
+}
 export type GeneratedSceneLayer='backdrop'|'structures';
 /**
  * Optional replacement for how housing parts and facilities are painted (Issue #35 D2-c review only).
@@ -49,17 +63,31 @@ export type GeneratedSceneLayer='backdrop'|'structures';
 export interface GeneratedStructurePainter {
  readonly residentialRoofs?:(c:CanvasRenderingContext2D,scene:GeneratedSceneObservation['composition'],depth:'far'|'middle'|'near')=>void;
  readonly facility?:(c:CanvasRenderingContext2D,o:GeneratedSceneObservation['snapshot']['objects'][number],plot:GroundPlot,year:number)=>boolean;
+ /** Issue #47 B2d (v10 worlds): the world's flora of the observed year and site. Present, plants follow it. */
+ readonly flora?:(o:GeneratedSceneObservation)=>SceneFloraSource;
 }
 export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:GeneratedSceneObservation,layer?:GeneratedSceneLayer,paint?:ScenePaintProjection,painter?:GeneratedStructurePainter):void {
  if(layer!==undefined&&layer!=='backdrop'&&layer!=='structures')throw Error('Unknown scene layer');
  if(paint&&paint.observation!==observation)throw Error('Scene paint projection mismatch');
  const {snapshot:s,composition:scene,ground}=observation;
  if(scene.generatedGround!==ground||scene.year!==s.year||scene.siteIndex!==(s.local?.index??0))throw Error('Generated scene composition mismatch');
+ if(painter?.flora){
+  paint=withoutLandscapePlants(paint??projectScenePaint(observation));
+  if(!layer){
+   // Same composition as the motion frame (trees still): tinted backdrop, clouds, plants behind, people, structures, plants in front.
+   drawGeneratedSceneReview(canvas,observation,'backdrop',paint,painter);
+   const structures=document.createElement('canvas');drawGeneratedSceneReview(structures,observation,'structures',paint,painter);
+   const flora=prepareSceneFlora(canvas,structures,observation,painter.flora(observation),paint.presentation,sceneStructureDrawer(paint,painter));
+   const c=canvas.getContext('2d')!;c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}
+   drawClouds(c,paint.presentation);c.restore();c.drawImage(flora.behind,0,0);c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}drawPeople(c,paint.presentation);c.restore();
+   c.drawImage(structures,0,0);c.drawImage(flora.front,0,0);return;
+  }
+ }
  if(layer==='structures'){canvas.width=320;canvas.height=180;}else drawTerrainRecord(canvas,ground.terrain,ground.site);const c=canvas.getContext('2d');if(!c)throw Error('2d context missing');
  c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}
  if(layer!=='structures'){paintEnvironmentGround(c,ground);if(ground.terrain.format==='resolved-terrain-at-year')paintTerrainCutSurface(c,ground.terrain,ground.site);}
  const {presentation,vegetation}=paint??projectScenePaint(observation),r=readOwnedRecordPhysics(ground.terrain.sites[ground.site].physics);
- if(!layer)for(const {x,y} of presentation.clouds){c.fillStyle=presentation.drought?'#c4c3aa':'#e9e1cb';c.fillRect(x+4,y,19,3);c.fillRect(x,y+3,31,5);c.fillRect(x+8,y-3,10,4);}
+ if(!layer)drawClouds(c,presentation);
  // Weather paints only the saved surface type; floods never invent new water.
  if(layer!=='structures'&&(presentation.flood||presentation.drought))for(let y=96;y<180;y++)for(let x=0;x<320;x++){
   const i=y*320+x;
@@ -77,9 +105,7 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
  drawConfirmedPublicSpaces(c,s.publicSpaces??[]);drawHousingPlotSurface(c,scene);
  }
  if(layer!=='backdrop')for(const depth of ['far','middle','near'] as const)(painter?.residentialRoofs??drawResidentialRoofs)(c,scene,depth);
- if(!layer)for(const [i,[x,y]] of presentation.people.entries()){
-  c.fillStyle='#d2b894';c.fillRect(x,y-6,2,2);c.fillStyle=['#66594f','#b29b74','#667a70'][i%3]!;c.fillRect(x,y-4,2,3);c.fillStyle='#454e48';c.fillRect(x,y-1,2,2);
- }
+ if(!layer)drawPeople(c,presentation);
  if(layer!=='backdrop')for(const o of [...s.objects.filter(o=>o.civic),...s.objects.filter(o=>!o.civic&&o.kind!=='bridge')]){
   const f=ground.facilities.find(p=>p.id===o.id)!.plot;
   withinFootprint(c,f,()=>{

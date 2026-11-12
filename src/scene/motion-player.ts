@@ -36,7 +36,7 @@ export class SceneMotionPlayer {
  show(world:WorldSession,year:number,site:number):SiteSnapshot {
   if(this.disposed)throw Error('Disposed scene player');if(this.world===world&&this.year===year&&this.site===site)return this.snapshot!;
   if(world.mode==='generated'){
-   const observation=observeGeneratedWorldSession(world,year,site),key=sceneMotionVisualKey(observation),painter=worldStructurePainter(world);
+   const observation=observeGeneratedWorldSession(world,year,site),painter=worldStructurePainter(world),key=sceneMotionVisualKey(observation)+(painter?.flora?JSON.stringify(painter.flora(observation).views.map(v=>v?.stage??-1)):'');
    if(this.terrain!==observation.ground.terrain||this.visualKey!==key||(this.painter===undefined)!==(painter===undefined)){this.stopClock();this.prepared=null;}
    // A painter draws fixed birth styles; a new building already changes the visual key, so layers are reused as before.
    this.painter=painter;
