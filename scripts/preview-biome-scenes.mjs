@@ -85,8 +85,41 @@ try{
    if(original.toDataURL()!==originalRepeat.toDataURL())throw Error('Original scene changed while redrawing');
    const background=document.createElement('canvas');D.drawGeneratedSceneReview(background,obs,'backdrop',withoutPlants,painter);
    const buildings=document.createElement('canvas');D.drawGeneratedSceneReview(buildings,obs,'structures',withoutPlants,painter);
-   scenes.push({background,buildings,raster,mirrorX:obs.ground.terrain.sites[obs.ground.site].render.mirrorX===true});
-   result.push({siteIndex:si,siteId:obs.ground.site,occupied,mirrorX:obs.ground.terrain.sites[obs.ground.site].render.mirrorX===true,
+   /**
+    * Depth of every structure pixel for the plant/structure Y order. Each structure is drawn alone with
+    * the same game function, in the game's own order (roof parts far→middle→near, then civic, then other
+    * facilities, then presentation marks); the last one drawn owns the pixel. Its depth is its ground line:
+    * a facility's footprint front edge (plot.y+depth), a roof part's base y, a mark's y. The stacked singles
+    * must reproduce the full structure layer exactly, so structure-to-structure order stays the game's.
+    */
+   const pres=projection.presentation,blocks=obs.composition.residentialBlocks;
+   const single=(objects,roofPart,mark)=>{
+    const o2={...obs,snapshot:{...obs.snapshot,objects},composition:{...obs.composition,residentialBlocks:blocks.map(b=>({...b,roofParts:b.roofParts.filter(p=>p===roofPart)}))}};
+    const marks={festival:null,fire:null,cart:null};if(mark)marks[mark]=pres[mark];
+    const cv=document.createElement('canvas');D.drawGeneratedSceneReview(cv,o2,'structures',{observation:o2,presentation:{...pres,trees:[],...marks},vegetation:null},painter);return cv;
+   };
+   const items=[];
+   for(const depth of ['far','middle','near'])
+    for(const part of blocks.flatMap(b=>b.roofParts).filter(p=>p.depth===depth).sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId)))
+     items.push({id:'roof:'+part.partId,ground:part.y,canvas:single([],part,null)});
+   for(const o of [...obs.snapshot.objects.filter(o=>o.civic),...obs.snapshot.objects.filter(o=>!o.civic&&o.kind!=='bridge')]){
+    const plot=obs.ground.facilities.find(f=>f.id===o.id).plot;
+    items.push({id:o.id,ground:plot.y+plot.depth,canvas:single([o],null,null)});
+   }
+   for(const mark of ['festival','fire','cart'])if(pres[mark])items.push({id:mark,ground:pres[mark].y,canvas:single([],null,mark)});
+   const depthMap=new Int16Array(57600).fill(-1),ownerMap=new Int16Array(57600).fill(-1);
+   const stacked=document.createElement('canvas');stacked.width=320;stacked.height=180;const sctx=stacked.getContext('2d');
+   items.forEach((item,n)=>{
+    sctx.drawImage(item.canvas,0,0);
+    const d=item.canvas.getContext('2d').getImageData(0,0,320,180).data;
+    for(let i=0;i<57600;i++)if(d[i*4+3]){depthMap[i]=item.ground;ownerMap[i]=n;}
+   });
+   const full=buildings.getContext('2d').getImageData(0,0,320,180).data,again=sctx.getImageData(0,0,320,180).data;
+   for(let i=0;i<full.length;i++)if(full[i]!==again[i])throw Error('Single-structure renders do not reproduce the structure layer at '+obs.ground.site);
+   for(let i=0;i<57600;i++)if(full[i*4+3]&&full[i*4+3]!==255)throw Error('Partially transparent structure pixel; the Y-order proof needs opaque structures');
+   scenes.push({background,buildings,raster,mirrorX:obs.ground.terrain.sites[obs.ground.site].render.mirrorX===true,
+    depthMap,ownerMap,structures:items.map(({id,ground})=>({id,ground}))});
+   result.push({siteIndex:si,siteId:obs.ground.site,occupied,structures:items.map(({id,ground})=>({id,ground})),mirrorX:obs.ground.terrain.sites[obs.ground.site].render.mirrorX===true,
     physics:{surface:Array.from(raster.surface),grade:Array.from(raster.grade),bearing:Array.from(raster.bearing)},
     realBuildings:obs.snapshot.objects.length,realHousingBlocks:obs.composition.residentialBlocks.length,
     original:original.toDataURL('image/png')
@@ -152,14 +185,20 @@ try{
   };
   const blank=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;const ctx=c.getContext('2d');ctx.imageSmoothingEnabled=false;return [c,ctx];};
   // Plants are painted on their own transparent layer so the frame order can be verified pixel by pixel.
+  /**
+   * Plants of one frame, in Y order: every plant (undergrowth and trees together) sorted by root y,
+   * ties undergrowth first, then x. root[i] is the root y of the plant visible at pixel i (the last one
+   * drawn there, which has the largest root y); kind[i] is 1 undergrowth, 2 tree.
+   */
   const plantLayer=(si,style,plan)=>{
-   const [low,lowCtx]=blank(),[trees,treeCtx]=blank();
+   const [all,allCtx]=blank(),[scratch,sctx]=blank();
+   const root=new Int16Array(57600).fill(-1),kind=new Uint8Array(57600);
    let clipped=0;
-   const draw=(ctx,plant)=>{
+   const ordered=[...plan.low,...plan.trees].sort((a,b)=>a.y-b.y||Number(a.kind==='tree')-Number(b.kind==='tree')||a.x-b.x||a.id.localeCompare(b.id));
+   for(const plant of ordered){
     const expressive=style.id==='expressive'||(style.id==='hybrid'&&plant.kind==='tree'&&plant.y>=142);
-    const kind=expressive?'expressive':'claude',id=expressive?expressiveIds[plant.id]:plant.id;
-    const stage=plant.stage;
-    const img=expressive?loaded.expressive[id][stage]:loaded.claude[id][stage][plant.variant];
+    const id=expressive?expressiveIds[plant.id]:plant.id;
+    const img=expressive?loaded.expressive[id][plant.stage]:loaded.claude[id][plant.stage][plant.variant];
     const depth=(plant.y-96)/84;
     // Same tree roots; A retains the original expressive silhouette with a 0.45..0.73 scale.
     // B uses its native restrained 0.58..1.00 size. C combines them by depth.
@@ -169,47 +208,59 @@ try{
     // Sprites are not flipped; only the root position follows the scene's mirror.
     const left=Math.round(screenRoot(si,plant.x)-ox*k),top=Math.round(plant.y-oy*k);
     if(left<0||top<0||left+w>320||top+h>180)clipped++;
-    ctx.drawImage(img,left,top,w,h);
-   };
-   for(const p of [...plan.low].sort((a,b)=>a.y-b.y))draw(lowCtx,p);
-   for(const p of [...plan.trees].sort((a,b)=>a.y-b.y))draw(treeCtx,p);
-   // Undergrowth first, trees over it: the same order as the original single-pass drawing.
-   const [all,allCtx]=blank();allCtx.drawImage(low,0,0);allCtx.drawImage(trees,0,0);
-   return {low,trees,all,clipped};
+    allCtx.drawImage(img,left,top,w,h);
+    const x0=Math.max(0,left),y0=Math.max(0,top),x1=Math.min(320,left+w),y1=Math.min(180,top+h);
+    if(x1<=x0||y1<=y0)continue;
+    sctx.clearRect(x0,y0,x1-x0,y1-y0);sctx.drawImage(img,left,top,w,h);
+    const d=sctx.getImageData(x0,y0,x1-x0,y1-y0).data;
+    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)if(d[((y-y0)*(x1-x0)+x-x0)*4+3]){const i=y*320+x;root[i]=plant.y;kind[i]=plant.kind==='tree'?2:1;}
+    sctx.clearRect(x0,y0,x1-x0,y1-y0);
+   }
+   return {all,root,kind,clipped};
   };
   // Background + biome soil tint. Identical for every style of one site/biome.
   const ground=(si,biome)=>{const [c,ctx]=blank();ctx.drawImage(scenes[si].background,0,0);tint(c,scenes[si].raster,biome,si);return c;};
+  const pixels=c=>c.getContext('2d').getImageData(0,0,320,180).data;
+  /** A plant pixel is in front of a structure pixel only when the plant's root y is greater than the structure's ground line. */
+  const inFront=(si,layer,i)=>layer.root[i]>scenes[si].depthMap[i];
+  const splitPlants=(si,layer)=>{
+   if(layer.split?.si===si)return layer.split;
+   const p=pixels(layer.all),[front,fctx]=blank(),[behind,bctx]=blank();
+   const fi=fctx.createImageData(320,180),bi=bctx.createImageData(320,180);
+   for(let i=0;i<57600;i++){if(!p[i*4+3])continue;(inFront(si,layer,i)?fi:bi).data.set(p.subarray(i*4,i*4+4),i*4);}
+   fctx.putImageData(fi,0,0);bctx.putImageData(bi,0,0);
+   return layer.split={si,front,behind};
+  };
   /**
-   * B1b occlusion trial order: 1 background/terrain, 2 biome soil tint, 3 confirmed structures, 4 plants.
-   * The structure layer is a transparent canvas (drawGeneratedSceneReview 'structures'), so no
-   * background is painted twice. Every plant is drawn over every structure: this is deliberately
-   * NOT a depth sort (a far tree also covers a nearer building); see docs §4.
-   * order='plants-under-structures' reproduces the previous B1b frames for side-by-side review only.
+   * B1b order: 1 background/terrain, 2 biome soil tint, then plants and structures by ground line (Y):
+   * plants behind a structure, the structure layer, plants in front of it. The structure layer is the
+   * game's own transparent canvas, so structure-to-structure order is unchanged and nothing is painted twice.
+   * 'structures-under-plants' (every plant over every structure) and 'plants-under-structures' (the reverse)
+   * reproduce the two earlier B1b orders for side-by-side review only.
    */
-  const compose=(si,biome,layer,order='structures-under-plants')=>{
+  const compose=(si,biome,layer,order='y-sorted')=>{
    const [c,ctx]=blank();ctx.drawImage(ground(si,biome),0,0);
-   if(order==='structures-under-plants'){ctx.drawImage(scenes[si].buildings,0,0);ctx.drawImage(layer.all,0,0);}
+   if(order==='y-sorted'){const s=splitPlants(si,layer);ctx.drawImage(s.behind,0,0);ctx.drawImage(scenes[si].buildings,0,0);ctx.drawImage(s.front,0,0);}
+   else if(order==='structures-under-plants'){ctx.drawImage(scenes[si].buildings,0,0);ctx.drawImage(layer.all,0,0);}
    else if(order==='plants-under-structures'){ctx.drawImage(layer.all,0,0);ctx.drawImage(scenes[si].buildings,0,0);}
    else throw Error('Unknown B1b layer order '+order);
    return c;
   };
-  const pixels=c=>c.getContext('2d').getImageData(0,0,320,180).data;
-  /** Pixel proof of the order, plus how many structure pixels the plants cover. */
+  /** Pixel proof of the Y order, with how many structure pixels plants cover and how many plant pixels structures hide. */
   const verify=(si,biome,layer,frameCanvas,label)=>{
-   const [under,uctx]=blank();uctx.drawImage(ground(si,biome),0,0);uctx.drawImage(scenes[si].buildings,0,0);
-   const f=pixels(frameCanvas),u=pixels(under),p=pixels(layer.all),t=pixels(layer.trees),l=pixels(layer.low),b=pixels(scenes[si].buildings);
-   let structure=0,occluded=0,byTrees=0,byLow=0;
-   for(let i=0;i<f.length;i+=4){
-    const pa=p[i+3];
+   const f=pixels(frameCanvas),g=pixels(ground(si,biome)),p=pixels(layer.all),b=pixels(scenes[si].buildings);
+   let structure=0,occluded=0,byTrees=0,byLow=0,hidden=0;
+   for(let i=0;i<57600;i++){
+    const a=i*4,pa=p[a+3];
     if(pa!==0&&pa!==255)throw Error(label+': partially transparent plant pixel; order proof needs opaque sprites');
-    const src=pa?p:u;
-    if(f[i]!==src[i]||f[i+1]!==src[i+1]||f[i+2]!==src[i+2]||f[i+3]!==src[i+3])
-     throw Error(label+': pixel '+(i/4)+(pa?' is not the plant (plants must be in front)':' differs from background+structures (structure lost or altered)'));
-    if(b[i+3]){structure++;if(pa){occluded++;if(t[i+3])byTrees++;else if(l[i+3])byLow++;}}
+    const front=pa&&inFront(si,layer,i),src=front?p:b[a+3]?b:g;
+    if(f[a]!==src[a]||f[a+1]!==src[a+1]||f[a+2]!==src[a+2]||f[a+3]!==src[a+3])
+     throw Error(label+': pixel '+i+(front?' is not the plant in front':b[a+3]?' is not the structure (a plant behind it shows through)':' differs from the ground'));
+    if(b[a+3]){structure++;if(front){occluded++;if(layer.kind[i]===2)byTrees++;else byLow++;}else if(pa)hidden++;}
    }
    if(structure===0)throw Error(label+': structures vanished from the frame');
    return {structurePixels:structure,occludedStructurePixels:occluded,occludedByTrees:byTrees,occludedByUndergrowth:byLow,
-    occludedShare:Math.round(occluded/structure*10000)/10000};
+    occludedShare:Math.round(occluded/structure*10000)/10000,plantPixelsBehindStructures:hidden};
   };
   // Every planned root (2px, record land) must sit on record land when read back through the screen mapping.
   for(const plan of plans)for(const q of [...plan.trees,...plan.low]){
@@ -230,19 +281,21 @@ try{
    }
    frames.push(...rendered);
   }
-  /** Previous order and an occlusion map, for side-by-side review of selected frames only. */
-  const previousOrder=key=>{const {si,biome,layer}=layers.get(key);return compose(si,biome,layer,'plants-under-structures').toDataURL('image/png');};
+  /** The previous B1b order (every plant over every structure) and a front/back map, for review of selected frames. */
+  const previousOrder=key=>{const {si,biome,layer}=layers.get(key);return compose(si,biome,layer,'structures-under-plants').toDataURL('image/png');};
   const occlusionMap=key=>{
    const {si,biome,layer}=layers.get(key),c=compose(si,biome,layer),ctx=c.getContext('2d'),im=ctx.getImageData(0,0,320,180),d=im.data;
    const p=pixels(layer.all),b=pixels(scenes[si].buildings);
-   for(let i=0;i<d.length;i+=4){
-    if(b[i+3]&&p[i+3]){d[i]=230;d[i+1]=40;d[i+2]=170;}                 // structure hidden by a plant
-    else if(b[i+3]){d[i]=245;d[i+1]=245;d[i+2]=235;}                     // structure still visible
-    else for(let j=0;j<3;j++)d[i+j]=Math.round(d[i+j]*.35+235*.65);       // everything else, faded
+   for(let i=0;i<57600;i++){
+    const a=i*4;
+    if(b[a+3]&&p[a+3]&&inFront(si,layer,i)){d[a]=230;d[a+1]=40;d[a+2]=170;}        // structure hidden by a plant in front
+    else if(b[a+3]&&p[a+3]){d[a]=40;d[a+1]=120;d[a+2]=220;}                       // plant behind, hidden by the structure
+    else if(b[a+3]){d[a]=245;d[a+1]=245;d[a+2]=235;}                              // structure, nothing behind or in front
+    else for(let j=0;j<3;j++)d[a+j]=Math.round(d[a+j]*.35+235*.65);               // everything else, faded
    }
    ctx.putImageData(im,0,0);return c.toDataURL('image/png');
   };
-  // Guaranteed overlap (TEST ONLY, not one of the 63): a C near-ground tree rooted just in front of a real structure.
+  // Guaranteed overlaps (TEST ONLY, not part of the 63): one tree just in front of a real structure, one just behind it.
   const overlapChecks=[];
   for(let si=0;si<3;si++){
    const b=pixels(scenes[si].buildings);
@@ -252,16 +305,24 @@ try{
     // Prefer a structure whose front tree is a C near tree (root y>=142, painter A); otherwise the nearest one.
     .sort((a,c)=>Number(c.p.y+c.p.depth+4>=142)-Number(a.p.y+a.p.depth+4>=142)||c.p.y-a.p.y||c.n-a.n||a.p.x-c.p.x)[0];
    if(!target)throw Error('No near structure to test occlusion at site '+si);
-   // The tree root is a record coordinate, like every planned plant; plantLayer mirrors it.
-   const p=target.record,tree={kind:'tree',id:'deciduous',x:p.x+Math.floor(p.width/2)-1,y:p.y+p.depth+4,variant:0,stage:'mature'};
    const biome=biomes.find(x=>x.id==='temperate_forest'),style=styles.find(x=>x.id==='hybrid');
-   const layer=plantLayer(si,style,{trees:[tree],low:[]}),c=compose(si,biome,layer),key='overlap-check/'+si;
-   const occlusion=verify(si,biome,layer,c,key);
-   if(occlusion.occludedByTrees===0)throw Error(key+': the near tree did not cover the structure behind it');
-   layers.set(key,{si,biome,layer});
-   overlapChecks.push({siteIndex:si,tree:{id:tree.id,x:tree.x,y:tree.y,painter:tree.y>=142?'A (C near tree)':'B (C mid-ground tree; no structure near enough for A)'},structurePlot:p,occlusion,data:c.toDataURL('image/png'),previous:previousOrder(key)});
+   // Tree roots are record coordinates, like every planned plant; plantLayer mirrors them.
+   const p=target.record,x=p.x+Math.floor(p.width/2)-1;
+   const cases=[{placement:'front',tree:{kind:'tree',id:'deciduous',x,y:p.y+p.depth+4,variant:0,stage:'mature'}},
+    {placement:'behind',tree:{kind:'tree',id:'deciduous',x,y:p.y-2,variant:0,stage:'mature'}}];
+   for(const {placement,tree} of cases){
+    const layer=plantLayer(si,style,{trees:[tree],low:[]}),c=compose(si,biome,layer),key='overlap-check/'+placement+'/'+si;
+    const occlusion=verify(si,biome,layer,c,key);
+    if(placement==='front'&&occlusion.occludedByTrees===0)throw Error(key+': the tree in front did not cover the structure');
+    if(placement==='behind'&&occlusion.plantPixelsBehindStructures===0)throw Error(key+': the structure did not hide the tree behind it');
+    layers.set(key,{si,biome,layer});
+    overlapChecks.push({siteIndex:si,placement,tree:{id:tree.id,x:tree.x,y:tree.y,painter:tree.y>=142?'A (C near tree)':'B (C mid-ground tree)'},
+     structurePlot:p,occlusion,data:c.toDataURL('image/png'),previous:previousOrder(key)});
+   }
   }
-  const ranked=frames.filter(f=>f.style==='hybrid').sort((a,b)=>b.occlusion.occludedStructurePixels-a.occlusion.occludedStructurePixels||a.biome.localeCompare(b.biome)||a.siteIndex-b.siteIndex);
+  // Review examples: the C frames where the Y order hides the most plant pixels behind structures.
+  const ranked=frames.filter(f=>f.style==='hybrid'&&f.occlusion.plantPixelsBehindStructures>0)
+   .sort((a,b)=>b.occlusion.plantPixelsBehindStructures-a.occlusion.plantPixelsBehindStructures||a.biome.localeCompare(b.biome)||a.siteIndex-b.siteIndex);
   const examples=ranked.slice(0,6).map(f=>{const key=f.biome+'/'+f.siteIndex+'/'+f.style;return {biome:f.biome,siteIndex:f.siteIndex,style:f.style,previous:previousOrder(key),map:occlusionMap(key)};});
   return {frames,overlapChecks,examples};
  },{specimens,plans,biomes:REVIEW_BIOMES,styles:REVIEW_STYLES,expressiveIds:EXPRESSIVE_IDS,occupied:prepared.map(s=>s.occupied)});
@@ -282,11 +343,12 @@ try{
   await saveData(name,r.data);
   images.set(name,{name,clipped:r.clipped,occlusion:r.occlusion});
  }
- // Review aids, not part of the 63: previous order and occlusion maps for the most-occluded C frames,
- // and one guaranteed tree-over-structure check per site.
+ // Review aids, not part of the 63: the previous order and front/back maps for the C frames where the
+ // Y order hides the most plant pixels, and guaranteed tree-in-front / tree-behind checks per site.
  const exampleName=e=>e.biome+'_'+REVIEW_SITES[e.siteIndex].id+'_'+e.style;
  for(const e of examples){await saveData('previous-order_'+exampleName(e),e.previous);await saveData('occlusion-map_'+exampleName(e),e.map);}
- for(const o of overlapChecks){const id=REVIEW_SITES[o.siteIndex].id;await saveData('overlap-check_'+id+'_TEST_ONLY',o.data);await saveData('overlap-check_'+id+'_previous-order_TEST_ONLY',o.previous);}
+ const overlapName=o=>'overlap-check_'+REVIEW_SITES[o.siteIndex].id+'_'+o.placement;
+ for(const o of overlapChecks){await saveData(overlapName(o)+'_TEST_ONLY',o.data);await saveData(overlapName(o)+'_previous-order_TEST_ONLY',o.previous);}
  const report={
   status:'PROTOTYPE ONLY — NOT GENERATED CLIMATE, NOT HISTORY',
   sourceSHA:process.env.REVIEW_SOURCE_SHA??'unverified-local',
@@ -295,17 +357,18 @@ try{
   coordinateNote:'Planner roots, occupied plots and physics are record coordinates. Plants and the soil tint are mapped to the screen through the scene mirror (root x -> 318-x, column x -> 319-x when mirrorX); sprites are not flipped.',
   biomes:REVIEW_BIOMES.map(x=>({id:x.id,label:x.label})),
   styles:REVIEW_STYLES.map(x=>({id:x.id,label:x.label})),
-  layerOrder:['background (terrain, ground, canals, public spaces, bridges)','biome soil tint (land cells only)','confirmed structures (transparent layer)','plants: undergrowth, then trees by root y'],
-  layerOrderNote:'Every plant is drawn over every structure. This is an occlusion trial, not a depth sort.',
+  layerOrder:['background (terrain, ground, canals, public spaces, bridges)','biome soil tint (land cells only)','plants whose root y is not below the ground line of the structure pixel they overlap','confirmed structures (the game layer, unchanged internal order)','plants in front: root y greater than the structure ground line'],
+  layerOrderNote:'Plants are sorted by root y (undergrowth and trees together). Structure ground line: facility footprint front edge (plot.y+depth), roof part base y, presentation mark y. Ties put the structure in front.',
+  structureGroundLines:prepared.map(x=>({site:x.siteId,structures:x.structures})),
   counts,frames:results.map(x=>({biome:x.biome,site:REVIEW_SITES[x.siteIndex].id,style:x.style,clipped:x.clipped,occlusion:x.occlusion})),
-  mostOccludedHybridExamples:examples.map(e=>({name:exampleName(e),occlusion:images.get(exampleName(e)).occlusion})),
+  mostHiddenPlantHybridExamples:examples.map(e=>({name:exampleName(e),occlusion:images.get(exampleName(e)).occlusion})),
   overlapChecks:overlapChecks.map(({data,previous,...o})=>({...o,site:REVIEW_SITES[o.siteIndex].id})),
   assets:artifacts
  };
  await writeFile(out+'/report.json',JSON.stringify(report,null,2)+'\n');
  const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
  const pct=v=>(Math.round(v*1000)/10).toFixed(1)+'%';
- const share=o=>'建物の遮蔽 '+pct(o.occludedShare)+'（'+o.occludedStructurePixels+'/'+o.structurePixels+'px、うち樹木 '+o.occludedByTrees+'px）';
+ const share=o=>'建物の遮蔽 '+pct(o.occludedShare)+'（'+o.occludedStructurePixels+'/'+o.structurePixels+'px、うち樹木 '+o.occludedByTrees+'px）／建物の奥に隠れた植物 '+o.plantPixelsBehindStructures+'px';
  const img=name=>'<img src="'+esc(name)+'.png" width="320" height="180" loading="lazy" alt="'+esc(name)+'">';
  const rows=REVIEW_BIOMES.map(b=>{
   const cells=REVIEW_SITES.map(site=>'<tr><th>'+esc(site.label)+'</th>'+
@@ -320,16 +383,16 @@ try{
   '<style>:root{color-scheme:light}body{font:14px/1.6 system-ui,sans-serif;background:#e9eae3;color:#2b342b;margin:0;padding:22px}main{max-width:1200px;margin:auto}h1{font-size:24px}h2{border-top:1px solid #c5cbbf;padding-top:20px;margin-top:32px}table{border-collapse:separate;border-spacing:8px 6px}td,th{padding:6px;background:#f8f8f3;border-radius:3px}th{text-align:left;white-space:nowrap;font-size:12px}.scroll{overflow-x:auto}img{display:block;image-rendering:pixelated;max-width:none}figure{display:inline-block;margin:0 14px 14px 0}figcaption{font-size:12px}small,.note{color:#5c675c}details{margin:16px 0}@media(max-width:700px){body{padding:12px}h1{font-size:20px}}</style>'+
   '<main><h1>Issue #47 B1b｜本編の地形・建物×植物造形 A/B/C</h1>'+
   '<p><b>PROTOTYPE ONLY / NOT HISTORY.</b> seed '+seed+'、観測年 '+year+'。地形・建物・橋・住宅は本編の確定記録から取得。植物と地表色は7つの仮想気候を指定した<b>視覚比較用</b>であり、世界の気候が既に生成・保存されたものではありません。</p>'+
-  '<p>各地区内ではA/B/Cで植物の根元・種類・本数・観測年は同じです。A＝PR #126の輪郭、B＝PR #127の6個体差、C＝近景の主木をA、その他をB。<b>描画順は 背景→地表色→建物→植物</b>。植物が建物を隠す見え方を確認するための順序で、奥行きによる前後判定はしていません（奥の木も手前の建物を覆います）。各画像の下の数値は、建物の画素のうち植物に覆われた割合です。原寸320×180で評価してください。</p>'+
+  '<p>各地区内ではA/B/Cで植物の根元・種類・本数・観測年は同じです。A＝PR #126の輪郭、B＝PR #127の6個体差、C＝近景の主木をA、その他をB。<b>植物と建物の前後は根元・接地線のY座標で決めます</b>（建物より奥に根元がある植物は建物に隠れ、手前の植物は建物を覆う）。建物同士の重なり順は本編のまま。各画像の下の数値は、建物の画素のうち手前の植物に覆われた割合と、建物の奥に隠れた植物の画素数です。原寸320×180で評価してください。</p>'+
   '<h2>実ゲーム描画（変更前の参照）</h2>'+baseline+
-  '<h2>遮蔽の代表例（C統合版で建物が最も多く隠れた6画面）</h2><p class="note">左＝以前の描画順（建物が植物の上）、中＝現在（植物が建物の上）、右＝遮蔽図（<b style="color:#e628aa">桃色</b>＝植物に隠れた建物、白＝見えている建物）。植物の大きさ・本数・位置は変えていない。</p>'+
+  '<h2>前後判定の代表例（C統合版で建物の奥に隠れた植物が多い6画面）</h2><p class="note">左＝以前の描画順（すべての植物が建物の上）、中＝現在（Y座標で前後判定）、右＝前後図（<b style="color:#e628aa">桃色</b>＝手前の植物に隠れた建物、<b style="color:#2878dc">青</b>＝建物の奥に隠れた植物、白＝それ以外の建物）。植物の大きさ・本数・位置は変えていない。</p>'+
   examples.map(e=>{const n=exampleName(e);return '<div class="scroll"><table><tr><td>'+img('previous-order_'+n)+'<small>以前の順序</small></td><td>'+img(n)+'<small>現在の順序｜'+share(images.get(n).occlusion)+'</small></td><td>'+img('occlusion-map_'+n)+'<small>遮蔽図｜'+esc(n)+'</small></td></tr></table></div>';}).join('')+
-  '<h2>確実に重なる検証画面（TEST ONLY、63枚に含まない）</h2><p class="note">各地区で実在の建物の手前4pxにC方式の落葉広葉樹を1本だけ置いた画面（根元y≥142ならA造形、入り江のように手前に建物がない地区ではB造形）。画素単位で植物が前面にあることを検証している。</p>'+
-  overlapChecks.map(o=>{const id=REVIEW_SITES[o.siteIndex].id;return '<div class="scroll"><table><tr><td>'+img('overlap-check_'+id+'_previous-order_TEST_ONLY')+'<small>以前の順序</small></td><td>'+img('overlap-check_'+id+'_TEST_ONLY')+'<small>現在｜'+share(o.occlusion)+'</small></td></tr></table></div>';}).join('')+
+  '<h2>確実に重なる検証画面（TEST ONLY、63枚に含まない）</h2><p class="note">各地区で実在の建物の手前4px／奥2pxにC方式の落葉広葉樹を1本だけ置いた画面（根元y≥142ならA造形、それ以外はB造形）。手前の木は建物を覆い、奥の木は建物に隠れることを画素単位で検証している。</p>'+
+  overlapChecks.map(o=>'<div class="scroll"><table><tr><td>'+img(overlapName(o)+'_previous-order_TEST_ONLY')+'<small>以前の順序｜'+(o.placement==='front'?'手前の木':'奥の木')+'</small></td><td>'+img(overlapName(o)+'_TEST_ONLY')+'<small>現在｜'+share(o.occlusion)+'</small></td></tr></table></div>').join('')+
   rows+
   '<p class="note">次のHumanレビュー：建築の見え方・木の大きさ・各バイオームの形態差・局所水分・静かな余白。植物の数値的な成長・遷移、セーブと季節はB2以降です。</p></main></html>';
  await writeFile(out+'/gallery.html',html);
  console.log(JSON.stringify({type:'issue47-b1b',status:'review-only',seed,year,frames:results.length,
-  originals:prepared.length,artifacts:artifacts.length,maxHybridOcclusion:examples[0]&&images.get(exampleName(examples[0])).occlusion,
-  overlapChecks:overlapChecks.map(o=>o.occlusion.occludedByTrees),sites:prepared.map(s=>s.siteId),out, report:out+'/report.json'}));
+  originals:prepared.length,artifacts:artifacts.length,topHiddenPlantExample:examples[0]&&{name:exampleName(examples[0]),...images.get(exampleName(examples[0])).occlusion},
+  overlapChecks:overlapChecks.map(o=>[REVIEW_SITES[o.siteIndex].id,o.placement,o.occlusion.occludedByTrees,o.occlusion.plantPixelsBehindStructures]),sites:prepared.map(s=>s.siteId),out, report:out+'/report.json'}));
 }finally{await browser?.close();server.kill();}

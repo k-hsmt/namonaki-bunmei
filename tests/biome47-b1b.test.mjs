@@ -75,19 +75,25 @@ test('B1b: prototype modules are independent of actual production and never call
  assert.throws(()=>renderExpressivePlant('not-a-plant'),/Unknown expressive plant/);
  assert.throws(()=>renderExpressivePlant('deciduous',{stage:'old'}),/Invalid expressive stage/);
 });
-test('B1b: frames draw confirmed structures before plants (occlusion trial), never plants under structures by default',()=>{
- // The pixel-level proof runs in the browser over all 63 frames (scripts/preview-biome-scenes.mjs verify()).
- // This guard keeps npm test failing if the default order is reverted.
+test('B1b: plants and structures are ordered by ground-line Y, structure-to-structure order stays the game\'s',()=>{
+ // The pixel-level proof runs in the browser over all 63 frames and the front/behind overlap checks
+ // (scripts/preview-biome-scenes.mjs verify()). This guard keeps npm test failing if the order is reverted.
  const text=readFileSync(new URL('../scripts/preview-biome-scenes.mjs',import.meta.url),'utf8');
- const compose=text.slice(text.indexOf('const compose='),text.indexOf('const pixels='));
- assert.match(compose,/order='structures-under-plants'/,'default order changed');
- const current=compose.slice(compose.indexOf("if(order==='structures-under-plants')"),compose.indexOf("else if(order==='plants-under-structures')"));
- assert.ok(current.indexOf('scenes[si].buildings')>-1&&current.indexOf('layer.all')>current.indexOf('scenes[si].buildings'),'plants must be drawn after structures');
- assert.ok(compose.indexOf('ground(si,biome)')<compose.indexOf('scenes[si].buildings'),'soil tint must be applied before structures');
- assert.doesNotMatch(text,/Draw confirmed structures over the prototype canopy/);
+ const compose=text.slice(text.indexOf('const compose='),text.indexOf('const verify='));
+ assert.match(compose,/order='y-sorted'/,'default order changed');
+ const ysorted=compose.slice(compose.indexOf("if(order==='y-sorted')"),compose.indexOf("else if(order==='structures-under-plants')"));
+ assert.ok(ysorted.indexOf('s.behind')<ysorted.indexOf('scenes[si].buildings')&&ysorted.indexOf('scenes[si].buildings')<ysorted.indexOf('s.front'),
+  'plants behind, then the structure layer, then plants in front');
+ assert.match(text,/const inFront=\(si,layer,i\)=>layer\.root\[i\]>scenes\[si\]\.depthMap\[i\];/,'ties must keep the structure in front');
+ assert.match(text,/ground:plot\.y\+plot\.depth/,'facility ground line is the footprint front edge');
+ assert.match(text,/Single-structure renders do not reproduce the structure layer/);
+ assert.match(text,/a\.y-b\.y\|\|Number\(a\.kind==='tree'\)-Number\(b\.kind==='tree'\)/,'plants sorted together by root y');
  const verify=text.slice(text.indexOf('const verify='),text.indexOf('const frames=[]'));
- assert.match(verify,/is not the plant \(plants must be in front\)/);
+ assert.match(verify,/is not the plant in front/);
+ assert.match(verify,/a plant behind it shows through/);
  assert.match(verify,/structures vanished from the frame/);
+ assert.match(text,/the structure did not hide the tree behind it/);
+ assert.match(text,/the tree in front did not cover the structure/);
 });
 test('B1b: plants and soil tint follow the saved scene mirror; the planner stays in record coordinates',()=>{
  // The mapping is checked against the real canvas transform, and every root against land, while rendering.
