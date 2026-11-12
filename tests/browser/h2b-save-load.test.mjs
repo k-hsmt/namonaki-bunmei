@@ -8,7 +8,7 @@ import {prepareWorldSessionSave} from '../../dist/story/world-session.js';
 import {decodeWorldSave} from '../../dist/story/world-storage.js';
 import {createCivilization,step,chooseAutomatically} from '../../dist/story/engine.js';
 const port=process.env.H2B_TEST_PORT??'5198',origin='http://127.0.0.1:'+port;
-const KEY='namonaki-story-v9',BASELINE_KEY='namonaki-story-v6',OLD='namonaki-story-v3';
+const KEY='namonaki-story-v10',BASELINE_KEY='namonaki-story-v6',OLD='namonaki-story-v3';
 let server,browser;
 test.before(async()=>{
  server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:port},stdio:['ignore','pipe','inherit']});
@@ -22,14 +22,15 @@ const pageFor=async t=>{
  t.after(()=>assert.deepEqual(errors,[]));
  await page.goto(origin);return page;
 };
-test('新規ゲームは生成v9（建築の記録つき）とknownの住宅記録を保存し、再読込でも同一',async t=>{
+test('新規ゲームは生成v10（建築の記録と気候つき）とknownの住宅記録を保存し、再読込でも同一',async t=>{
  const page=await pageFor(t);
  await page.locator('#save').click();
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('ブラウザに保存しました'));
  const saved=await decodeWorldSave(await page.evaluate(k=>localStorage.getItem(k),KEY));
- assert.equal(saved.version,9);assert.equal(saved.world.initialTerrain.mode,'generated');
+ assert.equal(saved.version,10);assert.equal(saved.world.world.initialTerrain.mode,'generated');
+ assert.equal(saved.climate.ruleId,'initial-climate-v1');
  assert.deepEqual(saved,await prepareWorldSessionSave(await createNewWorld(Number(await page.locator('#seed').inputValue()))),'browser and Node produce the same complete seeded world');
- assert.deepEqual(saved.world.state.housing,{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
+ assert.deepEqual(saved.world.world.state.housing,{schemaVersion:1,introducedYear:0,legacyUntracked:false,events:[]});
  const pixels=await page.locator('#scene').evaluate(e=>e.toDataURL());
  await page.reload();
  await page.locator('#load').click();

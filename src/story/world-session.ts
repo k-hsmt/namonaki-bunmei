@@ -11,7 +11,9 @@ import {prepareEconomicProductionSave} from '../irrigation/economic-production-s
 import {restoreEconomicProductionSave} from '../irrigation/economic-production-history-v1.js';
 import {observeEconomicProductionScene} from '../scene/economic-production-scene-v1.js';
 import type {GeneratedSceneObservation} from '../scene/generated-scene-review.js';
-import {knownArchitectureWorld,advanceArchitectureWorld,chooseArchitectureWorld,prepareArchitectureSave,restoreArchitectureSave,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
+import {knownArchitectureWorld,advanceArchitectureWorld,chooseArchitectureWorld,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
+import {prepareClimateWorldSave,restoreClimateWorldSave,worldClimate} from '../climate/climate-world-v1.js';
+import type {WorldClimateBaseline} from '../climate/initial-climate-v1.js';
 import {createArchitecturePainter} from '../architecture/scene-v1.js';
 import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '../architecture/layout-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
@@ -37,14 +39,16 @@ export type TerrainGeneratedSession={mode:'generated';review:TerrainProductionWo
  * limit applies unchanged; `architecture` adds the recorded birth styles. Progression and persistence
  * always go through the v9 owner (checked before the v8 branch everywhere).
  */
-export type ArchitectureGeneratedSession=TerrainGeneratedSession&{architecture:ArchitectureProductionWorld};
+export type ArchitectureGeneratedSession=TerrainGeneratedSession&{architecture:ArchitectureProductionWorld;
+ /** Issue #47 B2a: the world's initial climate, a pure function of its seed; saved and checked in v10. */
+ climate:WorldClimateBaseline};
 export type WorldSession=BaselineGeneratedSession|EconomicGeneratedSession|TerrainGeneratedSession|ArchitectureGeneratedSession|{mode:'legacy-fixed';template:LegacyWorldSave;state:CivilizationState};
 function architecture(session:WorldSession):session is ArchitectureGeneratedSession {
  if(!('architecture' in session)||!session.architecture)return false;
  knownArchitectureWorld(session.architecture);
  if(session.review!==session.architecture.terrain||session.state!==session.architecture.terrain.review.state)throw Error('Architecture session differs from its owned world');return true;
 }
-export function architectureProductionSession(world:ArchitectureProductionWorld):ArchitectureGeneratedSession{knownArchitectureWorld(world);return {mode:'generated',review:world.terrain,state:world.terrain.review.state,architecture:world};}
+export function architectureProductionSession(world:ArchitectureProductionWorld):ArchitectureGeneratedSession{knownArchitectureWorld(world);return {mode:'generated',review:world.terrain,state:world.terrain.review.state,architecture:world,climate:worldClimate(world)};}
 const painters=new WeakMap<ArchitectureProductionWorld,GeneratedStructurePainter>();
 /**
  * D5 (Human decisions #2, #3): the district's layout in `year` as text for the observation panel, e.g.
@@ -105,7 +109,7 @@ export function generatedSession(review:GeneratedBridgeReview):BaselineGenerated
  if(review.review.reservationMode!=='field-only')throw Error('Unapproved session policy');return {mode:'generated',review,state:review.review.state};
 }
 export function restoreWorldSession(save:WorldSave):WorldSession {
- const valid=validateWorldSave(save);if(valid.version===9)return architectureProductionSession(restoreArchitectureSave(valid));if(valid.version===8)return terrainProductionSession(restoreTerrainProductionSave(valid));if(valid.version===7)return economicProductionSession(restoreEconomicProductionSave(valid));if(generatedWorld(valid))return generatedSession(restoreGeneratedWorld(valid));
+ const valid=validateWorldSave(save);if(valid.version===10)return architectureProductionSession(restoreClimateWorldSave(valid));if(valid.version===8)return terrainProductionSession(restoreTerrainProductionSave(valid));if(valid.version===7)return economicProductionSession(restoreEconomicProductionSave(valid));if(generatedWorld(valid))return generatedSession(restoreGeneratedWorld(valid));
  if(!valid.state.history.length)throw Error('Missing legacy birth record');
  if(valid.state.memory){const memory=valid.state.memory;if(!memory.legacies||typeof memory.legacies!=='object'||Array.isArray(memory.legacies)||!Array.isArray(memory.log)||memory.log.some(e=>!e||!Number.isSafeInteger(e.year)||e.year<0||e.year>valid.state.year||!Object.hasOwn(legacyNames,e.kind)))throw Error('Invalid legacy memory');}
  return {mode:'legacy-fixed',template:valid,state:structuredClone(valid.state)};
@@ -160,7 +164,7 @@ export function slowWorldClimate(session:WorldSession):WorldSession {if(architec
 export function enableWorldIrrigation(session:WorldSession):WorldSession {if(architecture(session))return session;if(terrain(session))return session;if(economic(session))return session;if(session.mode!=='generated')throw Error('Generated environment required');return generatedSession(introduceProductionIrrigation(session.review));}
 
 /** Complete async v7/v8 hashing before exposing a WorldSave to the common storage envelope. */
-export async function prepareWorldSessionSave(session:WorldSession):Promise<WorldSave>{return architecture(session)?prepareArchitectureSave(session.architecture):terrain(session)?prepareTerrainProductionSave(session.review):economic(session)?prepareEconomicProductionSave(session.review):saveWorldSession(session);}
+export async function prepareWorldSessionSave(session:WorldSession):Promise<WorldSave>{return architecture(session)?prepareClimateWorldSave(session.architecture):terrain(session)?prepareTerrainProductionSave(session.review):economic(session)?prepareEconomicProductionSave(session.review):saveWorldSession(session);}
 export async function enableWorldEconomicCoupling(session:WorldSession):Promise<WorldSession>{
  if(architecture(session)||terrain(session))return session;
  if(economic(session))return session;if(session.mode!=='generated')throw Error('Generated v6 required');

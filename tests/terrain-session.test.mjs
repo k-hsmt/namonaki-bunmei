@@ -32,7 +32,7 @@ test('asynchronous session transitions stop at choices and only expose approved 
  assert.deepEqual((await advanceWorldSessionAsync(chosen)).review.terrainHistory.events.slice(0,pending.review.terrainHistory.events.length),pending.review.terrainHistory.events);
 });
 test('only a successful explicit older save may supersede its higher priority slots',async()=>{
- assert.deepEqual(higherPriorityWorldSaveKeys(await prepareWorldSessionSave(initial)),['namonaki-story-v9'],'an explicit v8 save supersedes a stale v9 slot (D2-d)');
- assert.deepEqual(higherPriorityWorldSaveKeys(await prepareWorldSessionSave(old)),['namonaki-story-v8','namonaki-story-v9']);
+ assert.deepEqual(higherPriorityWorldSaveKeys(await prepareWorldSessionSave(initial)),['namonaki-story-v9','namonaki-story-v10'],'an explicit v8 save supersedes a stale v9 slot (D2-d)');
+ assert.deepEqual(higherPriorityWorldSaveKeys(await prepareWorldSessionSave(old)),['namonaki-story-v8','namonaki-story-v9','namonaki-story-v10']);
  const held=economicProductionSession(advanceEconomicProductionWorld(old.review,1000,'stop'));await assert.rejects(()=>enableWorldTerrainDevelopment(held));
 });

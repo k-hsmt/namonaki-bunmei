@@ -118,8 +118,9 @@ test('D2-a/D2-d: 描画は src/architecture の1実装だけで、本編とは�
  for(const file of await walk('src')){
   const text=await readFile(file,'utf8');
   assert.ok(![...text.matchAll(/from\s+'([^']+)'/g)].some(m=>m[1].includes('scripts/')),file+' imports a script');
-  // D2-d/D3 release (v0.7): only new worlds, sessions and the common save reader connect to it
-  const gates=['src/story/new-world.ts','src/story/world-session.ts','src/story/world-save.ts'];
+  // D2-d/D3 release (v0.7): only new worlds, sessions and the common save reader connect to it.
+  // Issue #47 B2a: the v10 save envelope (v9 packet + climate) is part of the common save reader.
+  const gates=['src/story/new-world.ts','src/story/world-session.ts','src/story/world-save.ts','src/climate/climate-world-v1.ts'];
   if(!file.startsWith('src/architecture/')&&!gates.includes(file))assert.ok(!/architecture\/[a-z-]+-v1\.js/.test(text),file+' connects architecture code outside the release gates');
   if(file.startsWith('src/architecture/'))assert.ok(!/Math\.random|Date\.now|performance\.now/.test(text),file);
  }

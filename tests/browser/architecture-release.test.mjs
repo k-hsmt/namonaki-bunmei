@@ -5,17 +5,19 @@ import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {chromium} from 'playwright';
 import {createNewArchitectureWorld,createNewTerrainWorld} from '../../dist/story/new-world.js';
-import {advanceArchitectureWorld} from '../../dist/architecture/production-v1.js';
+import {advanceArchitectureWorld,prepareArchitectureSave} from '../../dist/architecture/production-v1.js';
 import {advanceTerrainProductionWorld} from '../../dist/terrain/terrain-production-progression-v1.js';
 import {architectureProductionSession,terrainProductionSession,prepareWorldSessionSave} from '../../dist/story/world-session.js';
 import {encodeWorldSave} from '../../dist/story/world-storage.js';
 
 const port=process.env.ARCH_RELEASE_TEST_PORT??'5233',origin='http://127.0.0.1:'+port;
-let server,browser,v9json,v8json;
+let server,browser,v9json,v8json,preClimateJson;
 test.before(async()=>{
  const v9=architectureProductionSession(await advanceArchitectureWorld((await createNewArchitectureWorld(24)).architecture,1100,'automatic'));
  const v8=terrainProductionSession(await advanceTerrainProductionWorld((await createNewTerrainWorld(24)).review,1100,'automatic'));
- v9json=(await encodeWorldSave(await prepareWorldSessionSave(v9))).json;v8json=(await encodeWorldSave(await prepareWorldSessionSave(v8))).json;
+ v9json=(await encodeWorldSave(await prepareWorldSessionSave(v9))).json;
+ // Issue #47 B2a: a v9 packet (no climate record) as an older version of the game would have stored it.
+ preClimateJson=JSON.stringify(await prepareArchitectureSave(v9.architecture));v8json=(await encodeWorldSave(await prepareWorldSessionSave(v8))).json;
  server=spawn(process.execPath,['scripts/serve.mjs'],{env:{...process.env,PORT:port},stdio:['ignore','pipe','inherit']});
  await once(server.stdout,'data',{signal:AbortSignal.timeout(10000)});
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});
@@ -32,7 +34,7 @@ const open=async(t,key,value,motion=false)=>{
 const pixels=page=>page.locator('#scene').evaluate(e=>e.toDataURL());
 
 test('release UI: v9の世界は記録された様式で描き、再読込でも同じ。v8の保存は今までどおり',async t=>{
- const v9=await open(t,'namonaki-story-v9',v9json),v8=await open(t,'namonaki-story-v8',v8json);
+ const v9=await open(t,'namonaki-story-v10',v9json),v8=await open(t,'namonaki-story-v8',v8json);
  assert.equal(await v9.locator('#year').textContent(),await v8.locator('#year').textContent());
  const a=await pixels(v9),b=await pixels(v8);
  assert.notEqual(a,b,'v9 draws the recorded birth styles');
@@ -43,12 +45,12 @@ test('release UI: v9の世界は記録された様式で描き、再読込でも
 });
 
 test('release UI: 動きのある表示の建物の層も、記録された様式で描く',async t=>{
- const page=await open(t,'namonaki-story-v9',v9json);
+ const page=await open(t,'namonaki-story-v10',v9json);
  const result=await page.evaluate(async()=>{
   const {decodeWorldSave}=await import('/story/world-storage.js');
   const {restoreWorldSession,observeGeneratedWorldSession,worldStructurePainter}=await import('/story/world-session.js');
   const {prepareSceneMotion}=await import('/scene/motion-frame.js');
-  const session=restoreWorldSession(await decodeWorldSave(localStorage.getItem('namonaki-story-v9')));
+  const session=restoreWorldSession(await decodeWorldSave(localStorage.getItem('namonaki-story-v10')));
   const o=observeGeneratedWorldSession(session,session.state.year,0),painter=worldStructurePainter(session);
   const layer=p=>prepareSceneMotion(o,p).structures.toDataURL();
   return {hasPainter:!!painter,withPainter:layer(painter),again:layer(painter),without:layer(undefined)};
@@ -61,7 +63,7 @@ test('release UI: 動きのある表示の建物の層も、記録された様�
 test('release UI (D4-c): 年代記に「建て直される」を、元の記録の上に表示する',async t=>{
  // seed 24 has no rebuild by 1100; seed 7 has 34 by 3000
  const rebuilt=architectureProductionSession(await advanceArchitectureWorld((await createNewArchitectureWorld(7)).architecture,3000,'automatic'));
- const page=await open(t,'namonaki-story-v9',(await encodeWorldSave(await prepareWorldSessionSave(rebuilt))).json);
+ const page=await open(t,'namonaki-story-v10',(await encodeWorldSave(await prepareWorldSessionSave(rebuilt))).json);
  await page.locator('#toggle-all').click();
  const items=await page.locator('#timeline li').evaluateAll(ls=>ls.map(l=>({note:l.classList.contains('architecture-note'),text:l.textContent})));
  const notes=items.filter(i=>i.note);
@@ -73,8 +75,22 @@ test('release UI (D4-c): 年代記に「建て直される」を、元の記録�
 });
 
 test('release UI (D5): 観測地点に街並みの型を表示し、v8の保存には出さない',async t=>{
- const v9=await open(t,'namonaki-story-v9',v9json),v8=await open(t,'namonaki-story-v8',v8json);
+ const v9=await open(t,'namonaki-story-v10',v9json),v8=await open(t,'namonaki-story-v8',v8json);
  assert.match(await v9.locator('#site-streetscape').textContent(),/^街並み：.+(集落|村|町|都市)$/);
  assert.equal(await v9.locator('#site-streetscape').isHidden(),false);
  assert.equal(await v8.locator('#site-streetscape').isHidden(),true);
+});
+
+test('B2a UI: 気候の記録がない以前の版（v9）の保存は開かず、理由を示し、保存値はそのまま残す',async t=>{
+ const page=await browser.newPage({reducedMotion:'reduce'});t.after(()=>page.close());
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));t.after(()=>assert.deepEqual(errors,[]));
+ await page.addInitScript(v=>{if(!sessionStorage.getItem('seeded')){localStorage.clear();localStorage.setItem('namonaki-story-v9',v);sessionStorage.setItem('seeded','1');}},preClimateJson);
+ await page.goto(origin);
+ await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('以前の版'),{timeout:120000});
+ assert.match(await page.locator('#feedback').textContent(),/気候の記録がない世界.*開けません.*新しい文明を作ってください/);
+ assert.equal(await page.evaluate(()=>localStorage.getItem('namonaki-story-v9')),preClimateJson,'the old save is kept as it was');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('namonaki-story-v10')),null);
+ await page.locator('#random').click();
+ await page.waitForFunction(()=>!document.getElementById('save').disabled,{timeout:120000});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('namonaki-story-v9')),preClimateJson);
 });
