@@ -14,6 +14,7 @@ import type {GeneratedSceneObservation} from '../scene/generated-scene-review.js
 import {knownArchitectureWorld,advanceArchitectureWorld,chooseArchitectureWorld,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
 import {prepareClimateWorldSave,restoreClimateWorldSave,worldClimate,worldFlora} from '../climate/climate-world-v1.js';
 import type {LocalFlora} from '../flora/local-flora-v1.js';
+import {floraSiteAt,type FloraPatchView} from '../flora/flora-growth-v1.js';
 import type {WorldClimateBaseline} from '../climate/initial-climate-v1.js';
 import {createArchitecturePainter} from '../architecture/scene-v1.js';
 import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '../architecture/layout-v1.js';
@@ -95,6 +96,16 @@ export function worldArchitectureChronicle(session:WorldSession):readonly Archit
 }
 /** Read-only: the painter draws recorded birth styles and never changes the record (D2 §6.4). */
 /** The recorded-style painter of a v9 session (undefined otherwise). Read-only; used by every scene painter. */
+/**
+ * Issue #47 B2c: plant development of one site in a confirmed year (appearance only; nothing civilisational
+ * reads it). Undefined for sessions without the climate record.
+ */
+export function worldFloraAt(session:WorldSession,year:number,siteIndex:number):readonly (FloraPatchView|null)[]|undefined{
+ if(!architecture(session))return undefined;
+ const site=(['river-bank','hill-side','coast-inlet'] as const)[siteIndex];if(!site)throw Error('Invalid flora site');
+ const observation=observeGeneratedWorldSession(session,year,siteIndex);
+ return floraSiteAt({seed:session.state.seed,climate:session.climate,flora:session.flora,environment:session.review.environment!,year,site,vegetation:observation.ground.vegetation??[]});
+}
 export function worldStructurePainter(session:WorldSession):GeneratedStructurePainter|undefined{return architecture(session)?painterOf(session.architecture):undefined;}
 function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{let p=painters.get(world);if(!p){p=createArchitecturePainter(world.architecture.births);painters.set(world,p);}return p;}
 function terrain(session:WorldSession):session is TerrainGeneratedSession {
