@@ -40,7 +40,9 @@ jobs:
     needs: scope
     if: needs.scope.outputs.mode != 'docs'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # npm test took 4m45s (PR #119) and 8m38s (PR #123) for nearly the same suite: runner speed varies,
+    # and the terrain audit that follows was cut off at 10 minutes. 15 leaves room for slow runners.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
