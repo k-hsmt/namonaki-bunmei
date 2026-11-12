@@ -86,7 +86,7 @@ try{
    const background=document.createElement('canvas');D.drawGeneratedSceneReview(background,obs,'backdrop',withoutPlants,painter);
    const buildings=document.createElement('canvas');D.drawGeneratedSceneReview(buildings,obs,'structures',withoutPlants,painter);
    scenes.push({background,buildings,raster,mirrorX:obs.ground.terrain.sites[obs.ground.site].render.mirrorX===true});
-   result.push({siteIndex:si,siteId:obs.ground.site,occupied,
+   result.push({siteIndex:si,siteId:obs.ground.site,occupied,mirrorX:obs.ground.terrain.sites[obs.ground.site].render.mirrorX===true,
     physics:{surface:Array.from(raster.surface),grade:Array.from(raster.grade),bearing:Array.from(raster.bearing)},
     realBuildings:obs.snapshot.objects.length,realHousingBlocks:obs.composition.residentialBlocks.length,
     original:original.toDataURL('image/png')
@@ -122,18 +122,37 @@ try{
    for(const [stage,urls] of Object.entries(stages))
     loaded[kind][id][stage]=Array.isArray(urls)?await Promise.all(urls.map(imageOf)):await imageOf(urls);
   }
-  const tint=(canvas,raster,biome)=>{
+  /**
+   * Saved scenes are drawn through translate(320,0)·scale(-1,1) when render.mirrorX is set, but terrain
+   * physics, occupied plots and the planner's roots are record coordinates. Record pixel column x
+   * appears at screen column 319-x, so a 2px root at record x..x+1 appears at screen 318-x..319-x.
+   */
+  const screenColumn=(si,x)=>scenes[si].mirrorX?319-x:x;
+  const screenRoot=(si,x)=>scenes[si].mirrorX?318-x:x;
+  for(let si=0;si<3;si++){
+   // Check the mapping against the real canvas transform used by drawGeneratedSceneReview.
+   const probe=document.createElement('canvas');probe.width=320;probe.height=1;const p=probe.getContext('2d');
+   for(let x=0;x<320;x++){
+    p.setTransform(1,0,0,1,0,0);p.clearRect(0,0,320,1);
+    if(scenes[si].mirrorX){p.translate(320,0);p.scale(-1,1);}
+    p.fillStyle='#000';p.fillRect(x,0,1,1);
+    const d=p.getImageData(0,0,320,1).data;let hit=-1;for(let i=0;i<320;i++)if(d[i*4+3])hit=i;
+    if(hit!==screenColumn(si,x))throw Error('Mirror mapping disagrees with the canvas transform at site '+si+' x '+x);
+   }
+  }
+  const tint=(canvas,raster,biome,si)=>{
    const ctx=canvas.getContext('2d'),im=ctx.getImageData(0,0,320,180),d=im.data;
    const col=[1,3,5].map(i=>parseInt(biome.soil.slice(i,i+2),16)),a=biome.strength;
    for(let y=96;y<180;y++)for(let x=0;x<320;x++){
-    const z=y*320+x;if(raster.surface[z]!==1||raster.bearing[z]!==0)continue;
-    const i=z*4;for(let j=0;j<3;j++)d[i+j]=Math.round(d[i+j]*(1-a)+col[j]*a);
+    // Screen column x shows record column screenColumn(si,x) (the mapping is its own inverse).
+    const z=y*320+screenColumn(si,x);if(raster.surface[z]!==1||raster.bearing[z]!==0)continue;
+    const i=(y*320+x)*4;for(let j=0;j<3;j++)d[i+j]=Math.round(d[i+j]*(1-a)+col[j]*a);
    }
    ctx.putImageData(im,0,0);
   };
   const blank=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;const ctx=c.getContext('2d');ctx.imageSmoothingEnabled=false;return [c,ctx];};
   // Plants are painted on their own transparent layer so the frame order can be verified pixel by pixel.
-  const plantLayer=(style,plan)=>{
+  const plantLayer=(si,style,plan)=>{
    const [low,lowCtx]=blank(),[trees,treeCtx]=blank();
    let clipped=0;
    const draw=(ctx,plant)=>{
@@ -147,7 +166,8 @@ try{
     const k=expressive?.45+.28*depth:.58+.42*depth;
     const w=Math.max(1,Math.round(img.width*k)),h=Math.max(1,Math.round(img.height*k));
     const ox=expressive?36:48,oy=expressive?59:68;
-    const left=Math.round(plant.x-ox*k),top=Math.round(plant.y-oy*k);
+    // Sprites are not flipped; only the root position follows the scene's mirror.
+    const left=Math.round(screenRoot(si,plant.x)-ox*k),top=Math.round(plant.y-oy*k);
     if(left<0||top<0||left+w>320||top+h>180)clipped++;
     ctx.drawImage(img,left,top,w,h);
    };
@@ -158,7 +178,7 @@ try{
    return {low,trees,all,clipped};
   };
   // Background + biome soil tint. Identical for every style of one site/biome.
-  const ground=(si,biome)=>{const [c,ctx]=blank();ctx.drawImage(scenes[si].background,0,0);tint(c,scenes[si].raster,biome);return c;};
+  const ground=(si,biome)=>{const [c,ctx]=blank();ctx.drawImage(scenes[si].background,0,0);tint(c,scenes[si].raster,biome,si);return c;};
   /**
    * B1b occlusion trial order: 1 background/terrain, 2 biome soil tint, 3 confirmed structures, 4 plants.
    * The structure layer is a transparent canvas (drawGeneratedSceneReview 'structures'), so no
@@ -191,15 +211,20 @@ try{
    return {structurePixels:structure,occludedStructurePixels:occluded,occludedByTrees:byTrees,occludedByUndergrowth:byLow,
     occludedShare:Math.round(occluded/structure*10000)/10000};
   };
+  // Every planned root (2px, record land) must sit on record land when read back through the screen mapping.
+  for(const plan of plans)for(const q of [...plan.trees,...plan.low]){
+   const sx=screenRoot(plan.siteIndex,q.x);
+   for(const c of [sx,sx+1]){const z=q.y*320+screenColumn(plan.siteIndex,c);if(scenes[plan.siteIndex].raster.surface[z]!==1)throw Error('Plant root drawn off land: '+plan.biomeId+'/'+plan.siteIndex+' x '+q.x);}
+  }
   const frames=[],layers=new Map();
   for(const biome of biomes)for(let si=0;si<3;si++){
    const plan=plans.find(p=>p.siteIndex===si&&p.biomeId===biome.id);
    if(!plan)throw Error('Missing saved-terrain plan '+biome.id+'/'+si);
    const rendered=[];
    for(const style of styles){
-    const layer=plantLayer(style,plan),c=compose(si,biome,layer),data=c.toDataURL('image/png');
+    const layer=plantLayer(si,style,plan),c=compose(si,biome,layer),data=c.toDataURL('image/png');
     // Repeated rasterization must be bit-identical, including the fake biome palette.
-    if(data!==compose(si,biome,plantLayer(style,plan)).toDataURL('image/png'))throw Error('B1b pixel nondeterminism');
+    if(data!==compose(si,biome,plantLayer(si,style,plan)).toDataURL('image/png'))throw Error('B1b pixel nondeterminism');
     const key=biome.id+'/'+si+'/'+style.id;layers.set(key,{si,biome,layer});
     rendered.push({biome:biome.id,siteIndex:si,style:style.id,data,clipped:layer.clipped,occlusion:verify(si,biome,layer,c,key)});
    }
@@ -222,14 +247,15 @@ try{
   for(let si=0;si<3;si++){
    const b=pixels(scenes[si].buildings);
    // Structure layers are drawn mirrored when render.mirrorX is set; occupied plots are in record coordinates.
-   const target=occupied[si].map(q=>scenes[si].mirrorX?{...q,x:320-q.x-q.width}:q).map(p=>{let n=0;for(let y=Math.max(0,p.y-24);y<Math.min(180,p.y+p.depth);y++)for(let x=p.x;x<p.x+p.width;x++)if(b[(y*320+x)*4+3])n++;return {p,n};})
+   const target=occupied[si].map(record=>({record,p:scenes[si].mirrorX?{...record,x:320-record.x-record.width}:record})).map(({record,p})=>{let n=0;for(let y=Math.max(0,p.y-24);y<Math.min(180,p.y+p.depth);y++)for(let x=p.x;x<p.x+p.width;x++)if(b[(y*320+x)*4+3])n++;return {record,p,n};})
     .filter(({p,n})=>n>=20&&p.y+p.depth+4<=178)
     // Prefer a structure whose front tree is a C near tree (root y>=142, painter A); otherwise the nearest one.
     .sort((a,c)=>Number(c.p.y+c.p.depth+4>=142)-Number(a.p.y+a.p.depth+4>=142)||c.p.y-a.p.y||c.n-a.n||a.p.x-c.p.x)[0];
    if(!target)throw Error('No near structure to test occlusion at site '+si);
-   const {p}=target,tree={kind:'tree',id:'deciduous',x:p.x+Math.floor(p.width/2),y:p.y+p.depth+4,variant:0,stage:'mature'};
+   // The tree root is a record coordinate, like every planned plant; plantLayer mirrors it.
+   const p=target.record,tree={kind:'tree',id:'deciduous',x:p.x+Math.floor(p.width/2)-1,y:p.y+p.depth+4,variant:0,stage:'mature'};
    const biome=biomes.find(x=>x.id==='temperate_forest'),style=styles.find(x=>x.id==='hybrid');
-   const layer=plantLayer(style,{trees:[tree],low:[]}),c=compose(si,biome,layer),key='overlap-check/'+si;
+   const layer=plantLayer(si,style,{trees:[tree],low:[]}),c=compose(si,biome,layer),key='overlap-check/'+si;
    const occlusion=verify(si,biome,layer,c,key);
    if(occlusion.occludedByTrees===0)throw Error(key+': the near tree did not cover the structure behind it');
    layers.set(key,{si,biome,layer});
@@ -265,7 +291,8 @@ try{
   status:'PROTOTYPE ONLY — NOT GENERATED CLIMATE, NOT HISTORY',
   sourceSHA:process.env.REVIEW_SOURCE_SHA??'unverified-local',
   seed,year,reference:'Real saved terrain and architecture; forced visual-only species trial',
-  baselineSites:prepared.map(x=>({site:x.siteId,buildings:x.realBuildings,housingBlocks:x.realHousingBlocks})),
+  baselineSites:prepared.map(x=>({site:x.siteId,mirrorX:x.mirrorX,buildings:x.realBuildings,housingBlocks:x.realHousingBlocks})),
+  coordinateNote:'Planner roots, occupied plots and physics are record coordinates. Plants and the soil tint are mapped to the screen through the scene mirror (root x -> 318-x, column x -> 319-x when mirrorX); sprites are not flipped.',
   biomes:REVIEW_BIOMES.map(x=>({id:x.id,label:x.label})),
   styles:REVIEW_STYLES.map(x=>({id:x.id,label:x.label})),
   layerOrder:['background (terrain, ground, canals, public spaces, bridges)','biome soil tint (land cells only)','confirmed structures (transparent layer)','plants: undergrowth, then trees by root y'],

@@ -89,3 +89,13 @@ test('B1b: frames draw confirmed structures before plants (occlusion trial), nev
  assert.match(verify,/is not the plant \(plants must be in front\)/);
  assert.match(verify,/structures vanished from the frame/);
 });
+test('B1b: plants and soil tint follow the saved scene mirror; the planner stays in record coordinates',()=>{
+ // The mapping is checked against the real canvas transform, and every root against land, while rendering.
+ const text=readFileSync(new URL('../scripts/preview-biome-scenes.mjs',import.meta.url),'utf8');
+ assert.match(text,/const screenColumn=\(si,x\)=>scenes\[si\]\.mirrorX\?319-x:x;/);
+ assert.match(text,/const screenRoot=\(si,x\)=>scenes\[si\]\.mirrorX\?318-x:x;/);
+ assert.match(text,/left=Math\.round\(screenRoot\(si,plant\.x\)-ox\*k\)/,'plant roots must be mapped to screen');
+ assert.match(text,/const z=y\*320\+screenColumn\(si,x\);/,'tint must read the mirrored record column');
+ assert.match(text,/Mirror mapping disagrees with the canvas transform/);
+ assert.match(text,/Plant root drawn off land/);
+});
