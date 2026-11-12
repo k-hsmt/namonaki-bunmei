@@ -17,6 +17,7 @@ async function run(from,to){
  const {createNewTerrainWorld}=await import('../dist/story/new-world.js');
  const P=await import('../dist/architecture/production-v1.js');
  const C=await import('../dist/architecture/change-v1.js');
+ const S=await import('../dist/story/world-session.js');
  const flat=t=>Object.fromEntries(AXES.map(a=>[a,a in t.choices?String(t.choices[a]):a==='ornaments'?[...t.shared.ornaments].sort().join('+'):String(t.shared[a])]));
  for(let seed=from;seed<=to;seed++){
   const started=Date.now();
@@ -57,6 +58,10 @@ async function run(from,to){
    capability:a.capabilityEvents.map(e=>({y:e.year,s:e.site,t:e.technology,o:e.op})),
    advancedBirths:a.births.filter(b=>/^X/.test(b.features.structure)).length,
    rebuildModes:a.births.filter(b=>b.rebuild).reduce((m,b)=>{const k=b.adjustments.find(x=>/^rebuild:(old|current|mixed)$/.test(x)).slice(8);m[k]=(m[k]??0)+1;return m;},{})};
+  // D5: two-storey buildings by the town's scale, and the layout text of each district at the checkpoints
+  out.twoStoreys=a.births.filter(b=>b.adjustments.includes('scale:two-storeys')).length;
+  const session=S.architectureProductionSession(w);
+  out.layouts=Object.fromEntries(CHECKPOINTS.filter(y=>y<=YEARS).map(y=>[y,[0,1,2].map(i=>S.worldStreetscapeAt(session,y,i))]));
   process.stdout.write(JSON.stringify(out)+'\n');
   console.error('seed',seed,Math.round(out.ms/1000)+'s');
  }
@@ -98,6 +103,8 @@ async function summary(files){
   rebuild:{total:worlds.reduce((k,w)=>k+SITES.reduce((j,s)=>j+(w.sites[s].rebuilds??0),0),0),
    modes:worlds.reduce((m,w)=>{for(const [k,v] of Object.entries(w.rebuildModes??{}))m[k]=(m[k]??0)+v;return m;},{})},
   msPerWorld:Math.round(worlds.reduce((k,w)=>k+w.ms,0)/n),
+  twoStoreys:{total:worlds.reduce((k,w)=>k+(w.twoStoreys??0),0),worlds:pct(worlds.filter(w=>(w.twoStoreys??0)>0).length)},
+  layouts:Object.fromEntries(CHECKPOINTS.filter(y=>y<=YEARS).map(y=>[y,dist(worlds.flatMap(w=>w.layouts?.[y]??[]))])),
  };
 }
 

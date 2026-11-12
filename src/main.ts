@@ -2,7 +2,7 @@ import {environmentLabel} from './environment/presentation-v1.js';
 import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave,higherPriorityWorldSaveKeys} from './story/world-storage.js';
-import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSessionAsync,chooseWorldSessionAsync,observeWorldSession,drawWorldSession,worldArchitectureChronicle,type WorldSession} from './story/world-session.js';
+import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSessionAsync,chooseWorldSessionAsync,observeWorldSession,drawWorldSession,worldArchitectureChronicle,worldStreetscapeAt,type WorldSession} from './story/world-session.js';
 import {serializeWorldSave} from './story/world-save.js';
 import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
@@ -110,6 +110,8 @@ function render(){
   const affiliation=site.communityId==='founding-community'?'共同の寄り合い':'独自の寄り合い';
   el('site-residents').textContent=site.inhabited?`${population} · ${affiliation}`:population;
   el('site-practices').textContent=site.practices.map(p=>`${practiceNames[p.kind]}${p.active?'':'（途絶）'}`).join(' · ');
+  // D5: the layout of the observed district in that year (v9 worlds only)
+  const streetscape=worldStreetscapeAt(world,y,siteIndex);el('site-streetscape').hidden=!streetscape;el('site-streetscape').textContent=streetscape?`街並み：${streetscape}`:'';
  }
  // H2-C: 同じ観測年・地点の確定住宅履歴だけを描画へ投影する。
  // unknown / partial は建設履歴を推測で補完しない（H1のhousingAtに委譲）。

@@ -7,7 +7,8 @@ import {prepareTerrainProductionSave} from '../dist/terrain/terrain-production-s
 import * as P from '../dist/architecture/production-v1.js';
 import * as I from '../dist/architecture/interaction-v1.js';
 
-const SEED=7,YEARS=3000;
+// CI time (PR #123, Human decision B): 1500 years still has migrations (45), trade and route changes for seed 7
+const SEED=7,YEARS=1500;
 let world,plain,captures=[];
 const ready=(async()=>{
  world=await P.advanceArchitectureWorld(P.introduceArchitectureProduction((await createNewTerrainWorld(SEED)).review),YEARS,'automatic');

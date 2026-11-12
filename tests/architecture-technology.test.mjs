@@ -99,11 +99,13 @@ test('D3-c: 技術の習得は交流のある相手からだけ。金属＋ガ�
  for(const e of metal){const held=T.technologiesAt(withContact,e.site,e.year);assert.ok(held.includes('timber-span')||held.includes('masonry-arch'));}
 });
 
-test('D3-c: 本番の記録に技術の出来事を持ち、読込で照合する（seed 5、1100年）',async()=>{
- const w=await P.advanceArchitectureWorld(P.introduceArchitectureProduction((await createNewTerrainWorld(5)).review),1100,'automatic');
+test('D3-c/D5: 本番の記録に技術の出来事を持ち、読込で照合する（seed 15、1100年。町の条件は本当の規模）',async()=>{
+ const w=await P.advanceArchitectureWorld(P.introduceArchitectureProduction((await createNewTerrainWorld(15)).review),1100,'automatic');
  const a=w.architecture;
- assert.equal(a.schemaVersion,6);assert.equal(a.technology,T.TECHNOLOGY_ID);
- assert.ok(a.capabilityEvents.length>0,'seed 5 establishes a technology before 1100');
+ assert.equal(a.schemaVersion,7);assert.equal(a.technology,T.TECHNOLOGY_ID);
+ assert.ok(a.capabilityEvents.length>0,'seed 15 establishes a technology before 1100');
+ // D5 #4: every establishment / acquisition happens in a town or a city
+ for(const e of a.capabilityEvents.filter(e=>e.op!=='lose'))assert.ok(P.scaleAt(w.terrain,e.site,e.year)>=2,JSON.stringify(e));
  for(const b of a.births){
   const tech=b.adjustments.find(x=>x.startsWith('technology:'));
   if(tech)assert.ok(T.technologiesAt(a.capabilityEvents,b.ref.siteId,b.source.year).includes(tech.slice(11)));

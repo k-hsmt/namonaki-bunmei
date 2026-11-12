@@ -179,7 +179,12 @@ export interface BirthInput {
   * advanced structure is kept only if the district still holds a technology for it.
   */
  readonly inherit?:{readonly features:Omit<ArchitectureSpec,'use'|'faded'>;readonly mode:'old'|'current'|'mixed'};
+ /** D5: the district's settlement scale in the construction year (0 hamlet, 1 village, 2 town, 3 city; v8 observation ledger). */
+ readonly scale?:number;
 }
+/** D5 (Human decision #1): uses that may rise to two storeys in towns and cities, and the per-cent chances (provisional). */
+export const scaleStoreyUses:readonly Use[]=['house','rowhouse','courtyard','workshop','market'];
+export const scaleStoreyChance:Readonly<Record<2|3,number>>={2:20,3:40};
 
 // ---- advanced technology (D3-c, Human decision 2: only what D1 drew; no 3+ storeys) ----
 /** T01+T07 large-span timber, T02+T04 masonry and arch, T05+T06+T09 metal support, glazing and skin. */
@@ -303,6 +308,10 @@ function composeBirth(input:BirthInput):Composed|BirthHold {
   rebuiltAdvanced=isAdvancedStructure(s.structure!);
   adjustments.push('rebuild:'+mode);
  }
+ // D5: height by settlement scale (not when a rebuild reproduces the old building)
+ const scale=input.scale??0;
+ if(mode!=='old'&&scale>=2&&scaleStoreyUses.includes(use)&&(s.structure==='S05'||s.structure==='S06'||isAdvancedStructure(s.structure!))&&
+  b('storeys')%100<scaleStoreyChance[scale>=3?3:2]){s.storeys=2;adjustments.push('scale:two-storeys');}
  const anyAdvanced=advanced||rebuiltAdvanced;
  try{repair(s,subs,'constraint',anyAdvanced);}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
  return {spec:s,adjustments,subs,advanced:anyAdvanced};
@@ -338,7 +347,11 @@ export function deriveBirthStyle<E=ArchitectureEnvelope>(input:BirthInput,fits:(
  for(let stage=0;stage<stages.length;stage++){
   stages[stage]!(work);
   try{repair(work,subs,'constraint',advanced);}catch(e){return {status:'hold',ref,source,reason:'constraint',detail:String((e as Error).message)};}
-  const envelope=measure(work);
+  let envelope=measure(work);
+  // D5: a storey added for the town's scale is the first thing given up when the air above is taken
+  if(stage===0&&!fits(envelope)&&work.storeys===2&&adjustments.includes('scale:two-storeys')){
+   subs.push({axis:'storeys',from:2,to:1,reason:'envelope'});work.storeys=1;envelope=measure(work);
+  }
   if(fits(envelope))return {status:'ok',ref,source,use,traditionSite:tradition.siteId,features:featuresOf(work),envelope,adjustments,substitutions:subs,envelopeStage:(stage+1) as 1|2|3|4|5};
  }
  return {status:'hold',ref,source,reason:'envelope',detail:'no fallback stage fits the air above the plot'};

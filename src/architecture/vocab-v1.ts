@@ -75,7 +75,9 @@ const rules:readonly Rule[]=[
 ];
 /** D2 rule (Human decision 6): two storeys only for halls. Not part of the D1 drawing check. */
 const storeyRules:readonly Rule[]=[
- {fields:['storeys','use'],message:'D2では2階建ては会堂のみ',broken:s=>s.storeys>1&&s.use!=='hall'},
+ // D5 (Human decision #1): towns and cities may build two-storey houses, workshops and markets; which
+ // births do is decided by the settlement scale in grammar-v1. Granaries stay one storey.
+ {fields:['storeys','use'],message:'2階建ては会堂・住宅・仕事場・市場のみ（倉は1階）',broken:s=>s.storeys>1&&s.use==='granary'},
 ];
 /** D2 limits on advanced technology. D3-c lifts them only for a building that adopted a technology its district holds. */
 const technologyBans:readonly Rule[]=[

@@ -7,9 +7,9 @@
  *  - rediscover: a lost technology is established again (more easily than the first time)
  * Holding a technology does not make anyone use it: only hall / market / workshop births may adopt it
  * (grammar-v1). Losing it never changes buildings already standing (D0 A09).
- * Design §3.3 asks for the district's scale (town / city). v8 keeps no structured scale history, so the
- * town condition reads "a market and a workshop have been built in the district", which is part of v8's
- * own condition for a town (Human decision A on D3-c: buildings may rarely show it before D4).
+ * Design §3.3 asks for the district's scale (town / city). D5 (Human decision #4): the town condition is
+ * the real scale from v8's observation ledger (town or city in the boundary year). D3-c had used "a market
+ * and a workshop built" on the wrong belief that v8 keeps no structured scale history.
  * Rates are provisional; D3-d calibrates them with Human approval.
  */
 import {terrainHash} from '../terrain/terrain-hash-v1.js';
@@ -45,7 +45,7 @@ export interface TechnologyInputs {
  readonly changes:readonly TraditionChange[];readonly interaction:InteractionLedger;
  /** Facts of the window (year-24..year) for a district. */
  readonly facts:(site:ArchitectureSite,year:number)=>WindowFacts;
- /** Whether a market and a workshop had been built in the district by `year`. */
+ /** Whether the district is a town or a city in `year`. */
  readonly town:(site:ArchitectureSite,year:number)=>boolean;
 }
 const H=(...parts:(string|number)[])=>terrainHash([TECHNOLOGY_ID,...parts]);
