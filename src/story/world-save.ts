@@ -1,6 +1,6 @@
 import type {TerrainProductionSave} from '../terrain/terrain-production-wire-v1.js';
 import {knownClimateWorldPacket,validateClimateWorldSave,PreClimateWorldError,type ClimateWorldSave} from '../climate/climate-world-v1.js';
-export {CLIMATE_WORLD_SAVE_KEY,PreClimateWorldError} from '../climate/climate-world-v1.js';
+export {CLIMATE_WORLD_SAVE_KEY,PreClimateWorldError,OutdatedWorldSaveError} from '../climate/climate-world-v1.js';
 import {terrainProductionPacketWorldInternal} from '../terrain/terrain-production-owned-internal.js';
 import {validateTerrainProductionSave} from '../terrain/terrain-production-history-v1.js';
 import type {EconomicProductionSave} from '../irrigation/economic-production-wire-v1.js';

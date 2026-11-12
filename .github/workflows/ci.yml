@@ -122,6 +122,15 @@ jobs:
           name: biome47-b1c-climate-distribution
           path: artifacts/biome47-b1c/*
           if-no-files-found: error
+      # Issue 47 B2b: local habitat and plant community maps on real worlds (review aid; needs dist/).
+      - name: Render Issue 47 B2b local flora maps
+        run: node scripts/preview-local-flora.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biome47-b2b-local-flora
+          path: artifacts/biome47-b2b/*
+          if-no-files-found: error
 
   visual-browser:
     needs: scope

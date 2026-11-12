@@ -3,9 +3,12 @@ import {SceneMotionPlayer} from './scene/motion-player.js';
 import {lastObservedYear,ensureMemory,legacyNames} from './story/engine.js';
 import {findWorldSave,storeWorldSave,decodeWorldSave,higherPriorityWorldSaveKeys} from './story/world-storage.js';
 import {restoreWorldSession,prepareWorldSessionSave,enableWorldEconomicCoupling,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,enableWorldIrrigation,improveWorldGrowth,improveWorldEnvironment,slowWorldClimate,advanceWorldSessionAsync,chooseWorldSessionAsync,observeWorldSession,drawWorldSession,worldArchitectureChronicle,worldStreetscapeAt,type WorldSession} from './story/world-session.js';
-import {serializeWorldSave,PreClimateWorldError} from './story/world-save.js';
+import {serializeWorldSave,PreClimateWorldError,OutdatedWorldSaveError} from './story/world-save.js';
 /** Issue #47 B2a: saves from before the climate record (v9) are kept but not opened. */
 const preClimateNote='以前の版（気候の記録がない世界）の保存です。この版では開けません。保存値はそのまま残しています。新しい文明を作ってください。';
+/** Issue #47 B2b: saves of an earlier version of the current format (v10 before the flora record). */
+const outdatedNote='以前の版の保存です。この版では開けません。保存値はそのまま残しています。新しい文明を作ってください。';
+const unopenableNote=(error:unknown):string|null=>error instanceof PreClimateWorldError?preClimateNote:error instanceof OutdatedWorldSaveError?outdatedNote:null;
 import type {RecordEntry} from './story/engine.js';
 import {siteAt} from './story/settlement-history.js';
 import {practiceNames} from './story/society.js';
@@ -242,7 +245,7 @@ el('load').addEventListener('click',async()=>{
  if(busy)return;stop();setBusy(true);const source=world,ticket=++operation;el('feedback').textContent='歴史を開いています。';
  try{await paintFeedback();const saved=await findWorldSave(key=>localStorage.getItem(key));if(ticket!==operation||world!==source)return;if(!saved){el('feedback').textContent='保存された記録がありません。';return;}
   const candidate=restoreWorldSession(saved);adopt(candidate);el('feedback').textContent='保存された歴史を開きました。';
- }catch(error){if(ticket===operation)el('feedback').textContent=error instanceof PreClimateWorldError?preClimateNote:'この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
+ }catch(error){if(ticket===operation)el('feedback').textContent=unopenableNote(error)??'この保存データを読み込めませんでした。現在の歴史と保存値はそのままです。';}
  finally{if(ticket===operation){setBusy(false);render();}}
 });
 el('export').addEventListener('click',async()=>{
@@ -256,7 +259,7 @@ file.addEventListener('change',async()=>{
  const selected=file.files?.[0];if(!selected||busy)return;stop();setBusy(true);const source=world,ticket=++operation;
  el('feedback').textContent='記録ファイルを開いています。';
  try{await paintFeedback();if(selected.size>16*1024*1024)throw Error('File too large');const candidate=restoreWorldSession(await decodeWorldSave(await selected.text()));if(ticket!==operation||world!==source)return;adopt(candidate);el('feedback').textContent='記録ファイルを開きました。';}
- catch(error){if(ticket===operation)el('feedback').textContent=error instanceof PreClimateWorldError?preClimateNote:'この記録ファイルを開けませんでした。現在の歴史と保存値はそのままです。';}
+ catch(error){if(ticket===operation)el('feedback').textContent=unopenableNote(error)??'この記録ファイルを開けませんでした。現在の歴史と保存値はそのままです。';}
  finally{if(ticket===operation){file.value='';setBusy(false);render();}}
 });
 input.value=String(state.seed);render();
@@ -277,7 +280,7 @@ async function boot(){
   const world=saved?restoreWorldSession(saved):await (await import('./story/new-world.js')).createNewArchitectureWorld(randomSeed());
   startWorld(world);el('feedback').textContent=saved?'保存された歴史を開きました。':'';
  }catch(error){
-  el('feedback').textContent=error instanceof PreClimateWorldError?preClimateNote:'記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
+  el('feedback').textContent=unopenableNote(error)??'記録を準備できませんでした。保存値は保持しています。記録ファイルを開くか、新しい文明を作れます。';
   const recovery=['load','restart','random','import'];for(const id of recovery)(el(id) as HTMLButtonElement).disabled=false;
   el('load').onclick=()=>void boot();
   const recover=async(make:()=>Promise<WorldSession>)=>{
