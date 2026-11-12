@@ -60,7 +60,8 @@ export const FOREST_DENSITIES=Object.freeze({
  medium:Object.freeze({label:'中',treeFactor:2,treeSpacing:13,structureMarginX:10,structureMarginY:14}),
  dense:Object.freeze({label:'密',treeFactor:3,treeSpacing:10,structureMarginX:6,structureMarginY:8}),
 });
-export const DEFAULT_FOREST_DENSITY='medium';
+// Human review (B1b): dense is the default.
+export const DEFAULT_FOREST_DENSITY='dense';
 export function planReviewPlants({physics,occupied,seed,siteIndex,biomeId,forestDensity=DEFAULT_FOREST_DENSITY}){
  if(!Object.hasOwn(FOREST_DENSITIES,forestDensity))throw Error('Unknown forest density '+forestDensity);
  if(!physics||physics.surface?.length!==57600||physics.grade?.length!==57600||physics.bearing?.length!==57600)

@@ -128,7 +128,7 @@ test('B1b D: each plant gets A or B from a fixed hash, about half and half, and 
 });
 test('B1b forest density: only forests change; denser presets add trees with the stated spacing and building margins',()=>{
  const physics=fixture(),occupied=[{x:80,y:113,width:60,depth:30},{x:170,y:140,width:15,depth:20}];
- assert.equal(DEFAULT_FOREST_DENSITY,'medium');
+ assert.equal(DEFAULT_FOREST_DENSITY,'dense');
  assert.deepEqual(Object.keys(FOREST_DENSITIES),['baseline','medium','dense']);
  assert.deepEqual([...FOREST_BIOMES],['temperate_forest','tropical_rainforest','boreal_forest']);
  for(const biome of REVIEW_BIOMES){
