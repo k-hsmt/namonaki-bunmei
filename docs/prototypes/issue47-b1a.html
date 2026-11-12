@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>名もなき文明 / #47 B1a 植物造形比較</title>
+<style>
+:root{color-scheme:light;--paper:#eeefe8;--card:#fafaf6;--ink:#303831;--muted:#657065;--line:#cfd4c8}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.7 system-ui,-apple-system,"Noto Sans JP",sans-serif}main{max-width:1100px;margin:auto;padding:24px 20px 90px}h1{font-size:clamp(22px,3vw,30px);letter-spacing:.015em;line-height:1.4;margin:4px 0 8px}h2{font-size:19px;margin:36px 0 10px}.intro{max-width:750px;color:var(--muted);margin:0 0 24px}.eyebrow{font-size:11px;letter-spacing:.16em;color:#546953;font-weight:700}.hint{color:var(--muted);font-size:12px}.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:18px 0}.toolbar button{background:#4b6753;color:white;border:0;border-radius:5px;padding:9px 14px;cursor:pointer}.toolbar button:hover{background:#385540}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 15px}.card h3{font-size:15px;margin:0 0 3px}.card .desc{font-size:12px;color:var(--muted);min-height:39px;margin:0 0 10px}.comparisons{display:flex;align-items:flex-end;justify-content:space-around;gap:10px}.comparisons figure{margin:0;text-align:center}.comparisons figcaption{font-size:11px;color:var(--muted);margin-top:3px}.micro{display:block;width:72px;height:64px;image-rendering:pixelated;background:linear-gradient(#dfe7dc 0 68%,#b9b49b 68% 72%,#b2ad91 72%)}.comparisons figure:first-child .micro{background:linear-gradient(#e6ebe3 0 68%,#b7b49c 68% 72%,#b2ad91 72%)}.zoom-box{display:none;overflow-x:auto;border-top:1px solid var(--line);margin-top:10px;padding-top:9px}.zoom-box canvas{width:288px;height:256px;max-width:none;image-rendering:pixelated}.show-zoom .zoom-box{display:block}.tag{font-size:10px;display:inline-block;color:#5d685c;background:#eef0e9;border:1px solid #d9ded4;border-radius:3px;padding:1px 6px;margin-bottom:6px}.plates{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));}.plate{background:var(--card);border:1px solid var(--line);padding:10px;border-radius:8px;overflow-x:auto}.plate h3{font-size:14px;margin:0 0 7px}.plate canvas{display:block;width:320px;height:180px;image-rendering:pixelated;margin:auto;box-shadow:0 0 0 1px #d8ddd5}.plate footer{color:var(--muted);font-size:11px;margin-top:7px}ul{padding-left:20px;color:var(--muted)}.notice{font-size:12px;color:var(--muted);padding:13px 16px;border-left:2px solid #97a78a;background:#f8f9f5;margin:20px 0}.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)}@media(prefers-color-scheme:dark){:root{color-scheme:dark;--paper:#1f2621;--card:#2a322c;--ink:#e5eade;--muted:#b1bdae;--line:#4b574b}.tag{background:#39443a;border-color:#556055;color:#d7dfd0}.notice{background:#2c352e}}
+</style></head><body><main>
+<div class="eyebrow">NAMONAKI BUNMEI · ISSUE #47 · B1a · PROTOTYPE ONLY</div>
+<h1>その土地に、生きるかたち。</h1>
+<p class="intro">13系統の植物を、ゲーム本編から切り離した独立した試作として比較します。色だけではなく、輪郭・枝分かれ・葉の垂れ方・地表への広がりで違いをつけています。形の判断は原寸を優先し、拡大表示はピクセルの確認用です。</p>
+<div class="toolbar"><button id="zoom" type="button">4倍表示を切り替え</button><button id="save" type="button">比較プレートをPNGで保存</button><span class="hint">各スプライト72×64px・建築と近い落ち着いた色調</span></div>
+<section><h2>植物単体 / 13の造形系統</h2><div class="cards" id="cards"></div></section>
+<section><h2>320×180px / 原寸の見え方</h2><p class="hint">1枚に最大4系統を並べて輪郭と高さを比較。これは植生の試作見本であり、世界seed・地形正本・生育適性から生成した風景ではありません。背景と地表は固定の仮舞台です。</p><div class="plates" id="plates"></div></section>
+<div class="notice">Humanレビューで確認したいこと：①樹種・草種の輪郭は原寸で十分に違うか ②若齢／成熟の見分け ③最も似ている2系統はどれか ④「その土地らしさ」が感じられるか。<strong>本編への組込、気候分布、年次成長、保存形式には未接続です。</strong></div>
+<p class="hint">制作規則：整数座標の塗りつぶしのみ／アンチエイリアスなし／乱数と時刻を使用しない。若齢形は独立した生育アルゴリズムではなく、成熟形の小型化による比較用の仮姿です。</p>
+</main><script>
+'use strict';
+const SPEC=[
+ ['deciduous','落葉広葉樹','丸く分かれた樹冠と幹の枝分かれ','温帯林'],
+ ['evergreen','常緑広葉樹','濃く厚い樹冠と密な葉の層','温暖な湿潤地'],
+ ['conifer','針葉樹','細く高い尖塔形と水平の枝段','亜寒帯林'],
+ ['tropical','熱帯高木','高い直幹・張り出す樹冠・つる','熱帯雨林'],
+ ['savanna','乾燥地の疎林木','曲がる幹と横に平たい樹冠','サバンナ'],
+ ['riparian','河畔樹木','縦に垂れる枝葉と明るい河畔の緑','川辺'],
+ ['dry-shrub','乾燥地の低木','硬く分かれた小枝と隙間の多い葉','砂漠・ステップ'],
+ ['tundra-shrub','寒冷地の低木','横に這う低い枝とまばらな葉','ツンドラ'],
+ ['bush','一般低木','地表近くで丸く重なる小さな塊','温帯林'],
+ ['grass','草本類','高さの違う穂と細い葉の束','草原・ステップ'],
+ ['fern','林床植物','扇状に開く羽状葉とシダの層','熱帯・温帯林'],
+ ['reeds','湿地植物','水際で垂直に伸びる葦と穂','淡水湿地'],
+ ['moss','苔・地衣類','岩と地表に沿った薄い斑状被覆','ツンドラ・林床']
+];
+const P={bark:'#645744',bark2:'#827254',barkLight:'#a49270',dark:'#344f3c',leaf:'#58734d',light:'#8c9c65',bright:'#aeb381',fir:'#3e5c51',fir2:'#647b60',tropic:'#37634e',tropic2:'#648657',dry:'#8e8964',dry2:'#b2a177',cold:'#7e9085',cold2:'#a9b9a2',soil:'#a69c7c'};
+function paper(){const c=document.createElement('canvas');c.width=72;c.height=64;return c}
+function painter(c){const x=c.getContext('2d');x.imageSmoothingEnabled=false;const r=(a,b,w,h,col)=>{x.fillStyle=col;x.fillRect(Math.round(a),Math.round(b),w,h)};
+ const line=(x1,y1,x2,y2,col,weight=1)=>{let dx=Math.abs(x2-x1),sx=x1<x2?1:-1,dy=-Math.abs(y2-y1),sy=y1<y2?1:-1,err=dx+dy;while(true){r(x1,y1,weight,weight,col);if(x1===x2&&y1===y2)break;const e2=2*err;if(e2>=dy){err+=dy;x1+=sx}if(e2<=dx){err+=dx;y1+=sy}}};
+ const oval=(cx,cy,rx,ry,col)=>{for(let y=-ry;y<=ry;y++){const d=1-(y*y)/(ry*ry);if(d<0)continue;const width=Math.floor(rx*Math.sqrt(d));r(cx-width,cy+y,width*2+1,1,col)}};
+ const shade=(cx,cy,rx,ry,a,b)=>{oval(cx,cy,rx,ry,a);oval(cx-rx/3|0,cy-ry/3|0,Math.max(1,rx-3),Math.max(1,ry-3),b)};
+ const dot=(cx,cy,radius,col,count=12)=>{for(let i=0;i<count;i++){const u=((i*17+13)%37)/36*2-1,v=((i*11+3)%31)/30*2-1;if(u*u+v*v<.95)r(Math.round(cx+u*radius),Math.round(cy+v*radius*.6),i%3===0?2:1,1,col)}};
+ return {x,r,line,oval,shade,dot};}
+function renderPlant(id,young=false){
+ const full=paper(),{r,line,oval,shade,dot}=painter(full);
+ if(id==='deciduous'){
+  r(34,30,4,30,P.bark);r(32,56,9,3,P.bark2);line(35,40,19,27,P.bark,2);line(37,42,50,24,P.bark,2);
+  shade(20,25,12,9,'#4a6847','#71905c');shade(48,25,12,10,'#4e704d','#829866');shade(35,16,14,11,'#476b48','#7f9662');oval(35,30,14,7,'#527951');dot(23,22,11,'#a2ab77',16);dot(45,20,11,'#a3ac7c',14);
+ }else if(id==='evergreen'){
+  r(34,31,5,28,P.bark);r(31,57,11,2,P.bark2);line(35,39,24,30,P.bark2,2);line(37,37,48,31,P.bark2,2);
+  oval(32,29,21,13,'#314f3c');oval(38,23,18,13,'#426a49');oval(29,19,15,12,'#507654');oval(42,25,12,9,'#58794d');dot(25,19,13,'#819a63',13);dot(41,20,13,'#819662',9);r(27,32,21,3,'#3c6043');
+ }else if(id==='conifer'){
+  r(34,11,3,49,'#705943');r(33,54,5,5,P.bark2);
+  for(let i=0;i<7;i++){const y=11+i*6,w=2+i*3;r(35-w,y,w*2+1,5,'#324e48');r(35-w+2,y,w*2-3,2,'#5a7962');r(35-w+1,y+4,Math.max(2,w*2-1),1,'#425e50')}
+  r(34,7,2,8,'#66806d');r(35,57,2,3,P.bark);
+ }else if(id==='tropical'){
+  r(33,23,5,36,'#715943');r(31,38,2,17,'#8a7151');line(33,49,25,59,'#755c46',2);line(38,50,45,59,'#755c46',2);line(35,25,18,17,P.bark,2);line(37,24,56,19,P.bark,2);
+  oval(19,18,13,7,'#315b43');oval(50,16,15,8,'#3b6648');oval(34,11,17,10,'#3e6a49');oval(29,13,13,8,'#588055');dot(31,9,16,'#90a26b',12);
+  for(const x of [13,18,49,56]){r(x,23,1,x%2?13:18,'#547753');r(x+1,29,1,2,'#8fa56e')}
+ }else if(id==='savanna'){
+  line(35,59,37,34,P.bark,3);line(37,36,27,26,P.bark,2);line(38,34,49,24,P.bark,2);line(30,29,18,24,P.bark2,1);line(45,27,58,24,P.bark2,1);
+  oval(22,22,14,4,'#777f53');oval(48,20,18,5,'#657a4c');oval(35,18,20,5,'#82915a');r(15,23,12,2,'#536c46');r(45,24,15,2,'#596e49');dot(39,18,20,'#b0ad75',9);
+ }else if(id==='riparian'){
+  r(34,26,4,33,P.bark);line(36,35,21,27,P.bark2,2);line(36,37,52,28,P.bark2,2);
+  oval(34,18,24,10,'#426d53');oval(23,23,17,10,'#64895e');oval(50,23,13,8,'#658f68');oval(31,13,16,8,'#93a57a');
+  for(let x=13;x<60;x+=4){const top=18+(x%4),len=8+(x*7)%19;line(x,top,x+(x%3===0?1:-1),top+len,x%8===1?'#83a575':'#537e61');r(x,top+len,2,3,'#90a777')}
+ }else if(id==='dry-shrub'){
+  for(const [a,b,c,d]of [[35,58,20,43],[37,59,45,39],[38,55,57,45],[33,57,28,47],[34,57,40,43]])line(a,b,c,d,P.bark2,1);
+  for(const [x,y] of [[20,43],[25,46],[44,39],[50,46],[56,45],[35,44],[31,42]]){r(x-3,y-2,7,3,'#8e936b');r(x-2,y-3,4,2,'#b3a77b');r(x,y,5,2,'#6c7657')}
+  r(30,58,15,1,'#928667');
+ }else if(id==='tundra-shrub'){
+  line(16,57,50,57,P.bark2);for(const [x,dx,h] of [[20,-3,6],[28,3,7],[37,-4,9],[44,4,6],[53,3,4]]){line(x,57,x+dx,57-h,P.bark2);r(x+dx-3,56-h,7,3,'#718779');r(x+dx-2,54-h,5,2,'#9fae94')}
+  for(let x=13;x<60;x+=9)r(x,59,6,1,'#9a9e86');
+ }else if(id==='bush'){
+  r(33,48,3,12,P.bark);for(const [x,y,rx,ry,col]of [[19,47,12,7,'#476548'],[47,45,12,8,'#51714e'],[34,40,15,10,'#5f8156'],[28,47,15,7,'#71915d']])oval(x,y,rx,ry,col);dot(34,42,21,'#9da87a',21);
+ }else if(id==='grass'){
+  for(const [x,ht]of [[16,13],[24,21],[32,14],[38,26],[44,18],[53,17]]){line(x,59,x+(x%4-2),59-ht,x%2?'#8b9661':'#a8a474');r(x+(x%4-2)-1,59-ht-3,3,4,'#c4b481')}
+  for(const [x,d]of [[20,-9],[29,-7],[35,8],[42,10],[50,-7]])line(x,59,x+d,52,P.leaf);
+  r(19,58,34,2,'#859268');
+ }else if(id==='fern'){
+  for(const [x,y,dx,dy]of [[36,57,-24,-24],[36,57,25,-23],[36,57,-11,-31],[36,57,7,-37]]){
+   line(x,y,x+dx,y+dy,'#496d52');for(let k=2;k<12;k++){const xx=x+Math.round(dx*k/13),yy=y+Math.round(dy*k/13);r(xx-3,yy-2,4,2,'#719c67');r(xx,yy-3,4,2,'#5d885c')}}
+  r(34,50,3,9,'#536e51');
+ }else if(id==='reeds'){
+  r(12,59,49,2,'#849177');for(const [x,h]of [[18,29],[23,34],[29,25],[33,39],[39,29],[45,36],[51,27],[56,32]]){r(x,59-h,1,h,'#6d906c');r(x-1,59-h-4,3,6,x%2?'#826c4f':'#a18e66');line(x,54,x+6,43,'#84a174');line(x,53,x-6,46,'#7b9571')}
+ }else if(id==='moss'){
+  for(const [x,y,rx,ry,col]of [[18,57,10,3,'#728475'],[31,56,12,4,'#839680'],[47,57,13,3,'#a6ad8b'],[55,58,6,2,'#758b7a']])oval(x,y,rx,ry,col);
+  for(const [x,y]of [[21,57],[32,54],[49,55],[55,58]]){r(x,y,4,1,'#c0bfa0');r(x+3,y+1,1,1,'#627c77')}
+  r(25,59,4,1,'#536f63');r(40,57,8,1,'#c2b99c');
+ }else throw Error('Unknown archetype '+id);
+ if(!young)return full;
+ const out=paper(),d=out.getContext('2d');d.imageSmoothingEnabled=false;const scale=id==='conifer'||id==='tropical'?0.56:id==='grass'||id==='moss'?0.7:0.64;const w=Math.round(72*scale),h=Math.round(64*scale);d.drawImage(full,0,0,72,64,Math.round((72-w)/2),64-h,w,h);return out;
+}
+function contextPlate(group){const c=document.createElement('canvas');c.width=320;c.height=180;const p=c.getContext('2d');p.imageSmoothingEnabled=false;p.fillStyle='#c2c9ba';p.fillRect(0,0,320,180);p.fillStyle='#dbe0cd';p.fillRect(0,103,320,13);p.fillStyle='#9e9d7e';p.fillRect(0,116,320,64);p.fillStyle='#a4a185';p.fillRect(0,133,320,47);p.fillStyle='#b5ac8c';p.fillRect(0,151,320,29);
+ for(let i=0;i<32;i++){p.fillStyle=i%3===0?'#89906e':'#b0a587';p.fillRect((i*59+17)%320,125+(i*17)%50,2,1)}
+ for(let i=0;i<group.length;i++){const pos=40+80*i,plant=renderPlant(group[i][0]);p.drawImage(plant,pos-36,93);p.fillStyle='#5a6356';p.fillRect(pos-18,153,35,1)}
+ // 9px person as scale reference, separate from the comparison specimens.
+ p.fillStyle='#d6c5a6';p.fillRect(9,137,3,3);p.fillStyle='#6d7b74';p.fillRect(9,140,3,6);p.fillStyle='#464a43';p.fillRect(9,146,1,4);p.fillRect(11,146,1,4);
+ return c;
+}
+const cards=document.querySelector('#cards');for(const [id,name,desc,biome]of SPEC){const item=document.createElement('article');item.className='card';item.innerHTML='<span class="tag"></span><h3></h3><p class="desc"></p><div class="comparisons"><figure><figcaption>若齢形（仮）</figcaption></figure><figure><figcaption>成熟形</figcaption></figure></div><div class="zoom-box"></div>';item.querySelector('h3').textContent=name;item.querySelector('.tag').textContent=biome;item.querySelector('.desc').textContent=desc;const f=item.querySelectorAll('figure');for(let i=0;i<2;i++){const c=renderPlant(id,i===0);c.className='micro';f[i].prepend(c)}const large=renderPlant(id);item.querySelector('.zoom-box').appendChild(large);cards.appendChild(item)}
+const plateHolder=document.querySelector('#plates');const allPlates=[];for(let i=0;i<SPEC.length;i+=4){const group=SPEC.slice(i,i+4),c=contextPlate(group);allPlates.push(c);const card=document.createElement('article');card.className='plate';const h=document.createElement('h3'),foot=document.createElement('footer');h.textContent='比較プレート '+(Math.floor(i/4)+1)+' / '+group.map(z=>z[1]).join('・');foot.textContent='320×180px / 実際の地形や生育密度を表すものではありません';card.append(h,c,foot);plateHolder.appendChild(card)}
+document.querySelector('#zoom').addEventListener('click',()=>document.body.classList.toggle('show-zoom'));
+document.querySelector('#save').addEventListener('click',()=>{allPlates.forEach((c,i)=>{const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download='issue47-b1a-plate-'+String(i+1).padStart(2,'0')+'-320x180.png';a.click()})});
+window.B1A={SPEC,renderPlant,contextPlate,allPlates};
+</script></body></html>
