@@ -20,6 +20,7 @@ import {createArchitecturePainter} from '../architecture/scene-v1.js';
 import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '../architecture/layout-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import type {GeneratedStructurePainter} from '../scene/draw-generated-review.js';
+import type {SceneFloraSource} from '../scene/flora-draw.js';
 import {assertProductionBoundary} from './trial-boundary.js';
 import {introduceProductionIrrigation,slowProductionClimate} from '../irrigation/production-progression-v1.js';
 import {ownProductionWorld} from '../irrigation/production-history-v1.js';
@@ -107,7 +108,15 @@ export function worldFloraAt(session:WorldSession,year:number,siteIndex:number):
  return floraSiteAt({seed:session.state.seed,climate:session.climate,flora:session.flora,environment:session.review.environment!,year,site,vegetation:observation.ground.vegetation??[]});
 }
 export function worldStructurePainter(session:WorldSession):GeneratedStructurePainter|undefined{return architecture(session)?painterOf(session.architecture):undefined;}
-function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{let p=painters.get(world);if(!p){p=createArchitecturePainter(world.architecture.births);painters.set(world,p);}return p;}
+/** Recorded birth styles plus (Issue #47 B2d) the world's flora of each observed year and site, cached per observation. */
+function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{
+ let p=painters.get(world);if(p)return p;
+ const climate=worldClimate(world),flora=worldFlora(world),seen=new WeakMap<GeneratedSceneObservation,SceneFloraSource>();
+ p={...createArchitecturePainter(world.architecture.births),flora:o=>{let f=seen.get(o);if(!f){
+  f={seed:world.terrain.review.state.seed,patches:flora.sites[o.ground.site],views:floraSiteAt({seed:world.terrain.review.state.seed,climate,flora,environment:world.terrain.environment!,year:o.snapshot.year,site:o.ground.site,vegetation:o.ground.vegetation??[]})};
+  seen.set(o,f);}return f;}};
+ painters.set(world,p);return p;
+}
 function terrain(session:WorldSession):session is TerrainGeneratedSession {
  if(session.mode!=='generated'||session.review.format!=='terrain-production-world-v1')return false;
  knownTerrainProductionWorldInternal(session.review);if(session.state!==session.review.review.state)throw Error('Terrain session state differs from its owned world');return true;
