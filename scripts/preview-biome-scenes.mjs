@@ -18,7 +18,7 @@ import {createHash} from 'node:crypto';
 import {chromium} from 'playwright';
 import * as Claude from './lib/plant-prototype.mjs';
 import {expressiveCatalog,renderExpressivePlant} from './lib/expressive-plant-prototype.mjs';
-import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,MIXED_UNDERGROWTH_SCALE,planReviewPlants,mixedPainter} from './lib/biome47-b1b-spec.mjs';
+import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,MIXED_UNDERGROWTH_SCALE,FOREST_BIOMES,FOREST_DENSITIES,DEFAULT_FOREST_DENSITY,planReviewPlants,mixedPainter} from './lib/biome47-b1b-spec.mjs';
 
 const out='artifacts/biome47-b1b';
 const seed=Number(process.env.BIOME47_B1B_SEED??88),year=Number(process.env.BIOME47_B1B_YEAR??300);
@@ -131,7 +131,7 @@ try{
  assert.equal(prepared.length,3);
 
  // 2. Plan fixed test-only species and roots on verified REAL land for each site/biome.
- const plans=[],counts=[];
+ const plans=[],counts=[],densityPlans=[];
  for(const site of prepared){
   assert.equal(site.siteId,REVIEW_SITES[site.siteIndex].id,'Current saved site does not match review site');
   const physics={surface:Uint8Array.from(site.physics.surface),grade:Uint8Array.from(site.physics.grade),bearing:Uint8Array.from(site.physics.bearing)};
@@ -140,18 +140,25 @@ try{
    assert.ok(plan.habitats.validCandidates>0,'No eligible saved terrain at '+site.siteId);
    assert.ok(plan.counts.low>0,'No eligible undergrowth at '+site.siteId+'/'+biome.id);
    plans.push(plan);
-   counts.push({site:site.siteId,biome:biome.id,...plan.counts,...plan.habitats});
+   counts.push({site:site.siteId,biome:biome.id,forestDensity:plan.forestDensity,...plan.counts,...plan.habitats});
+   // Forest density comparison (D only): the other presets of the same forest, same roots and hashes.
+   if(FOREST_BIOMES.includes(biome.id))for(const forestDensity of Object.keys(FOREST_DENSITIES))if(forestDensity!==DEFAULT_FOREST_DENSITY){
+    const alt=planReviewPlants({physics,occupied:site.occupied,seed,siteIndex:site.siteIndex,biomeId:biome.id,forestDensity});
+    assert.ok(alt.counts.low>0,'No eligible undergrowth at '+site.siteId+'/'+biome.id+'/'+forestDensity);
+    densityPlans.push(alt);
+   }
   }
  }
 
  // 3. Render 84 frames with the same origins, species, climate trial palette, occupation and architecture.
  //    D's per-plant A/B choice is fixed here, in Node, from the plan (no browser-side randomness).
- const renderPlans=plans.map(p=>({...p,
+ const withMix=p=>({...p,
   trees:p.trees.map(q=>({...q,mix:mixedPainter(seed,p.siteIndex,q)})),
-  low:p.low.map(q=>({...q,mix:mixedPainter(seed,p.siteIndex,q)}))}));
+  low:p.low.map(q=>({...q,mix:mixedPainter(seed,p.siteIndex,q)}))});
+const renderPlans=plans.map(withMix),renderDensityPlans=densityPlans.map(withMix);
  const mixedSplit=renderPlans.map(p=>{const n=(list,m)=>list.filter(q=>q.mix===m).length;
   return {site:REVIEW_SITES[p.siteIndex].id,biome:p.biomeId,treesA:n(p.trees,'expressive'),treesB:n(p.trees,'claude'),undergrowthA:n(p.low,'expressive'),undergrowthB:n(p.low,'claude')};});
- const rendered=await page.evaluate(async({specimens,plans,biomes,styles,expressiveIds,occupied,mixedUndergrowthScale})=>{
+ const rendered=await page.evaluate(async({specimens,plans,densityPlans,biomes,styles,expressiveIds,occupied,mixedUndergrowthScale})=>{
   const scenes=window.__biome47B1bScenes;
   if(!scenes||scenes.length!==3)throw Error('Saved scene context missing');
   const imageOf=async url=>{const image=new Image();image.src=url;await image.decode();return image;};
@@ -270,7 +277,7 @@ try{
     occludedShare:Math.round(occluded/structure*10000)/10000,plantPixelsBehindStructures:hidden};
   };
   // Every planned root (2px, record land) must sit on record land when read back through the screen mapping.
-  for(const plan of plans)for(const q of [...plan.trees,...plan.low]){
+  for(const plan of [...plans,...densityPlans])for(const q of [...plan.trees,...plan.low]){
    const sx=screenRoot(plan.siteIndex,q.x);
    for(const c of [sx,sx+1]){const z=q.y*320+screenColumn(plan.siteIndex,c);if(scenes[plan.siteIndex].raster.surface[z]!==1)throw Error('Plant root drawn off land: '+plan.biomeId+'/'+plan.siteIndex+' x '+q.x);}
   }
@@ -287,6 +294,15 @@ try{
     rendered.push({biome:biome.id,siteIndex:si,style:style.id,data,clipped:layer.clipped,occlusion:verify(si,biome,layer,c,key)});
    }
    frames.push(...rendered);
+  }
+  // Forest density comparison: D only, the non-default presets (the default preset is the main D frame).
+  const densityFrames=[];
+  for(const plan of densityPlans){
+   const si=plan.siteIndex,biome=biomes.find(b=>b.id===plan.biomeId),style=styles.find(x=>x.id==='mixed');
+   const layer=plantLayer(si,style,plan),c=compose(si,biome,layer),data=c.toDataURL('image/png');
+   if(data!==compose(si,biome,plantLayer(si,style,plan)).toDataURL('image/png'))throw Error('B1b pixel nondeterminism (density)');
+   const key='density/'+plan.forestDensity+'/'+plan.biomeId+'/'+si;
+   densityFrames.push({biome:plan.biomeId,siteIndex:si,density:plan.forestDensity,data,clipped:layer.clipped,occlusion:verify(si,biome,layer,c,key)});
   }
   /** The previous B1b order (every plant over every structure) and a front/back map, for review of selected frames. */
   const previousOrder=key=>{const {si,biome,layer}=layers.get(key);return compose(si,biome,layer,'structures-under-plants').toDataURL('image/png');};
@@ -331,9 +347,10 @@ try{
   const ranked=frames.filter(f=>f.style==='hybrid'&&f.occlusion.plantPixelsBehindStructures>0)
    .sort((a,b)=>b.occlusion.plantPixelsBehindStructures-a.occlusion.plantPixelsBehindStructures||a.biome.localeCompare(b.biome)||a.siteIndex-b.siteIndex);
   const examples=ranked.slice(0,6).map(f=>{const key=f.biome+'/'+f.siteIndex+'/'+f.style;return {biome:f.biome,siteIndex:f.siteIndex,style:f.style,previous:previousOrder(key),map:occlusionMap(key)};});
-  return {frames,overlapChecks,examples};
- },{specimens,plans:renderPlans,biomes:REVIEW_BIOMES,styles:REVIEW_STYLES,expressiveIds:EXPRESSIVE_IDS,occupied:prepared.map(s=>s.occupied),mixedUndergrowthScale:MIXED_UNDERGROWTH_SCALE});
- const {frames:results,overlapChecks,examples}=rendered;
+  return {frames,overlapChecks,examples,densityFrames};
+ },{specimens,plans:renderPlans,densityPlans:renderDensityPlans,biomes:REVIEW_BIOMES,styles:REVIEW_STYLES,expressiveIds:EXPRESSIVE_IDS,occupied:prepared.map(s=>s.occupied),mixedUndergrowthScale:MIXED_UNDERGROWTH_SCALE});
+ const {frames:results,overlapChecks,examples,densityFrames}=rendered;
+ assert.equal(densityFrames.length,FOREST_BIOMES.length*REVIEW_SITES.length*(Object.keys(FOREST_DENSITIES).length-1));
  assert.equal(results.length,REVIEW_BIOMES.length*REVIEW_SITES.length*REVIEW_STYLES.length);
  assert.equal(results.length,84);
  const artifacts=[],images=new Map();
@@ -355,6 +372,8 @@ try{
  // Y order hides the most plant pixels, and guaranteed tree-in-front / tree-behind checks per site.
  const exampleName=e=>e.biome+'_'+REVIEW_SITES[e.siteIndex].id+'_'+e.style;
  for(const e of examples){await saveData('previous-order_'+exampleName(e),e.previous);await saveData('occlusion-map_'+exampleName(e),e.map);}
+ const densityName=d=>'density-'+d.density+'_'+d.biome+'_'+REVIEW_SITES[d.siteIndex].id+'_mixed';
+ for(const d of densityFrames)await saveData(densityName(d),d.data);
  const overlapName=o=>'overlap-check_'+REVIEW_SITES[o.siteIndex].id+'_'+o.placement;
  for(const o of overlapChecks){await saveData(overlapName(o)+'_TEST_ONLY',o.data);await saveData(overlapName(o)+'_previous-order_TEST_ONLY',o.previous);}
  const report={
@@ -369,6 +388,10 @@ try{
   layerOrderNote:'Plants are sorted by root y (undergrowth and trees together). Structure ground line: facility footprint front edge (plot.y+depth), roof part base y, presentation mark y. Ties put the structure in front.',
   structureGroundLines:prepared.map(x=>({site:x.siteId,structures:x.structures})),
   mixedPainter:{rule:'Per plant: reviewHash(seed, site, rootY*320+rootX, 97) % 2 → A or B, independent of depth, kind and species',undergrowthScaleForA:MIXED_UNDERGROWTH_SCALE,split:mixedSplit},
+  forestDensity:{default:DEFAULT_FOREST_DENSITY,presets:FOREST_DENSITIES,biomes:FOREST_BIOMES,
+   comparison:[...densityFrames.map(d=>({name:densityName(d),biome:d.biome,site:REVIEW_SITES[d.siteIndex].id,density:d.density,occlusion:d.occlusion,
+    trees:densityPlans.find(p=>p.biomeId===d.biome&&p.siteIndex===d.siteIndex&&p.forestDensity===d.density).counts.trees,
+    low:densityPlans.find(p=>p.biomeId===d.biome&&p.siteIndex===d.siteIndex&&p.forestDensity===d.density).counts.low}))]},
   counts,frames:results.map(x=>({biome:x.biome,site:REVIEW_SITES[x.siteIndex].id,style:x.style,clipped:x.clipped,occlusion:x.occlusion})),
   mostHiddenPlantHybridExamples:examples.map(e=>({name:exampleName(e),occlusion:images.get(exampleName(e)).occlusion})),
   overlapChecks:overlapChecks.map(({data,previous,...o})=>({...o,site:REVIEW_SITES[o.siteIndex].id})),

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {expressiveCatalog,renderExpressivePlant} from '../scripts/lib/expressive-plant-prototype.mjs';
 import * as Claude from '../scripts/lib/plant-prototype.mjs';
-import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,MIXED_UNDERGROWTH_SCALE,planReviewPlants,nearFreshwater,mixedPainter} from '../scripts/lib/biome47-b1b-spec.mjs';
+import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,MIXED_UNDERGROWTH_SCALE,FOREST_BIOMES,FOREST_DENSITIES,DEFAULT_FOREST_DENSITY,planReviewPlants,nearFreshwater,mixedPainter} from '../scripts/lib/biome47-b1b-spec.mjs';
 
 const fixture=()=>{
  const surface=new Uint8Array(320*180),grade=new Uint8Array(320*180),bearing=new Uint8Array(320*180);
@@ -52,7 +52,8 @@ test('B1b: forest, desert and tundra planting use actual habitable land, ignore 
   const p=planReviewPlants(args);
   assert.deepEqual(p,planReviewPlants(args));
   assert.ok(p.counts.low>0,biome.id);
-  assert.ok(p.counts.trees<=biome.trees&&p.counts.low<=biome.low);
+  const cap=biome.trees*(FOREST_BIOMES.includes(biome.id)?FOREST_DENSITIES[DEFAULT_FOREST_DENSITY].treeFactor:1);
+  assert.ok(p.counts.trees<=cap&&p.counts.low<=biome.low,biome.id);
   if(biome.id==='tundra')assert.equal(p.counts.trees,0);
   for(const plant of [...p.low,...p.trees]){
    const i=plant.y*320+plant.x;
@@ -124,4 +125,32 @@ test('B1b D: each plant gets A or B from a fixed hash, about half and half, and 
  const text=readFileSync(new URL('../scripts/preview-biome-scenes.mjs',import.meta.url),'utf8');
  assert.match(text,/style\.id==='mixed'&&plant\.mix==='expressive'/);
  assert.match(text,/style\.id==='mixed'&&expressive&&plant\.kind==='low'\?mixedUndergrowthScale:1/);
+});
+test('B1b forest density: only forests change; denser presets add trees with the stated spacing and building margins',()=>{
+ const physics=fixture(),occupied=[{x:80,y:113,width:60,depth:30},{x:170,y:140,width:15,depth:20}];
+ assert.equal(DEFAULT_FOREST_DENSITY,'medium');
+ assert.deepEqual(Object.keys(FOREST_DENSITIES),['baseline','medium','dense']);
+ assert.deepEqual([...FOREST_BIOMES],['temperate_forest','tropical_rainforest','boreal_forest']);
+ for(const biome of REVIEW_BIOMES){
+  const plan=d=>planReviewPlants({physics,occupied,seed:88,siteIndex:1,biomeId:biome.id,forestDensity:d});
+  if(!FOREST_BIOMES.includes(biome.id)){
+   for(const d of ['medium','dense'])assert.deepEqual(plan(d),plan('baseline'),biome.id+' must not depend on forest density');
+   assert.equal(plan('dense').forestDensity,'baseline');
+   continue;
+  }
+  const counts=['baseline','medium','dense'].map(d=>plan(d).counts.trees);
+  assert.ok(counts[0]<counts[1]&&counts[1]<counts[2],biome.id+' '+counts);
+  for(const [d,preset] of Object.entries(FOREST_DENSITIES)){
+   const p=plan(d);
+   assert.ok(p.counts.trees<=biome.trees*preset.treeFactor);
+   for(let i=0;i<p.trees.length;i++)for(let j=i+1;j<p.trees.length;j++){
+    const a=p.trees[i],b=p.trees[j];assert.ok((a.x-b.x)**2+(a.y-b.y)**2>=preset.treeSpacing**2,biome.id+'/'+d+' spacing');
+   }
+   for(const t of p.trees)for(const o of occupied)
+    assert.ok(t.x<o.x-preset.structureMarginX||t.x>=o.x+o.width+preset.structureMarginX||t.y<o.y-preset.structureMarginY||t.y>=o.y+o.depth+preset.structureMarginY,biome.id+'/'+d+' building margin');
+   for(const q of [...p.trees,...p.low])for(const o of occupied)
+    assert.ok(q.x<o.x-4||q.x>=o.x+o.width+4||q.y<o.y-4||q.y>=o.y+o.depth+4,'no plant inside a plot or its 4px ring');
+  }
+ }
+ assert.throws(()=>planReviewPlants({physics,occupied,seed:88,siteIndex:0,biomeId:'boreal_forest',forestDensity:'jungle'}),/Unknown forest density/);
 });

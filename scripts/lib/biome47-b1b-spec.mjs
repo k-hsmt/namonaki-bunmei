@@ -50,7 +50,19 @@ export function mixedPainter(seed,siteIndex,plant){
  if(!Number.isSafeInteger(plant?.x)||!Number.isSafeInteger(plant?.y))throw Error('Mixed painter needs a planned root');
  return reviewHash(seed,siteIndex,plant.y*320+plant.x,97)%2?'expressive':'claude';
 }
-export function planReviewPlants({physics,occupied,seed,siteIndex,biomeId}){
+/**
+ * Forest tree density (Human review: forests may be denser by default). Applies only to FOREST_BIOMES;
+ * other biomes always use the baseline values. treeFactor multiplies the biome's tree cap.
+ */
+export const FOREST_BIOMES=Object.freeze(['temperate_forest','tropical_rainforest','boreal_forest']);
+export const FOREST_DENSITIES=Object.freeze({
+ baseline:Object.freeze({label:'従来',treeFactor:1,treeSpacing:18,structureMarginX:18,structureMarginY:25}),
+ medium:Object.freeze({label:'中',treeFactor:2,treeSpacing:13,structureMarginX:10,structureMarginY:14}),
+ dense:Object.freeze({label:'密',treeFactor:3,treeSpacing:10,structureMarginX:6,structureMarginY:8}),
+});
+export const DEFAULT_FOREST_DENSITY='medium';
+export function planReviewPlants({physics,occupied,seed,siteIndex,biomeId,forestDensity=DEFAULT_FOREST_DENSITY}){
+ if(!Object.hasOwn(FOREST_DENSITIES,forestDensity))throw Error('Unknown forest density '+forestDensity);
  if(!physics||physics.surface?.length!==57600||physics.grade?.length!==57600||physics.bearing?.length!==57600)
   throw Error('B1b requires the actual 320x180 saved terrain physics');
  if(!Number.isSafeInteger(seed)||seed<1||!Number.isSafeInteger(siteIndex)||siteIndex<0||siteIndex>2)throw Error('Invalid review context');
@@ -64,12 +76,14 @@ export function planReviewPlants({physics,occupied,seed,siteIndex,biomeId}){
   if(occupied.some(p=>inside(p,x,y,4,4)))continue;
   candidates.push({x,y,h,patchIndex:i,fresh:nearFreshwater(physics,x,y)});
  }
+ const density=FOREST_BIOMES.includes(biomeId)?FOREST_DENSITIES[forestDensity]:FOREST_DENSITIES.baseline;
+ const treeCap=biome.trees*density.treeFactor;
  const trees=[],low=[],sorted=[...candidates].sort((a,b)=>a.h-b.h||a.patchIndex-b.patchIndex);
  const okDistance=(chosen,c,dist)=>chosen.every(p=>(p.x-c.x)**2+(p.y-c.y)**2>=dist*dist);
  for(const c of sorted){
-  if(trees.length>=biome.trees)break;
-  if(occupied.some(p=>inside(p,c.x,c.y,18,25)))continue;
-  if(!okDistance(trees,c,18))continue;
+  if(trees.length>=treeCap)break;
+  if(occupied.some(p=>inside(p,c.x,c.y,density.structureMarginX,density.structureMarginY)))continue;
+  if(!okDistance(trees,c,density.treeSpacing))continue;
   const group=biome.high;
   // A riverine tree is allowed near actual freshwater only, never near sea alone.
   let id=group[reviewHash(seed,siteIndex,c.patchIndex,31)%group.length];
@@ -85,5 +99,5 @@ export function planReviewPlants({physics,occupied,seed,siteIndex,biomeId}){
   const id=pool[reviewHash(seed,siteIndex,c.patchIndex,53)%pool.length];
   low.push({kind:'low',id,x:c.x,y:c.y,variant:(c.h>>>5)%6,stage:c.h%4===0?'young':'mature',fresh:c.fresh});
  }
- return Object.freeze({seed,siteIndex,biomeId,trees,low,counts:{trees:trees.length,low:low.length},habitats:{freshRoots:candidates.filter(c=>c.fresh).length,validCandidates:candidates.length}});
+ return Object.freeze({seed,siteIndex,biomeId,forestDensity:FOREST_BIOMES.includes(biomeId)?forestDensity:'baseline',trees,low,counts:{trees:trees.length,low:low.length},habitats:{freshRoots:candidates.filter(c=>c.fresh).length,validCandidates:candidates.length}});
 }
