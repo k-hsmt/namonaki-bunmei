@@ -46,11 +46,19 @@ test('B2d: plants cover a structure only when rooted in front of its ground line
      if(plantFront)front++;else if(layer.root[i]>=0)behind++;
      if(fr[a]!==src[a]||fr[a+1]!==src[a+1]||fr[a+2]!==src[a+2])wrong++;
     }
-    // Moving layers without the time-dependent smoke: backdrop, structures, plants in front.
-    const moving=M.prepareSceneMotion(o,painter),mv=document.createElement('canvas');mv.width=320;mv.height=180;const mc=mv.getContext('2d');mc.drawImage(moving.backdrop,0,0);mc.drawImage(moving.structures,0,0);mc.drawImage(moving.floraFront,0,0);M.drawSceneMotion(document.createElement('canvas'),moving,0);
-    const mp=px(mv);let differ=0;for(let i=0;i<57600;i++)if(st[i*4+3]&&(mp[i*4]!==fr[i*4]||mp[i*4+1]!==fr[i*4+1]||mp[i*4+2]!==fr[i*4+2]))differ++;
+    // Moving layers without the time-dependent smoke, still and at two swaying poses, checked per structure pixel.
+    const moving=M.prepareSceneMotion(o,painter),raster=P.rasterizeFlora(plants,mirror);M.drawSceneMotion(document.createElement('canvas'),moving,0);
+    const composite=seconds=>{moving.flora.at(seconds);const mv=document.createElement('canvas');mv.width=320;mv.height=180;const mc=mv.getContext('2d');
+     mc.drawImage(moving.backdrop,0,0);mc.drawImage(moving.flora.behind,0,0);mc.drawImage(moving.structures,0,0);mc.drawImage(moving.flora.front,0,0);return px(mv);};
+    const still=composite(undefined);let differ=0,swayWrong=0,swayed=false;
+    for(let i=0;i<57600;i++)if(st[i*4+3]&&(still[i*4]!==fr[i*4]||still[i*4+1]!==fr[i*4+1]||still[i*4+2]!==fr[i*4+2]))differ++;
+    for(const seconds of [1.7,4.2]){
+     const pose=P.composeFlora(raster,Array.from({length:raster.trees},(_,t)=>P.treeSwayAt(t,seconds))),m=composite(seconds);
+     for(let i=0;i<57600;i++){const a=i*4;if(m[a]!==still[a]||m[a+1]!==still[a+1]||m[a+2]!==still[a+2])swayed=true;if(!st[a+3])continue;
+      const src=pose.root[i]>=0&&pose.root[i]>lines[i]?pose.rgba:st;if(m[a]!==src[a]||m[a+1]!==src[a+1]||m[a+2]!==src[a+2])swayWrong++;}
+    }
     const bare=document.createElement('canvas');D.drawGeneratedSceneReview(bare,o,undefined,undefined,{...painter,flora:undefined});
-    rows.push({site:o.ground.site,mirror,plants:plants.length,trees:plants.filter(q=>q.kind==='tree').length,front,behind,unlined,wrong,differ,
+    rows.push({site:o.ground.site,mirror,plants:plants.length,trees:plants.filter(q=>q.kind==='tree').length,front,behind,unlined,wrong,differ,swayWrong,swayed,
      deterministic:frame.toDataURL()===again.toDataURL(),changed:frame.toDataURL()!==bare.toDataURL(),structurePixels:st.reduce((n,v,i)=>n+(i%4===3&&v?1:0),0)});
    }
   }
@@ -60,6 +68,7 @@ test('B2d: plants cover a structure only when rooted in front of its ground line
   assert.equal(r.unlined,0,'every structure pixel has a ground line');
   assert.equal(r.wrong,0,r.site+': structure pixels show the structure, or a plant rooted in front of it');
   assert.equal(r.differ,0,r.site+': the moving frame matches the static frame on structures');
+  assert.equal(r.swayWrong,0,r.site+': swaying crowns keep the ground-line order');if(r.trees)assert.ok(r.swayed,'trees sway');
   assert.ok(r.deterministic,'reproducible after reload');assert.ok(r.changed,'v10 plants follow the flora');
  }
  assert.ok(result.some(r=>r.mirror)&&result.some(r=>!r.mirror),'both mirrored and unmirrored sites are covered');

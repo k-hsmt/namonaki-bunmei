@@ -74,12 +74,12 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
  if(painter?.flora){
   paint=withoutLandscapePlants(paint??projectScenePaint(observation));
   if(!layer){
-   // Same composition as the motion frame: backdrop with tint and plants behind, clouds, people, structures, plants in front.
+   // Same composition as the motion frame (trees still): tinted backdrop, clouds, plants behind, people, structures, plants in front.
    drawGeneratedSceneReview(canvas,observation,'backdrop',paint,painter);
    const structures=document.createElement('canvas');drawGeneratedSceneReview(structures,observation,'structures',paint,painter);
    const flora=prepareSceneFlora(canvas,structures,observation,painter.flora(observation),paint.presentation,sceneStructureDrawer(paint,painter));
    const c=canvas.getContext('2d')!;c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}
-   drawClouds(c,paint.presentation);drawPeople(c,paint.presentation);c.restore();
+   drawClouds(c,paint.presentation);c.restore();c.drawImage(flora.behind,0,0);c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}drawPeople(c,paint.presentation);c.restore();
    c.drawImage(structures,0,0);c.drawImage(flora.front,0,0);return;
   }
  }

@@ -6,7 +6,7 @@ import {renderPlant} from '../scripts/lib/plant-prototype.mjs';
 import {renderExpressivePlant} from '../scripts/lib/expressive-plant-prototype.mjs';
 import {EXPRESSIVE_IDS} from '../scripts/lib/biome47-b1b-spec.mjs';
 import {restrainedSprite,expressiveSprite} from '../dist/flora/plant-sprites-v1.js';
-import {planFloraScene,renderFloraLayer,plantScale,BIOME_SCENE,SCENE_DENSITY,LOW_SPACING,LOW_TREE_CLEARANCE,ROOT_MARGIN} from '../dist/flora/flora-scene-v1.js';
+import {planFloraScene,renderFloraLayer,rasterizeFlora,composeFlora,treeSwayAt,plantScale,BIOME_SCENE,SCENE_DENSITY,LOW_SPACING,LOW_TREE_CLEARANCE,ROOT_MARGIN} from '../dist/flora/flora-scene-v1.js';
 import {sceneOccupiedPlots} from '../dist/scene/flora-draw.js';
 import {PLANT_ARCHETYPES,FLORA_SITES,describeFloraPatch} from '../dist/flora/local-flora-v1.js';
 import {generateClimateBaseline} from '../dist/climate/initial-climate-v1.js';
@@ -105,4 +105,16 @@ test('B2d: plant drawing uses no random source and is not read by civilisation c
  const walk=d=>readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(d+'/'+e.name):[d+'/'+e.name]);
  for(const file of walk('src').filter(f=>/\/(story|irrigation|terrain|architecture|engine|environment|vegetation|climate)\//.test(f)&&!f.endsWith('world-session.ts')))
   assert.doesNotMatch(readFileSync(file,'utf8'),/flora\/(flora-scene-v1|plant-sprites-v1)|scene\/flora-draw/,file+' must not read plant drawing');
+});
+
+test('B2d: a swaying tree moves only its crown, by one pixel, and undergrowth stays still',()=>{
+ const tree={kind:'tree',id:'deciduous',x:100,y:150,stage:'mature',variant:0,painter:'restrained'},grass={kind:'low',id:'herb',x:140,y:150,stage:'mature',variant:0,painter:'restrained'};
+ const r=rasterizeFlora([tree,grass],false),still=composeFlora(r),left=composeFlora(r,[-1]);
+ assert.equal(r.trees,1);
+ const rows=l=>{const m=new Map();for(let i=0;i<57600;i++)if(l.root[i]>=0&&i%320<130){const y=Math.floor(i/320);m.set(y,[...(m.get(y)??[]),i%320]);}return m;};
+ const a=rows(still),b=rows(left);let moved=0,kept=0;
+ for(const [y,xs] of a){const ys=b.get(y);if(ys.join()===xs.join())kept++;else{assert.deepEqual(ys,xs.map(x=>x-1));moved++;}}
+ assert.ok(moved>0&&kept>0,'crown rows move, trunk rows stay');
+ for(let i=0;i<57600;i++)if(i%320>=130)assert.equal(left.root[i],still.root[i]);
+ for(const s of [0,1,2.5,10])for(let t=0;t<20;t++)assert.ok(Math.abs(treeSwayAt(t,s))<=1);
 });

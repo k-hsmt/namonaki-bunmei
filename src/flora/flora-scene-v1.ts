@@ -99,26 +99,48 @@ export function plantScale(p:ScenePlant):number {
 }
 
 export interface FloraLayer {readonly rgba:Uint8ClampedArray;readonly root:Int16Array}
-/**
- * Plants of one scene on a transparent 320×180 screen layer, drawn by root y (undergrowth before trees on a tie,
- * then x). `root[i]` is the root y of the plant visible at screen pixel i (−1 none). Sprites are never flipped.
- */
-export function renderFloraLayer(plants:readonly ScenePlant[],mirror:boolean):FloraLayer {
- const rgba=new Uint8ClampedArray(57600*4),root=new Int16Array(57600).fill(-1);
+/** Share of a tree's visible height, from the root, that stays still while the crown above it sways. */
+export const SWAY_TRUNK_SHARE=.4;
+interface RasterItem {readonly root:number;readonly tree:number;readonly x:Int16Array;readonly y:Int16Array;readonly crown:Uint8Array;readonly rgba:Uint8ClampedArray}
+/** Screen pixels of every plant, in drawing order (root y, undergrowth before trees on a tie, then x). `tree` numbers trees in that order (−1 for undergrowth). */
+export interface FloraRaster {readonly items:readonly RasterItem[];readonly trees:number}
+export function rasterizeFlora(plants:readonly ScenePlant[],mirror:boolean):FloraRaster {
  const ordered=[...plants].sort((a,b)=>a.y-b.y||Number(a.kind==='tree')-Number(b.kind==='tree')||a.x-b.x||a.id.localeCompare(b.id));
+ let trees=0;const items:RasterItem[]=[];
  for(const p of ordered){
   const s=spriteOf(p),k=plantScale(p),w=Math.max(1,Math.round(s.width*k)),hh=Math.max(1,Math.round(s.height*k));
-  const left=Math.round((mirror?318-p.x:p.x)-s.originX*k),top=Math.round(p.y-s.originY*k);
+  const left=Math.round((mirror?318-p.x:p.x)-s.originX*k),top=Math.round(p.y-s.originY*k),xs:number[]=[],ys:number[]=[],cols:number[]=[];
   for(let y=Math.max(0,top);y<Math.min(180,top+hh);y++){
    const V=Math.floor((y-top+.5)*s.height/hh);
    for(let x=Math.max(0,left);x<Math.min(320,left+w);x++){
     const U=Math.floor((x-left+.5)*s.width/w),si=(V*s.width+U)*4;if(s.data[si+3]===0)continue;
-    const di=y*320+x;rgba.set(s.data.subarray(si,si+4),di*4);root[di]=p.y;
+    xs.push(x);ys.push(y);cols.push(s.data[si]!,s.data[si+1]!,s.data[si+2]!,s.data[si+3]!);
    }
+  }
+  const tree=p.kind==='tree'?trees++:-1,highest=ys.length?Math.min(...ys):p.y,still=p.y-SWAY_TRUNK_SHARE*(p.y-highest);
+  items.push({root:p.y,tree,x:Int16Array.from(xs),y:Int16Array.from(ys),crown:Uint8Array.from(ys,y=>+(tree>=0&&y<still)),rgba:Uint8ClampedArray.from(cols)});
+ }
+ return {items,trees};
+}
+/**
+ * Plants of one scene on a transparent 320×180 screen layer. `sway[t]` moves the crown of tree t sideways by that
+ * many pixels (absent: still). `root[i]` is the root y of the plant visible at screen pixel i (−1 none). Sprites are never flipped.
+ */
+export function composeFlora(r:FloraRaster,sway?:ArrayLike<number>,into?:FloraLayer):FloraLayer {
+ const rgba=into?.rgba??new Uint8ClampedArray(57600*4),root=into?.root??new Int16Array(57600);
+ rgba.fill(0);root.fill(-1);
+ for(const it of r.items){
+  const dx=it.tree>=0&&sway?sway[it.tree]??0:0;
+  for(let n=0;n<it.x.length;n++){
+   const x=it.x[n]!+(it.crown[n]?dx:0);if(x<0||x>=320)continue;
+   const i=it.y[n]!*320+x;rgba.set(it.rgba.subarray(n*4,n*4+4),i*4);root[i]=it.root;
   }
  }
  return {rgba,root};
 }
+/** Sideways crown offset of tree t at a wall-clock second (same rule as the earlier scene trees). */
+export function treeSwayAt(t:number,seconds:number):number {return Math.round(Math.sin(seconds*.7+t*2.3));}
+export function renderFloraLayer(plants:readonly ScenePlant[],mirror:boolean):FloraLayer {return composeFlora(rasterizeFlora(plants,mirror));}
 
 /**
  * Soil tint of each land pixel by its patch's biome (B1b colours), on a screen RGBA image. Record column x

@@ -10,7 +10,7 @@
  */
 import type {GeneratedSceneObservation} from './generated-scene-review.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
-import {planFloraScene,renderFloraLayer,tintFloraSoil,type ScenePlant,type ScenePlot} from '../flora/flora-scene-v1.js';
+import {planFloraScene,rasterizeFlora,composeFlora,treeSwayAt,tintFloraSoil,type FloraLayer,type ScenePlant,type ScenePlot} from '../flora/flora-scene-v1.js';
 import type {FloraPatch} from '../flora/local-flora-v1.js';
 import type {FloraPatchView} from '../flora/flora-growth-v1.js';
 
@@ -44,27 +44,42 @@ export function structureGroundLines(o:GeneratedSceneObservation,presentation:Pr
  return ground;
 }
 
-export interface PreparedSceneFlora {readonly plants:readonly ScenePlant[];readonly front:HTMLCanvasElement;readonly frontPixels:number;readonly behindPixels:number}
+export interface PreparedSceneFlora {
+ readonly plants:readonly ScenePlant[];
+ /** Plants not in front of any structure: drawn after the ground, water and clouds, before people and structures. */
+ readonly behind:HTMLCanvasElement;
+ /** Plants in front of a structure: drawn after the structure layer. */
+ readonly front:HTMLCanvasElement;
+ /** Redraws both layers with the tree crowns at that second (no-op when no crown moved). Without a time, trees stand still. */
+ at(seconds?:number):void;
+}
 /**
- * Tints the soil and paints the plants behind structures onto `backdrop` (already drawn), and returns the plants
- * in front of structures as a transparent layer to draw after the structure layer.
+ * Tints the soil of `backdrop` (already drawn) and prepares the plant layers, split against `structures` by ground line.
+ * Trees sway in moving views by moving their crowns one pixel; the split is redone per pixel for every pose.
  */
 export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanvasElement,o:GeneratedSceneObservation,source:SceneFloraSource,presentation:Presentation,draw:StructureLayerDrawer):PreparedSceneFlora {
  const physics=readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),mirror=o.ground.terrain.sites[o.ground.site].render.mirrorX===true;
  const plants=planFloraScene({seed:source.seed,site:o.ground.site,patches:source.patches,views:source.views,physics,occupied:sceneOccupiedPlots(o)});
- const layer=renderFloraLayer(plants,mirror);
+ const raster=rasterizeFlora(plants,mirror);
  const s=structures.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,320,180).data;
- let covered=false;for(let i=0;i<57600&&!covered;i++)covered=layer.root[i]!>=0&&s[i*4+3]!==0;
+ // Ground lines are needed only when a plant (in any pose: crowns move by at most one pixel) can cover a structure.
+ let covered=false;
+ for(const it of raster.items){for(let n=0;n<it.x.length&&!covered;n++)for(const d of it.crown[n]?[-1,0,1]:[0]){const x=it.x[n]!+d;if(x>=0&&x<320&&s[(it.y[n]!*320+x)*4+3]!==0){covered=true;break;}}if(covered)break;}
  const lines=covered?structureGroundLines(o,presentation,draw):null;
- const bctx=backdrop.getContext('2d',{willReadFrequently:true})!,bimage=bctx.getImageData(0,0,320,180),b=bimage.data;
- tintFloraSoil(b,source.patches,physics,mirror);
- const front=document.createElement('canvas');front.width=320;front.height=180;const fctx=front.getContext('2d')!,fimage=fctx.createImageData(320,180);
- let frontPixels=0,behindPixels=0;
- for(let i=0;i<57600;i++){
-  const root=layer.root[i]!;if(root<0)continue;
-  const inFront=s[i*4+3]!==0&&root>lines![i]!;
-  if(inFront){fimage.data.set(layer.rgba.subarray(i*4,i*4+4),i*4);frontPixels++;}else{b.set(layer.rgba.subarray(i*4,i*4+4),i*4);behindPixels++;}
- }
- bctx.putImageData(bimage,0,0);fctx.putImageData(fimage,0,0);
- return {plants,front,frontPixels,behindPixels};
+ const bctx=backdrop.getContext('2d',{willReadFrequently:true})!,bimage=bctx.getImageData(0,0,320,180);
+ tintFloraSoil(bimage.data,source.patches,physics,mirror);bctx.putImageData(bimage,0,0);
+ const canvas=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;const x=c.getContext('2d')!;return {c,x,image:x.createImageData(320,180)};},behind=canvas(),front=canvas();
+ const work:FloraLayer={rgba:new Uint8ClampedArray(57600*4),root:new Int16Array(57600)},sway=new Int8Array(raster.trees);let pose:string|null=null;
+ const at=(seconds?:number)=>{
+  for(let t=0;t<raster.trees;t++)sway[t]=seconds===undefined?0:treeSwayAt(t,seconds);
+  const key=sway.join(',');if(key===pose)return;pose=key;
+  composeFlora(raster,sway,work);behind.image.data.fill(0);front.image.data.fill(0);
+  for(let i=0;i<57600;i++){
+   const root=work.root[i]!;if(root<0)continue;
+   const target=s[i*4+3]!==0&&root>lines![i]!?front:behind;target.image.data.set(work.rgba.subarray(i*4,i*4+4),i*4);
+  }
+  behind.x.putImageData(behind.image,0,0);front.x.putImageData(front.image,0,0);
+ };
+ at();
+ return {plants,behind:behind.c,front:front.c,at};
 }
