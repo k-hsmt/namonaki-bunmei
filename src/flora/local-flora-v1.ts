@@ -16,7 +16,7 @@ import {BIOME_KINDS,CLIMATE_TRANSITION_MARGIN,type BiomeKind,type WorldClimateBa
 
 export const FLORA_RULE_ID='local-flora-v1' as const;
 export const FLORA_SITES=['river-bank','hill-side','coast-inlet'] as const satisfies readonly RecordSite[];
-/** The 13 plant forms of B1a (same ids and order as scripts/lib/plant-prototype.mjs). */
+/** The 13 plant forms reviewed in Issue #47 B1a (B1a review document, §3), same ids and order. */
 export const PLANT_ARCHETYPES=['deciduous','evergreen','conifer','tropical','savanna','riparian','dryShrub','coldShrub','shrub','herb','understory','wetland','moss'] as const;
 export type PlantArchetype=typeof PLANT_ARCHETYPES[number];
 export const GROUND_MATERIALS=['sand','rock','bareSoil','leafLitter','wetSoil','coldGround'] as const;
@@ -35,7 +35,7 @@ export const HABITAT_LIMITS=Object.freeze({rockyCliffShare:.25,rockySteepShare:.
 /** Share (%) of patches that take the neighbouring biome in a transition world, by distance 1..4. */
 export const TRANSITION_PATCH_SHARE=Object.freeze([48,36,24,12]);
 
-/** Biome recipes, from the reviewed B1b forced-biome planting (scripts/lib/biome47-b1b-spec.mjs). */
+/** Biome recipes, from the reviewed B1b forced-biome planting (docs/issue47-b1b-scene-comparison.md). */
 const RECIPES:Readonly<Record<BiomeKind,{canopy:readonly PlantArchetype[];shrub:readonly PlantArchetype[];herb:readonly PlantArchetype[];ground:GroundMaterial;potential:number}>>={
  desert:{canopy:['savanna'],shrub:['dryShrub'],herb:['herb'],ground:'sand',potential:10},
  steppe:{canopy:['savanna'],shrub:['dryShrub'],herb:['herb'],ground:'bareSoil',potential:20},
