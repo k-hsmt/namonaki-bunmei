@@ -79,6 +79,8 @@ test('確定住宅の描画は年・地点・巻戻し・再読込で決定的�
  assert.deepEqual(stored.observation,s.observation);
  await page.reload();
  await page.locator('#load').click();
+ // wait for the load to finish before reading the canvas (a slow runner drew the previous frame; PR #123)
+ await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
  assert.equal(await image(page),current);
  await rewind(page,4);
  assert.equal(await image(page),before);
