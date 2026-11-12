@@ -37,10 +37,10 @@ test('D5 #2: 街並みの型は、実在の建物・水・斜面・中心だけ�
 });
 
 test('D5 #1/#4: 本番では、2階建ても技術の成立も、その年に町・都市だった地区だけで起きる',async()=>{
- const w=await P.advanceArchitectureWorld(P.introduceArchitectureProduction((await createNewTerrainWorld(88)).review),3000,'automatic');
+ const w=await P.advanceArchitectureWorld(P.introduceArchitectureProduction((await createNewTerrainWorld(88)).review),1500,'automatic');
  const a=w.architecture;assert.equal(a.streetscape,'architecture-scale-v1');
  const raised=a.births.filter(b=>b.adjustments.includes('scale:two-storeys'));
- assert.ok(raised.length>0,'seed 88 raises some buildings by 3000');
+ assert.ok(raised.length>0,'seed 88 raises some buildings by 1500 (CI time, PR #123)');
  for(const b of raised){assert.ok(P.scaleAt(w.terrain,b.ref.siteId,b.source.year)>=2);assert.notEqual(b.use,'granary');}
  for(const b of a.births.filter(b=>b.substitutions.some(s=>s.axis==='storeys')))assert.equal(b.features.storeys,1,'given up when the air above is taken');
  for(const e of a.capabilityEvents.filter(e=>e.op!=='lose'))assert.ok(P.scaleAt(w.terrain,e.site,e.year)>=2);

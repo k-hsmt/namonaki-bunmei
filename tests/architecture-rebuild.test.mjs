@@ -6,7 +6,8 @@ import * as P from '../dist/architecture/production-v1.js';
 import * as R from '../dist/architecture/rebuild-v1.js';
 import {createArchitecturePainter} from '../dist/architecture/scene-v1.js';
 
-const SEED=7,YEARS=3000;
+// CI time (PR #123, Human decision B): 2000 years has 18 rebuilds (14 facilities) and all three ways for seed 7
+const SEED=7,YEARS=2000;
 let world;
 const ready=(async()=>{world=await P.advanceArchitectureWorld((await createNewArchitectureWorld(SEED)).architecture,YEARS,'automatic');})();
 const keyOf=b=>b.ref.kind==='facility'?b.ref.id:b.ref.blockId;
