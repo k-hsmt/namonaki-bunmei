@@ -100,6 +100,17 @@ jobs:
           name: architecture35-d1-gallery
           path: artifacts/architecture35-d1/*
           if-no-files-found: error
+      # Issue 47 B1a plant forms: standalone gallery, no build or game history needed.
+      - name: Render Issue 47 B1a plant form gallery
+        run: node scripts/preview-plants.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biome47-b1a-plant-gallery
+          path: artifacts/biome47-b1a/*
+          if-no-files-found: error
 
   visual-browser:
     needs: scope
