@@ -22,6 +22,6 @@ test('automatic generated choices consume the same RNG and complete only the pen
  assert.equal(result.state.pending,null);assert.equal(JSON.stringify(pending),original);
 });
 test('current v5 corruption stops discovery and failed production writes preserve export data',async()=>{
- const reads=[];await assert.rejects(()=>findWorldSave(k=>{reads.push(k);return (k==='namonaki-story-v9'||k==='namonaki-story-v8'||k==='namonaki-story-v7'||k==='namonaki-story-v6')?null:k==='namonaki-story-v5'?'broken':JSON.stringify(createCivilization(42));}));assert.deepEqual(reads,['namonaki-story-v9','namonaki-story-v8','namonaki-story-v7','namonaki-story-v6','namonaki-story-v5']);
+ const reads=[];await assert.rejects(()=>findWorldSave(k=>{reads.push(k);return (k==='namonaki-story-v10'||k==='namonaki-story-v9'||k==='namonaki-story-v8'||k==='namonaki-story-v7'||k==='namonaki-story-v6')?null:k==='namonaki-story-v5'?'broken':JSON.stringify(createCivilization(42));}));assert.deepEqual(reads,['namonaki-story-v10','namonaki-story-v9','namonaki-story-v8','namonaki-story-v7','namonaki-story-v6','namonaki-story-v5']);
  const result=await storeWorldSave({setItem(){throw new DOMException('controlled','QuotaExceededError');}},saveWorldSession(initial));assert.equal(result.status,'not-saved');assert.deepEqual(restoreWorldSession(await decodeWorldSave(result.exportJson)).state,initial.state);
 });

@@ -38,9 +38,9 @@ test('native proof detaches before the first hash yield and recomputed hashes ca
 
 test('v8 key precedence fails closed, retains old v7 bytes and returns complete export on quota failure',async()=>{
  const old=(await encodeWorldSave(await prepareEconomicProductionSave(source))).json,values=new Map([[ECONOMIC_WORLD_SAVE_KEY,old]]),reads=[];
- assert.equal((await findWorldSave(k=>{reads.push(k);return values.get(k)??null;})).version,7);assert.deepEqual(reads,['namonaki-story-v9',TERRAIN_WORLD_SAVE_KEY,ECONOMIC_WORLD_SAVE_KEY]);
+ assert.equal((await findWorldSave(k=>{reads.push(k);return values.get(k)??null;})).version,7);assert.deepEqual(reads,['namonaki-story-v10','namonaki-story-v9',TERRAIN_WORLD_SAVE_KEY,ECONOMIC_WORLD_SAVE_KEY]);
  assert.deepEqual(await storeWorldSave({setItem:(k,v)=>values.set(k,v)},packet),{status:'saved'});assert.equal(values.get(ECONOMIC_WORLD_SAVE_KEY),old);assert.equal((await findWorldSave(k=>values.get(k)??null)).version,8);
- values.set(TERRAIN_WORLD_SAVE_KEY,'broken');const failedReads=[];await assert.rejects(()=>findWorldSave(k=>{failedReads.push(k);return values.get(k)??null;}));assert.deepEqual(failedReads,['namonaki-story-v9',TERRAIN_WORLD_SAVE_KEY]);
+ values.set(TERRAIN_WORLD_SAVE_KEY,'broken');const failedReads=[];await assert.rejects(()=>findWorldSave(k=>{failedReads.push(k);return values.get(k)??null;}));assert.deepEqual(failedReads,['namonaki-story-v10','namonaki-story-v9',TERRAIN_WORLD_SAVE_KEY]);
  const previous=new Map(values),result=await storeWorldSave({setItem:()=>{throw Error('quota');}},packet);assert.equal(result.status,'not-saved');assert.deepEqual(values,previous);assert.deepEqual(await decodeWorldSave(result.exportJson),packet);
 });
 

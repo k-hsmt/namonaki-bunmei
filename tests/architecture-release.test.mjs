@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createNewArchitectureWorld,createNewTerrainWorld} from '../dist/story/new-world.js';
 import {advanceWorldSession,advanceWorldSessionAsync,chooseWorldSessionAsync,prepareWorldSessionSave,restoreWorldSession,improveWorldEnvironment,slowWorldClimate,enableWorldTerrainDevelopment,worldTerrainDevelopmentAtYear,observeGeneratedWorldSession} from '../dist/story/world-session.js';
-import {ARCHITECTURE_WORLD_SAVE_KEY,TERRAIN_WORLD_SAVE_KEY,parseWorldSaveAsync,serializeWorldSave,validateWorldSave} from '../dist/story/world-save.js';
+import {CLIMATE_WORLD_SAVE_KEY,ARCHITECTURE_WORLD_SAVE_KEY,TERRAIN_WORLD_SAVE_KEY,parseWorldSaveAsync,serializeWorldSave,validateWorldSave} from '../dist/story/world-save.js';
 import {encodeWorldSave,decodeWorldSave,findWorldSave,storeWorldSave,higherPriorityWorldSaveKeys} from '../dist/story/world-storage.js';
 import {prepareTerrainProductionSave} from '../dist/terrain/terrain-production-storage-v1.js';
 
@@ -37,9 +37,9 @@ test('release: v9の進行と選択はv9のまま、v8と同じ歴史をたど�
  assert.equal(a.architecture.architecture.interaction.confirmedThrough>=a.state.year-1,true);
 });
 
-test('release: v9の保存は専用の場所に入り、最初に読まれ、圧縮しても元に戻る',async()=>{
+test('release: 現行の保存（v10＝v9一式＋気候、Issue #47 B2a）は専用の場所に入り、最初に読まれ、圧縮しても元に戻る',async()=>{
  const packet=await prepareWorldSessionSave(v9);
- assert.equal(packet.version,9);assert.equal(validateWorldSave(packet),packet);
+ assert.equal(packet.version,10);assert.equal(validateWorldSave(packet),packet);
  const encoded=await encodeWorldSave(packet);assert.notEqual(encoded.json,encoded.plain,'compressed');
  const back=restoreWorldSession(await decodeWorldSave(encoded.json));assert.ok(back.architecture);
  assert.deepEqual(await prepareWorldSessionSave(back),packet);
@@ -47,11 +47,11 @@ test('release: v9の保存は専用の場所に入り、最初に読まれ、圧
  const data=new Map(),v8packet=await prepareWorldSessionSave(v8);
  await storeWorldSave({setItem:(k,v)=>data.set(k,v)},v8packet);
  await storeWorldSave({setItem:(k,v)=>data.set(k,v)},packet);
- assert.deepEqual([...data.keys()].sort(),[ARCHITECTURE_WORLD_SAVE_KEY,TERRAIN_WORLD_SAVE_KEY].sort());
- assert.equal((await findWorldSave(k=>data.get(k)??null)).version,9);
+ assert.deepEqual([...data.keys()].sort(),[CLIMATE_WORLD_SAVE_KEY,TERRAIN_WORLD_SAVE_KEY].sort());
+ assert.equal((await findWorldSave(k=>data.get(k)??null)).version,10);
  assert.deepEqual(higherPriorityWorldSaveKeys(packet),[]);
- assert.deepEqual(higherPriorityWorldSaveKeys(v8packet),[ARCHITECTURE_WORLD_SAVE_KEY],'saving an opened v8 world makes it the one found next');
- // an external v9 packet must go through the asynchronous reader
+ assert.deepEqual(higherPriorityWorldSaveKeys(v8packet),[ARCHITECTURE_WORLD_SAVE_KEY,CLIMATE_WORLD_SAVE_KEY],'saving an opened v8 world makes it the one found next');
+ // an external v10 packet must go through the asynchronous reader
  assert.throws(()=>validateWorldSave(JSON.parse(JSON.stringify(packet))),/asynchronous/);
 });
 
@@ -69,14 +69,14 @@ test('release: 通常画面は新しい世界をv9で作り、版（v0.9）と�
  assert.ok(html.includes('建物は建った年の伝統で建ち、その後に伝統が変わっても姿は変わりません。'));
 });
 
-test('release: v9の保存は、歴史を進めるコードを読み込まずに読める',async()=>{
+test('release: 現行の保存（v10）は、歴史を進めるコードを読み込まずに読める',async()=>{
  const packet=await prepareWorldSessionSave(await advanceWorldSessionAsync(v9)),dir=await mkdtemp(join(tmpdir(),'architecture-native-')),file=join(dir,'world.json');
  await writeFile(file,(await encodeWorldSave(packet)).json);
  try{
   const code=String.raw`import{registerHooks}from'node:module';import{readFileSync}from'node:fs';
   registerHooks({resolve(s,c,n){const r=n(s,c);if(/(terrain-production-progression-v1|terrain-evolution-progression-internal|economic-production-progression-v1|annual-baseline-internal|environment\/progression-v1|vegetation\/initial-v1|terrain\/world-prototype|story\/new-world)\.js$/.test(r.url))throw Error('blocked producer '+r.url);return r;}});
-  const{decodeWorldSave}=await import(WORLD_STORAGE),{restoreArchitectureSave,prepareArchitectureSave}=await import(PRODUCTION);const p=await decodeWorldSave(readFileSync(process.argv[1],'utf8'));console.log(JSON.stringify(await prepareArchitectureSave(restoreArchitectureSave(p))).length);`;
-  const script=code.replace('WORLD_STORAGE',JSON.stringify(new URL('../dist/story/world-storage.js',import.meta.url).href)).replace('PRODUCTION',JSON.stringify(new URL('../dist/architecture/production-v1.js',import.meta.url).href));
+  const{decodeWorldSave}=await import(WORLD_STORAGE),{restoreClimateWorldSave,prepareClimateWorldSave}=await import(PRODUCTION);const p=await decodeWorldSave(readFileSync(process.argv[1],'utf8'));console.log(JSON.stringify(await prepareClimateWorldSave(restoreClimateWorldSave(p))).length);`;
+  const script=code.replace('WORLD_STORAGE',JSON.stringify(new URL('../dist/story/world-storage.js',import.meta.url).href)).replace('PRODUCTION',JSON.stringify(new URL('../dist/climate/climate-world-v1.js',import.meta.url).href));
   assert.equal(Number(execFileSync(process.execPath,['--input-type=module','-e',script,file],{encoding:'utf8'}).trim()),JSON.stringify(packet).length);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
