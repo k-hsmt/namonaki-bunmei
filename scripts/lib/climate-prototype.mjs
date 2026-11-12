@@ -66,6 +66,8 @@ export function climateAxes(seed){
  return {temperatureIndex,moistureSupplyIndex,annualTemperatureRangeIndex,rainfallConcentrationIndex,effectiveTemperature,effectiveMoisture};
 }
 
+/** Transition zone width in effective-index points (Human review: 8 put ~42% of worlds in a transition; 4 gives ~22%). */
+export const TRANSITION_MARGIN=4;
 /** Nearby biome across the closest threshold (within `margin` index points), for transition-zone planting. */
 function transitionBiome(a,biome,margin){
  let best=null;
@@ -82,5 +84,5 @@ function transitionBiome(a,biome,margin){
 /** WorldClimateBaseline (design doc §4.1) plus the effective values and the nearest other biome. */
 export function generateClimateBaseline(seed){
  const a=climateAxes(seed),dominantBiome=classifyClimate(a.effectiveTemperature,a.effectiveMoisture);
- return Object.freeze({schemaVersion:1,ruleId:CLIMATE_RULE_ID,...a,dominantBiome,transition:transitionBiome(a,dominantBiome,8)});
+ return Object.freeze({schemaVersion:1,ruleId:CLIMATE_RULE_ID,...a,dominantBiome,transition:transitionBiome(a,dominantBiome,TRANSITION_MARGIN)});
 }

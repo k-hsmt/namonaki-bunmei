@@ -6,7 +6,7 @@
  * if the population estimate leaves 10–12%, or if a climate sanity check breaks.
  */
 import {mkdir,writeFile} from 'node:fs/promises';
-import {BIOMES,TARGET_SHARES,THRESHOLDS,CLIMATE_RULE_ID,generateClimateBaseline,climateHash} from './lib/climate-prototype.mjs';
+import {BIOMES,TARGET_SHARES,THRESHOLDS,CLIMATE_RULE_ID,TRANSITION_MARGIN,generateClimateBaseline,climateHash} from './lib/climate-prototype.mjs';
 
 const hashedSeeds=(namespace,n)=>Array.from({length:n},(_,i)=>(climateHash([namespace,i])%0xffffffff)+1);
 const calibration=new Set(hashedSeeds('b1c-calibration-seeds',50000));
@@ -59,7 +59,7 @@ for(const s of [1,88,4294967295])if(JSON.stringify(generateClimateBaseline(s))!=
 const out='artifacts/biome47-b1c';await mkdir(out,{recursive:true});
 const report={status:'PROTOTYPE_NOT_HISTORY',issue:47,stage:'B1c',ruleId:CLIMATE_RULE_ID,sourceHead:process.env.REVIEW_SOURCE_SHA??'local-unidentified',
  boundary:{readsGameHistory:false,usesGameRng:false,saveSchemaChange:false,rerollsOrQuotas:false},
- thresholds:THRESHOLDS,targets:TARGET_SHARES,warningBand:WARN,populationBand:POPULATION,calibration:{namespace:'b1c-calibration-seeds',seeds:calibration.size},
+ thresholds:THRESHOLDS,transitionMargin:TRANSITION_MARGIN,targets:TARGET_SHARES,warningBand:WARN,populationBand:POPULATION,calibration:{namespace:'b1c-calibration-seeds',seeds:calibration.size},
  sets,sanity,failures};
 await writeFile(out+'/report.json',JSON.stringify(report,null,1)+'\n');
 // Chart data: 3000 worlds of random set A (effective temperature × moisture) for the review page.

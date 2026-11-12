@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {BIOMES,TARGET_SHARES,THRESHOLDS,CLIMATE_RULE_ID,climateHash,climateAxes,classifyClimate,generateClimateBaseline} from '../scripts/lib/climate-prototype.mjs';
+import {BIOMES,TARGET_SHARES,THRESHOLDS,CLIMATE_RULE_ID,TRANSITION_MARGIN,climateHash,climateAxes,classifyClimate,generateClimateBaseline} from '../scripts/lib/climate-prototype.mjs';
 import {terrainHash} from '../dist/terrain/terrain-hash-v1.js';
 
 test('B1c: the climate hash is the game\'s frozen terrainHash, under its own namespace',()=>{
@@ -23,7 +23,7 @@ test('B1c: the same seed always gives the same climate, and all values stay in r
    assert.ok(Number.isInteger(a[k]),k);
   assert.ok(BIOMES.includes(a.dominantBiome));
   assert.equal(a.dominantBiome,classifyClimate(a.effectiveTemperature,a.effectiveMoisture));
-  if(a.transition){assert.notEqual(a.transition.biome,a.dominantBiome);assert.ok(a.transition.distance>=1&&a.transition.distance<=8);}
+  if(a.transition){assert.notEqual(a.transition.biome,a.dominantBiome);assert.ok(a.transition.distance>=1&&a.transition.distance<=TRANSITION_MARGIN);}
  }
  for(const bad of [0,-1,1.5,4294967296,NaN])assert.throws(()=>generateClimateBaseline(bad),/Invalid world seed/);
 });
@@ -53,6 +53,9 @@ test('B1c: desert and tundra stay within the 8–14% warning band on 1000 sequen
  for(let seed=1;seed<=1000;seed++)counts[generateClimateBaseline(seed).dominantBiome]++;
  for(const b of ['desert','tundra'])assert.ok(counts[b]>=80&&counts[b]<=140,b+' '+counts[b]);
  for(const b of BIOMES)assert.ok(counts[b]>=50,b+' too rare: '+counts[b]);
+ assert.equal(TRANSITION_MARGIN,4);
+ let near=0;for(let seed=1;seed<=1000;seed++)if(generateClimateBaseline(seed).transition)near++;
+ assert.ok(near>=150&&near<=300,'transition share '+near+'/1000');
  assert.equal(Object.values(TARGET_SHARES).reduce((a,b)=>a+b,0).toFixed(6),'1.000000');
 });
 
