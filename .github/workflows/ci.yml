@@ -100,6 +100,17 @@ jobs:
           name: architecture35-d1-gallery
           path: artifacts/architecture35-d1/*
           if-no-files-found: error
+      # Issue 47 B1a plant forms: standalone gallery, no build or game history needed.
+      - name: Render Issue 47 B1a plant form gallery
+        run: node scripts/preview-plants.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biome47-b1a-plant-gallery
+          path: artifacts/biome47-b1a/*
+          if-no-files-found: error
 
   visual-browser:
     needs: scope
@@ -123,6 +134,19 @@ jobs:
         timeout-minutes: 12
       - run: npm run test:browser
         timeout-minutes: 10
+      # B1b: use the current recorded world and real Chromium. The forced biomes are
+      # screenshot trials, not generated climate or production/save changes.
+      - name: Render Issue 47 B1b actual-scene 7x3x3 comparison
+        run: node scripts/preview-biome-scenes.mjs
+        timeout-minutes: 8
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biome47-b1b-scene-comparison
+          path: artifacts/biome47-b1b/*
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:
