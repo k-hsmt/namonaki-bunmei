@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {expressiveCatalog,renderExpressivePlant} from '../scripts/lib/expressive-plant-prototype.mjs';
 import * as Claude from '../scripts/lib/plant-prototype.mjs';
-import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,planReviewPlants,nearFreshwater} from '../scripts/lib/biome47-b1b-spec.mjs';
+import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,MIXED_UNDERGROWTH_SCALE,planReviewPlants,nearFreshwater,mixedPainter} from '../scripts/lib/biome47-b1b-spec.mjs';
 
 const fixture=()=>{
  const surface=new Uint8Array(320*180),grade=new Uint8Array(320*180),bearing=new Uint8Array(320*180);
@@ -32,11 +32,12 @@ test('B1b: both original B1a painters supply all 13 distinct archetypes with non
   }
  }
 });
-test('B1b: test-only recipes enumerate exactly 7 biomes, 3 styles, 3 actual site IDs',()=>{
- assert.equal(REVIEW_BIOMES.length,7);assert.equal(REVIEW_STYLES.length,3);assert.equal(REVIEW_SITES.length,3);
+test('B1b: test-only recipes enumerate exactly 7 biomes, 4 styles, 3 actual site IDs',()=>{
+ assert.equal(REVIEW_BIOMES.length,7);assert.equal(REVIEW_STYLES.length,4);assert.equal(REVIEW_SITES.length,3);
  assert.deepEqual(REVIEW_SITES.map(x=>x.id),['river-bank','hill-side','coast-inlet']);
  assert.equal(new Set(REVIEW_BIOMES.map(x=>x.id)).size,7);
- assert.equal(new Set(REVIEW_STYLES.map(x=>x.id)).size,3);
+ assert.equal(new Set(REVIEW_STYLES.map(x=>x.id)).size,4);
+ assert.deepEqual(REVIEW_STYLES.map(x=>x.id),['expressive','claude','hybrid','mixed']);
 });
 test('B1b: terrain mask treats freshwater as distinct from sea',()=>{
  const r=fixture();
@@ -76,7 +77,7 @@ test('B1b: prototype modules are independent of actual production and never call
  assert.throws(()=>renderExpressivePlant('deciduous',{stage:'old'}),/Invalid expressive stage/);
 });
 test('B1b: plants and structures are ordered by ground-line Y, structure-to-structure order stays the game\'s',()=>{
- // The pixel-level proof runs in the browser over all 63 frames and the front/behind overlap checks
+ // The pixel-level proof runs in the browser over all 84 frames and the front/behind overlap checks
  // (scripts/preview-biome-scenes.mjs verify()). This guard keeps npm test failing if the order is reverted.
  const text=readFileSync(new URL('../scripts/preview-biome-scenes.mjs',import.meta.url),'utf8');
  const compose=text.slice(text.indexOf('const compose='),text.indexOf('const verify='));
@@ -104,4 +105,23 @@ test('B1b: plants and soil tint follow the saved scene mirror; the planner stays
  assert.match(text,/const z=y\*320\+screenColumn\(si,x\);/,'tint must read the mirrored record column');
  assert.match(text,/Mirror mapping disagrees with the canvas transform/);
  assert.match(text,/Plant root drawn off land/);
+});
+test('B1b D: each plant gets A or B from a fixed hash, about half and half, and A undergrowth is scaled 0.6',()=>{
+ const physics=fixture(),seen={expressive:0,claude:0};
+ for(const biome of REVIEW_BIOMES)for(let siteIndex=0;siteIndex<3;siteIndex++){
+  const plan=planReviewPlants({physics,occupied:[],seed:88,siteIndex,biomeId:biome.id});
+  for(const plant of [...plan.trees,...plan.low]){
+   const a=mixedPainter(88,siteIndex,plant);
+   assert.ok(a==='expressive'||a==='claude');
+   assert.equal(mixedPainter(88,siteIndex,{...plant}),a,'deterministic');
+   seen[a]++;
+  }
+ }
+ const total=seen.expressive+seen.claude,share=seen.expressive/total;
+ assert.ok(total>300&&share>.4&&share<.6,'split '+JSON.stringify(seen));
+ assert.equal(MIXED_UNDERGROWTH_SCALE,0.6);
+ assert.throws(()=>mixedPainter(88,0,{}),/planned root/);
+ const text=readFileSync(new URL('../scripts/preview-biome-scenes.mjs',import.meta.url),'utf8');
+ assert.match(text,/style\.id==='mixed'&&plant\.mix==='expressive'/);
+ assert.match(text,/style\.id==='mixed'&&expressive&&plant\.kind==='low'\?mixedUndergrowthScale:1/);
 });

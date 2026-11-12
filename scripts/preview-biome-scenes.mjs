@@ -3,7 +3,7 @@
  *
  * npm run build && node scripts/preview-biome-scenes.mjs
  *
- * Renders 7 forced VISUAL TEST biomes × 3 REAL sites × A/B/C renderers (63 frames),
+ * Renders 7 forced VISUAL TEST biomes × 3 REAL sites × A/B/C/D renderers (84 frames),
  * plus 3 unchanged actual-scene baselines. All geometry, architecture and observation
  * come from the current game; climate/vegetation assignments here are NOT generated
  * climate, ecology, historic state, or save fields. No production files are modified.
@@ -18,7 +18,7 @@ import {createHash} from 'node:crypto';
 import {chromium} from 'playwright';
 import * as Claude from './lib/plant-prototype.mjs';
 import {expressiveCatalog,renderExpressivePlant} from './lib/expressive-plant-prototype.mjs';
-import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,planReviewPlants} from './lib/biome47-b1b-spec.mjs';
+import {REVIEW_BIOMES,REVIEW_STYLES,REVIEW_SITES,EXPRESSIVE_IDS,MIXED_UNDERGROWTH_SCALE,planReviewPlants,mixedPainter} from './lib/biome47-b1b-spec.mjs';
 
 const out='artifacts/biome47-b1b';
 const seed=Number(process.env.BIOME47_B1B_SEED??88),year=Number(process.env.BIOME47_B1B_YEAR??300);
@@ -144,8 +144,14 @@ try{
   }
  }
 
- // 3. Render 63 frames with the same origins, species, climate trial palette, occupation and architecture.
- const rendered=await page.evaluate(async({specimens,plans,biomes,styles,expressiveIds,occupied})=>{
+ // 3. Render 84 frames with the same origins, species, climate trial palette, occupation and architecture.
+ //    D's per-plant A/B choice is fixed here, in Node, from the plan (no browser-side randomness).
+ const renderPlans=plans.map(p=>({...p,
+  trees:p.trees.map(q=>({...q,mix:mixedPainter(seed,p.siteIndex,q)})),
+  low:p.low.map(q=>({...q,mix:mixedPainter(seed,p.siteIndex,q)}))}));
+ const mixedSplit=renderPlans.map(p=>{const n=(list,m)=>list.filter(q=>q.mix===m).length;
+  return {site:REVIEW_SITES[p.siteIndex].id,biome:p.biomeId,treesA:n(p.trees,'expressive'),treesB:n(p.trees,'claude'),undergrowthA:n(p.low,'expressive'),undergrowthB:n(p.low,'claude')};});
+ const rendered=await page.evaluate(async({specimens,plans,biomes,styles,expressiveIds,occupied,mixedUndergrowthScale})=>{
   const scenes=window.__biome47B1bScenes;
   if(!scenes||scenes.length!==3)throw Error('Saved scene context missing');
   const imageOf=async url=>{const image=new Image();image.src=url;await image.decode();return image;};
@@ -196,13 +202,14 @@ try{
    let clipped=0;
    const ordered=[...plan.low,...plan.trees].sort((a,b)=>a.y-b.y||Number(a.kind==='tree')-Number(b.kind==='tree')||a.x-b.x||a.id.localeCompare(b.id));
    for(const plant of ordered){
-    const expressive=style.id==='expressive'||(style.id==='hybrid'&&plant.kind==='tree'&&plant.y>=142);
+    const expressive=style.id==='expressive'||(style.id==='hybrid'&&plant.kind==='tree'&&plant.y>=142)||(style.id==='mixed'&&plant.mix==='expressive');
     const id=expressive?expressiveIds[plant.id]:plant.id;
     const img=expressive?loaded.expressive[id][plant.stage]:loaded.claude[id][plant.stage][plant.variant];
     const depth=(plant.y-96)/84;
     // Same tree roots; A retains the original expressive silhouette with a 0.45..0.73 scale.
     // B uses its native restrained 0.58..1.00 size. C combines them by depth.
-    const k=expressive?.45+.28*depth:.58+.42*depth;
+    // D mixes them per plant and draws A undergrowth at mixedUndergrowthScale of its A size.
+    const k=(expressive?.45+.28*depth:.58+.42*depth)*(style.id==='mixed'&&expressive&&plant.kind==='low'?mixedUndergrowthScale:1);
     const w=Math.max(1,Math.round(img.width*k)),h=Math.max(1,Math.round(img.height*k));
     const ox=expressive?36:48,oy=expressive?59:68;
     // Sprites are not flipped; only the root position follows the scene's mirror.
@@ -295,7 +302,7 @@ try{
    }
    ctx.putImageData(im,0,0);return c.toDataURL('image/png');
   };
-  // Guaranteed overlaps (TEST ONLY, not part of the 63): one tree just in front of a real structure, one just behind it.
+  // Guaranteed overlaps (TEST ONLY, not part of the 84): one tree just in front of a real structure, one just behind it.
   const overlapChecks=[];
   for(let si=0;si<3;si++){
    const b=pixels(scenes[si].buildings);
@@ -325,9 +332,10 @@ try{
    .sort((a,b)=>b.occlusion.plantPixelsBehindStructures-a.occlusion.plantPixelsBehindStructures||a.biome.localeCompare(b.biome)||a.siteIndex-b.siteIndex);
   const examples=ranked.slice(0,6).map(f=>{const key=f.biome+'/'+f.siteIndex+'/'+f.style;return {biome:f.biome,siteIndex:f.siteIndex,style:f.style,previous:previousOrder(key),map:occlusionMap(key)};});
   return {frames,overlapChecks,examples};
- },{specimens,plans,biomes:REVIEW_BIOMES,styles:REVIEW_STYLES,expressiveIds:EXPRESSIVE_IDS,occupied:prepared.map(s=>s.occupied)});
+ },{specimens,plans:renderPlans,biomes:REVIEW_BIOMES,styles:REVIEW_STYLES,expressiveIds:EXPRESSIVE_IDS,occupied:prepared.map(s=>s.occupied),mixedUndergrowthScale:MIXED_UNDERGROWTH_SCALE});
  const {frames:results,overlapChecks,examples}=rendered;
- assert.equal(results.length,7*3*3);
+ assert.equal(results.length,REVIEW_BIOMES.length*REVIEW_SITES.length*REVIEW_STYLES.length);
+ assert.equal(results.length,84);
  const artifacts=[],images=new Map();
  const saveData=async(name,encoded)=>{
   assert.ok(encoded.startsWith('data:image/png;base64,'));
@@ -343,7 +351,7 @@ try{
   await saveData(name,r.data);
   images.set(name,{name,clipped:r.clipped,occlusion:r.occlusion});
  }
- // Review aids, not part of the 63: the previous order and front/back maps for the C frames where the
+ // Review aids, not part of the 84: the previous order and front/back maps for the C frames where the
  // Y order hides the most plant pixels, and guaranteed tree-in-front / tree-behind checks per site.
  const exampleName=e=>e.biome+'_'+REVIEW_SITES[e.siteIndex].id+'_'+e.style;
  for(const e of examples){await saveData('previous-order_'+exampleName(e),e.previous);await saveData('occlusion-map_'+exampleName(e),e.map);}
@@ -360,6 +368,7 @@ try{
   layerOrder:['background (terrain, ground, canals, public spaces, bridges)','biome soil tint (land cells only)','plants whose root y is not below the ground line of the structure pixel they overlap','confirmed structures (the game layer, unchanged internal order)','plants in front: root y greater than the structure ground line'],
   layerOrderNote:'Plants are sorted by root y (undergrowth and trees together). Structure ground line: facility footprint front edge (plot.y+depth), roof part base y, presentation mark y. Ties put the structure in front.',
   structureGroundLines:prepared.map(x=>({site:x.siteId,structures:x.structures})),
+  mixedPainter:{rule:'Per plant: reviewHash(seed, site, rootY*320+rootX, 97) % 2 → A or B, independent of depth, kind and species',undergrowthScaleForA:MIXED_UNDERGROWTH_SCALE,split:mixedSplit},
   counts,frames:results.map(x=>({biome:x.biome,site:REVIEW_SITES[x.siteIndex].id,style:x.style,clipped:x.clipped,occlusion:x.occlusion})),
   mostHiddenPlantHybridExamples:examples.map(e=>({name:exampleName(e),occlusion:images.get(exampleName(e)).occlusion})),
   overlapChecks:overlapChecks.map(({data,previous,...o})=>({...o,site:REVIEW_SITES[o.siteIndex].id})),
@@ -383,11 +392,11 @@ try{
   '<style>:root{color-scheme:light}body{font:14px/1.6 system-ui,sans-serif;background:#e9eae3;color:#2b342b;margin:0;padding:22px}main{max-width:1200px;margin:auto}h1{font-size:24px}h2{border-top:1px solid #c5cbbf;padding-top:20px;margin-top:32px}table{border-collapse:separate;border-spacing:8px 6px}td,th{padding:6px;background:#f8f8f3;border-radius:3px}th{text-align:left;white-space:nowrap;font-size:12px}.scroll{overflow-x:auto}img{display:block;image-rendering:pixelated;max-width:none}figure{display:inline-block;margin:0 14px 14px 0}figcaption{font-size:12px}small,.note{color:#5c675c}details{margin:16px 0}@media(max-width:700px){body{padding:12px}h1{font-size:20px}}</style>'+
   '<main><h1>Issue #47 B1b｜本編の地形・建物×植物造形 A/B/C</h1>'+
   '<p><b>PROTOTYPE ONLY / NOT HISTORY.</b> seed '+seed+'、観測年 '+year+'。地形・建物・橋・住宅は本編の確定記録から取得。植物と地表色は7つの仮想気候を指定した<b>視覚比較用</b>であり、世界の気候が既に生成・保存されたものではありません。</p>'+
-  '<p>各地区内ではA/B/Cで植物の根元・種類・本数・観測年は同じです。A＝PR #126の輪郭、B＝PR #127の6個体差、C＝近景の主木をA、その他をB。<b>植物と建物の前後は根元・接地線のY座標で決めます</b>（建物より奥に根元がある植物は建物に隠れ、手前の植物は建物を覆う）。建物同士の重なり順は本編のまま。各画像の下の数値は、建物の画素のうち手前の植物に覆われた割合と、建物の奥に隠れた植物の画素数です。原寸320×180で評価してください。</p>'+
+  '<p>各地区内ではA/B/C/Dで植物の根元・種類・本数・観測年は同じです。A＝PR #126の輪郭、B＝PR #127の6個体差、C＝近景の主木をA、その他をB、D＝植物1本ごとに固定ハッシュでAかBを約半々に割り当て（Aの下層植生は0.6倍）。<b>植物と建物の前後は根元・接地線のY座標で決めます</b>（建物より奥に根元がある植物は建物に隠れ、手前の植物は建物を覆う）。建物同士の重なり順は本編のまま。各画像の下の数値は、建物の画素のうち手前の植物に覆われた割合と、建物の奥に隠れた植物の画素数です。原寸320×180で評価してください。</p>'+
   '<h2>実ゲーム描画（変更前の参照）</h2>'+baseline+
   '<h2>前後判定の代表例（C統合版で建物の奥に隠れた植物が多い6画面）</h2><p class="note">左＝以前の描画順（すべての植物が建物の上）、中＝現在（Y座標で前後判定）、右＝前後図（<b style="color:#e628aa">桃色</b>＝手前の植物に隠れた建物、<b style="color:#2878dc">青</b>＝建物の奥に隠れた植物、白＝それ以外の建物）。植物の大きさ・本数・位置は変えていない。</p>'+
   examples.map(e=>{const n=exampleName(e);return '<div class="scroll"><table><tr><td>'+img('previous-order_'+n)+'<small>以前の順序</small></td><td>'+img(n)+'<small>現在の順序｜'+share(images.get(n).occlusion)+'</small></td><td>'+img('occlusion-map_'+n)+'<small>遮蔽図｜'+esc(n)+'</small></td></tr></table></div>';}).join('')+
-  '<h2>確実に重なる検証画面（TEST ONLY、63枚に含まない）</h2><p class="note">各地区で実在の建物の手前4px／奥2pxにC方式の落葉広葉樹を1本だけ置いた画面（根元y≥142ならA造形、それ以外はB造形）。手前の木は建物を覆い、奥の木は建物に隠れることを画素単位で検証している。</p>'+
+  '<h2>確実に重なる検証画面（TEST ONLY、84枚に含まない）</h2><p class="note">各地区で実在の建物の手前4px／奥2pxにC方式の落葉広葉樹を1本だけ置いた画面（根元y≥142ならA造形、それ以外はB造形）。手前の木は建物を覆い、奥の木は建物に隠れることを画素単位で検証している。</p>'+
   overlapChecks.map(o=>'<div class="scroll"><table><tr><td>'+img(overlapName(o)+'_previous-order_TEST_ONLY')+'<small>以前の順序｜'+(o.placement==='front'?'手前の木':'奥の木')+'</small></td><td>'+img(overlapName(o)+'_TEST_ONLY')+'<small>現在｜'+share(o.occlusion)+'</small></td></tr></table></div>').join('')+
   rows+
   '<p class="note">次のHumanレビュー：建築の見え方・木の大きさ・各バイオームの形態差・局所水分・静かな余白。植物の数値的な成長・遷移、セーブと季節はB2以降です。</p></main></html>';

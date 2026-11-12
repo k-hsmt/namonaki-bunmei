@@ -15,8 +15,11 @@ export const REVIEW_BIOMES=Object.freeze([
 export const REVIEW_STYLES=Object.freeze([
  {id:'expressive',label:'A：表現力重視（PR #126）'},
  {id:'claude',label:'B：多様性重視（PR #127）'},
- {id:'hybrid',label:'C：近景・中遠景統合'}
+ {id:'hybrid',label:'C：近景・中遠景統合'},
+ {id:'mixed',label:'D：A/B完全ミックス'}
 ]);
+/** D: A undergrowth is drawn at this fraction of its A scale (Human request: A undergrowth is 3-4x taller than B). */
+export const MIXED_UNDERGROWTH_SCALE=0.6;
 export const REVIEW_SITES=Object.freeze([
  {id:'river-bank',label:'川辺'},{id:'hill-side',label:'丘陵'},{id:'coast-inlet',label:'入り江'}
 ]);
@@ -38,6 +41,14 @@ export function nearFreshwater(physics,x,y){
   for(let xx=Math.max(0,x-14);xx<Math.min(320,x+15);xx+=2)
    if((xx-x)**2+(yy-y)**2<=14*14&&physics.surface[yy*320+xx]===2)return true;
  return false;
+}
+/**
+ * D (complete mix): each plant independently uses the A or the B painter, about half and half,
+ * from a dedicated hash of seed, site and its record root. Not tied to depth, kind or species.
+ */
+export function mixedPainter(seed,siteIndex,plant){
+ if(!Number.isSafeInteger(plant?.x)||!Number.isSafeInteger(plant?.y))throw Error('Mixed painter needs a planned root');
+ return reviewHash(seed,siteIndex,plant.y*320+plant.x,97)%2?'expressive':'claude';
 }
 export function planReviewPlants({physics,occupied,seed,siteIndex,biomeId}){
  if(!physics||physics.surface?.length!==57600||physics.grade?.length!==57600||physics.bearing?.length!==57600)
