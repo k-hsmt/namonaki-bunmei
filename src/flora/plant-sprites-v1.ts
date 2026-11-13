@@ -33,7 +33,8 @@ const PALETTE:Readonly<Record<PlantArchetype,readonly [string,string,string]>>={
  dryShrub:['#8a8a5a','#aaa572','#666448'],coldShrub:['#7d8b6a','#9fa98a','#5d6a52'],shrub:['#5f8352','#82a066','#45633f'],
  herb:['#7f9a5e','#a1b276','#5e7a4c'],understory:['#4f7a46','#79a05e','#355a37'],wetland:['#7a9160','#a0b07a','#566c48'],moss:['#6d8a55','#b7bd9a','#4f6a42'],
 };
-function vh(variant:number,n:number):number {let h=Math.imul(variant+1,0x9e3779b1)^Math.imul(n+7,0x85ebca6b);h^=h>>>15;h=Math.imul(h,0xc2b2ae35);h^=h>>>13;return h>>>0;}
+/** B1a fixed hash of a variant and a running number (0..2^32-1); not the civilisation RNG. */
+export function vh(variant:number,n:number):number {let h=Math.imul(variant+1,0x9e3779b1)^Math.imul(n+7,0x85ebca6b);h^=h>>>15;h=Math.imul(h,0xc2b2ae35);h^=h>>>13;return h>>>0;}
 const BW=96,BH=72,BX=48,BY=68;
 interface Pen {rect(x:number,y:number,w:number,h:number,c:string):void;under(x:number,y:number,w:number,h:number,c:string):void;clear(x:number,y:number,w:number,h:number):void;blob(cx:number,top:number,w:number,h:number,c:string):void}
 function pen(r:Pixels):Pen {
