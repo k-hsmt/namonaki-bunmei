@@ -99,10 +99,12 @@ try{
     const cv=document.createElement('canvas');D.drawGeneratedSceneReview(cv,o2,'structures',{observation:o2,presentation:{...pres,trees:[],...marks},vegetation:null},painter);return cv;
    };
    const items=[];
+   // Game order (scene/structure-order): fields first, then roofs, civic, other buildings.
+   for(const o of obs.snapshot.objects.filter(o=>!o.civic&&o.kind==='field')){const plot=obs.ground.facilities.find(f=>f.id===o.id).plot;items.push({id:o.id,ground:plot.y+plot.depth,canvas:single([o],null,null)});}
    for(const depth of ['far','middle','near'])
     for(const part of blocks.flatMap(b=>b.roofParts).filter(p=>p.depth===depth).sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId)))
      items.push({id:'roof:'+part.partId,ground:part.y,canvas:single([],part,null)});
-   for(const o of [...obs.snapshot.objects.filter(o=>o.civic),...obs.snapshot.objects.filter(o=>!o.civic&&o.kind!=='bridge')]){
+   for(const o of [...obs.snapshot.objects.filter(o=>o.civic),...obs.snapshot.objects.filter(o=>!o.civic&&o.kind!=='bridge'&&o.kind!=='field')]){
     const plot=obs.ground.facilities.find(f=>f.id===o.id).plot;
     items.push({id:o.id,ground:plot.y+plot.depth,canvas:single([o],null,null)});
    }

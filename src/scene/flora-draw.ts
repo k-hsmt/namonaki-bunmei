@@ -5,10 +5,11 @@
  * the game's structure layer (unchanged internal order) → plants in front of structures.
  * A plant pixel is in front only where it covers a structure pixel and its root y is greater than that
  * structure's ground line (a tie keeps the structure in front). The ground line of each structure pixel is
- * found by drawing every structure alone with the game's own function, in the game's own order; the last one
- * drawn owns the pixel. Ground lines: facility footprint front edge (plot.y+depth), roof part base y, mark y.
+ * found by drawing every structure alone with the game's own function, in the game's own order (fields, roofs, civic, other
+ * buildings: scene/structure-order); the last one drawn owns the pixel. Ground lines: facility footprint front edge (plot.y+depth), roof part base y, mark y.
  */
 import type {GeneratedSceneObservation} from './generated-scene-review.js';
+import {sceneFields,sceneBuildings} from './structure-order.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {planFloraScene,rasterizeFlora,composeFlora,treeSwayAt,tintFloraSoil,type FloraLayer,type ScenePlant,type ScenePlot} from '../flora/flora-scene-v1.js';
 import type {FloraPatch,GroundMaterial} from '../flora/local-flora-v1.js';
@@ -38,11 +39,12 @@ export function structureGroundLines(o:GeneratedSceneObservation,presentation:Pr
   const d=cv.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,320,180).data;
   for(let i=0;i<57600;i++)if(d[i*4+3])ground[i]=line;
  };
+ const groundLine=(x:GeneratedSceneObservation['snapshot']['objects'][number])=>{const plot=o.ground.facilities.find(f=>f.id===x.id)!.plot;return plot.y+plot.depth;};
+ for(const x of sceneFields(o.snapshot.objects))one([x],null,null,groundLine(x));
  for(const depth of ['far','middle','near'] as const)
   for(const part of blocks.flatMap(b=>b.roofParts).filter(p=>p.depth===depth).sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId)))one([],part,null,part.y);
- for(const x of [...o.snapshot.objects.filter(x=>x.civic),...o.snapshot.objects.filter(x=>!x.civic&&x.kind!=='bridge')]){
-  const plot=o.ground.facilities.find(f=>f.id===x.id)!.plot;one([x],null,null,plot.y+plot.depth);
- }
+ for(const x of sceneBuildings(o.snapshot.objects))one([x],null,null,groundLine(x));
+
  for(const mark of ['festival','fire','cart'] as const){const m=presentation[mark];if(m)one([],null,mark,m.y);}
  return ground;
 }

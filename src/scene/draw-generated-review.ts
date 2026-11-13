@@ -11,6 +11,7 @@ import type {GeneratedSceneObservation} from './generated-scene-review.js';
 import {drawBuildingSprite,drawCivicArchitecture,drawHousingPlotSurface,drawResidentialRoofs,drawConfirmedPublicSpaces} from './draw.js';
 import {projectGeneratedPresentation} from './generated-presentation-review.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
+import {sceneFields,sceneBuildings} from './structure-order.js';
 import {prepareSceneFlora,type SceneFloraSource,type StructureLayerDrawer} from './flora-draw.js';
 /** Ground-level paint is clipped to the actual footprint; upper roofs may overhang. */
 function withinFootprint(c:CanvasRenderingContext2D,p:GroundPlot,draw:()=>void){
@@ -104,9 +105,7 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
  c.fillStyle=presentation.drought?'#aa9b77':'#b1a180';for(const [x,y] of presentation.wear)c.fillRect(x,y,1,1);
  drawConfirmedPublicSpaces(c,s.publicSpaces??[]);drawHousingPlotSurface(c,scene);
  }
- if(layer!=='backdrop')for(const depth of ['far','middle','near'] as const)(painter?.residentialRoofs??drawResidentialRoofs)(c,scene,depth);
- if(!layer)drawPeople(c,presentation);
- if(layer!=='backdrop')for(const o of [...s.objects.filter(o=>o.civic),...s.objects.filter(o=>!o.civic&&o.kind!=='bridge')]){
+ const facility=(o:typeof s.objects[number])=>{
   const f=ground.facilities.find(p=>p.id===o.id)!.plot;
   withinFootprint(c,f,()=>{
    if(painter?.facility?.(c,o,f,s.year))return;
@@ -122,7 +121,13 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
    }else drawBuildingSprite(c,o,o.kind==='hall'||o.kind==='granary');
    if(o.condition==='damaged'){c.fillStyle='#454e48';c.fillRect(o.x-6,o.y-2,6,2);}
   });
- }
+ };
+ // Fields lie flat on their own footprint, so they come first: a later field would paint over the upper part of a
+ // roof or building standing in front of it (Issue #47 B3 review). Then roofs, people, civic and other buildings.
+ if(layer!=='backdrop')for(const o of sceneFields(s.objects))facility(o);
+ if(layer!=='backdrop')for(const depth of ['far','middle','near'] as const)(painter?.residentialRoofs??drawResidentialRoofs)(c,scene,depth);
+ if(!layer)drawPeople(c,presentation);
+ if(layer!=='backdrop')for(const o of sceneBuildings(s.objects))facility(o);
  if(layer!=='structures')for(const g of ground.bridges){
   const o=s.objects.find(b=>b.id===g.bridgeId)!;const p=g.deck;c.fillStyle='#70594b';
   for(const support of g.bankSupports)c.fillRect(support.x,support.y,support.width,support.depth);
