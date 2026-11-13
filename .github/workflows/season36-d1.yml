@@ -1,0 +1,48 @@
+name: Issue 36 D1 — seasonal scene comparison
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/lib/season36-*.mjs'
+      - 'scripts/preview-season36.mjs'
+      - 'tests/season36-d1.test.mjs'
+      - '.github/workflows/season36-d1.yml'
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: season36-d1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  season-gallery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - name: Unit checks — year phase, climate projection, latest-only frame sampling
+        run: node --test tests/season36-d1.test.mjs
+      - name: Chromium for real saved-world scene comparison
+        run: npx playwright install --with-deps chromium
+        timeout-minutes: 12
+      - name: Render Issue 36 D1 (7 natural biomes × 3 districts × 4 phase views)
+        run: node scripts/preview-season36.mjs
+        timeout-minutes: 17
+        env:
+          SEASON36_D1_YEAR: 180
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: season36-d1-scene-comparison
+          path: artifacts/season36-d1/**
+          if-no-files-found: warn
+          retention-days: 21
