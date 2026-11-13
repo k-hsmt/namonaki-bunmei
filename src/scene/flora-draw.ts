@@ -15,10 +15,14 @@ import {planFloraScene,rasterizeFlora,composeFlora,treeSwayAt,tintFloraSoil,type
 import type {FloraPatch,GroundMaterial} from '../flora/local-flora-v1.js';
 import type {BiomeKind} from '../climate/initial-climate-v1.js';
 import {paintGroundMaterials,toneDistantLand} from '../flora/ground-materials-v1.js';
+import {paintGroundSeason,paintGroundSnow,paintStructureSnow} from '../season/season-ground-v1.js';
+import type {SeasonalView} from '../season/season-presentation-v1.js';
 import {describeFloraPatch} from '../flora/local-flora-v1.js';
 import type {FloraPatchView} from '../flora/flora-growth-v1.js';
 
-export interface SceneFloraSource {readonly seed:number;readonly patches:readonly (FloraPatch|null)[];readonly views:readonly (FloraPatchView|null)[]}
+export interface SceneFloraSource {readonly seed:number;readonly patches:readonly (FloraPatch|null)[];readonly views:readonly (FloraPatchView|null)[];
+ /** Issue #36 D1a: a forced season for development comparison only. The live game never sets it (D0 §3, §10). */
+ readonly season?:SeasonalView}
 /** Draws one structure-only layer of a (filtered) observation; supplied by the scene drawer. */
 export type StructureLayerDrawer=(canvas:HTMLCanvasElement,o:GeneratedSceneObservation,marks:{festival:boolean;fire:boolean;cart:boolean})=>void;
 type Presentation={readonly festival:{x:number;y:number}|null;readonly fire:{x:number;y:number}|null;readonly cart:{x:number;y:number}|null};
@@ -30,24 +34,32 @@ export function sceneOccupiedPlots(o:GeneratedSceneObservation):ScenePlot[] {
   ...(o.snapshot.publicSpaces??[]).filter(x=>x.condition==='used').map(x=>x.footprint),...o.ground.bridges.flatMap(x=>[x.deck,...x.bankSupports])];
 }
 
-/** Ground line (y) of every screen pixel of the structure layer, −1 where there is no structure. */
-export function structureGroundLines(o:GeneratedSceneObservation,presentation:Presentation,draw:StructureLayerDrawer):Int16Array {
- const blocks=o.composition.residentialBlocks,ground=new Int16Array(57600).fill(-1),cv=document.createElement('canvas');
- const one=(objects:GeneratedSceneObservation['snapshot']['objects'],part:unknown,mark:'festival'|'fire'|'cart'|null,line:number)=>{
+/**
+ * Per-pixel layout of the structure layer, from each structure drawn alone with the game's own function in the
+ * game's own order (the last one drawn owns the pixel):
+ * - ground: the owner's ground line (y), −1 where there is no structure;
+ * - surface: 1 a field, 2 the top edge of a building or roof's own drawn shape (its pixel above is not its own),
+ *   3 the pixel just below such an edge, 0 otherwise (marks, walls, nothing). Issue #36 D1b lays roof snow on 2/3.
+ */
+export function structureLayout(o:GeneratedSceneObservation,presentation:Presentation,draw:StructureLayerDrawer):{readonly ground:Int16Array;readonly surface:Uint8Array} {
+ const blocks=o.composition.residentialBlocks,ground=new Int16Array(57600).fill(-1),surface=new Uint8Array(57600),cv=document.createElement('canvas');
+ const one=(objects:GeneratedSceneObservation['snapshot']['objects'],part:unknown,mark:'festival'|'fire'|'cart'|null,line:number,kind:'field'|'building'|'mark')=>{
   const o2:GeneratedSceneObservation={...o,snapshot:{...o.snapshot,objects},composition:{...o.composition,residentialBlocks:blocks.map(b=>({...b,roofParts:b.roofParts.filter(p=>p===part)}))}};
   draw(cv,o2,{festival:mark==='festival',fire:mark==='fire',cart:mark==='cart'});
-  const d=cv.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,320,180).data;
-  for(let i=0;i<57600;i++)if(d[i*4+3])ground[i]=line;
+  const d=cv.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,320,180).data,own=(i:number)=>i>=0&&d[i*4+3]!==0;
+  for(let i=0;i<57600;i++)if(own(i)){ground[i]=line;
+   surface[i]=kind==='field'?1:kind==='mark'?0:!own(i-320)?2:!own(i-640)&&own(i-320)?3:0;}
  };
  const groundLine=(x:GeneratedSceneObservation['snapshot']['objects'][number])=>{const plot=o.ground.facilities.find(f=>f.id===x.id)!.plot;return plot.y+plot.depth;};
- for(const x of sceneFields(o.snapshot.objects))one([x],null,null,groundLine(x));
+ for(const x of sceneFields(o.snapshot.objects))one([x],null,null,groundLine(x),'field');
  for(const depth of ['far','middle','near'] as const)
-  for(const part of blocks.flatMap(b=>b.roofParts).filter(p=>p.depth===depth).sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId)))one([],part,null,part.y);
- for(const x of sceneBuildings(o.snapshot.objects))one([x],null,null,groundLine(x));
-
- for(const mark of ['festival','fire','cart'] as const){const m=presentation[mark];if(m)one([],null,mark,m.y);}
- return ground;
+  for(const part of blocks.flatMap(b=>b.roofParts).filter(p=>p.depth===depth).sort((a,b)=>a.y-b.y||a.x-b.x||a.partId.localeCompare(b.partId)))one([],part,null,part.y,'building');
+ for(const x of sceneBuildings(o.snapshot.objects))one([x],null,null,groundLine(x),'building');
+ for(const mark of ['festival','fire','cart'] as const){const m=presentation[mark];if(m)one([],null,mark,m.y,'mark');}
+ return {ground,surface};
 }
+/** Ground line (y) of every screen pixel of the structure layer, −1 where there is no structure. */
+export function structureGroundLines(o:GeneratedSceneObservation,presentation:Presentation,draw:StructureLayerDrawer):Int16Array {return structureLayout(o,presentation,draw).ground;}
 
 export interface PreparedSceneFlora {
  readonly plants:readonly ScenePlant[];
@@ -65,15 +77,19 @@ export interface PreparedSceneFlora {
 export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanvasElement,o:GeneratedSceneObservation,source:SceneFloraSource,presentation:Presentation,draw:StructureLayerDrawer):PreparedSceneFlora {
  const physics=readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),mirror=o.ground.terrain.sites[o.ground.site].render.mirrorX===true;
  const plants=planFloraScene({seed:source.seed,site:o.ground.site,patches:source.patches,views:source.views,physics,occupied:sceneOccupiedPlots(o)});
- const raster=rasterizeFlora(plants,mirror);
+ const raster=rasterizeFlora(plants,mirror,source.season);
  const s=structures.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,320,180).data;
  // Ground lines are needed only when a plant (in any pose: crowns move by at most one pixel) can cover a structure.
  let covered=false;
  for(const it of raster.items){for(let n=0;n<it.x.length&&!covered;n++)for(const d of it.crown[n]?[-1,0,1]:[0]){const x=it.x[n]!+d;if(x>=0&&x<320&&s[(it.y[n]!*320+x)*4+3]!==0){covered=true;break;}}if(covered)break;}
- const lines=covered?structureGroundLines(o,presentation,draw):null;
+ const snow=source.season?.snow??0,layout=covered||snow>0?structureLayout(o,presentation,draw):null,lines=layout?.ground??null;
+ // Issue #36 D1b: snow on the structures' own top edges and on fields, painted into the structure layer so that
+ // plants in front still cover it. Ground snow is painted with the ground below.
+ if(snow>0&&layout){const sctx=structures.getContext('2d',{willReadFrequently:true})!,img=sctx.getImageData(0,0,320,180);paintStructureSnow(img.data,layout.surface,snow,mirror);sctx.putImageData(img,0,0);}
  const bctx=backdrop.getContext('2d',{willReadFrequently:true})!,bimage=bctx.getImageData(0,0,320,180);
  // Ground: the biome tint (B2d), then each patch's material (B2d2), except on built ground, plazas and bridges.
  tintFloraSoil(bimage.data,source.patches,physics,mirror);paintGroundMaterials(bimage.data,source.patches,physics,mirror,sceneOccupiedPlots(o));
+ if(source.season){paintGroundSeason(bimage.data,source.patches,physics,mirror,source.season);if(source.season.snow>0)paintGroundSnow(bimage.data,physics,mirror,source.season.snow,sceneOccupiedPlots(o));}
  toneDistant(bimage.data,o,source.patches,mirror);bctx.putImageData(bimage,0,0);
  const canvas=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;const x=c.getContext('2d')!;return {c,x,image:x.createImageData(320,180)};},behind=canvas(),front=canvas();
  const work:FloraLayer={rgba:new Uint8ClampedArray(57600*4),root:new Int16Array(57600)},sway=new Int8Array(raster.trees);let pose:string|null=null;
