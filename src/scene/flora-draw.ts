@@ -11,8 +11,10 @@
 import type {GeneratedSceneObservation} from './generated-scene-review.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {planFloraScene,rasterizeFlora,composeFlora,treeSwayAt,tintFloraSoil,type FloraLayer,type ScenePlant,type ScenePlot} from '../flora/flora-scene-v1.js';
-import type {FloraPatch} from '../flora/local-flora-v1.js';
-import {paintGroundMaterials} from '../flora/ground-materials-v1.js';
+import type {FloraPatch,GroundMaterial} from '../flora/local-flora-v1.js';
+import type {BiomeKind} from '../climate/initial-climate-v1.js';
+import {paintGroundMaterials,toneDistantLand} from '../flora/ground-materials-v1.js';
+import {describeFloraPatch} from '../flora/local-flora-v1.js';
 import type {FloraPatchView} from '../flora/flora-growth-v1.js';
 
 export interface SceneFloraSource {readonly seed:number;readonly patches:readonly (FloraPatch|null)[];readonly views:readonly (FloraPatchView|null)[]}
@@ -69,7 +71,8 @@ export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanv
  const lines=covered?structureGroundLines(o,presentation,draw):null;
  const bctx=backdrop.getContext('2d',{willReadFrequently:true})!,bimage=bctx.getImageData(0,0,320,180);
  // Ground: the biome tint (B2d), then each patch's material (B2d2), except on built ground, plazas and bridges.
- tintFloraSoil(bimage.data,source.patches,physics,mirror);paintGroundMaterials(bimage.data,source.patches,physics,mirror,sceneOccupiedPlots(o));bctx.putImageData(bimage,0,0);
+ tintFloraSoil(bimage.data,source.patches,physics,mirror);paintGroundMaterials(bimage.data,source.patches,physics,mirror,sceneOccupiedPlots(o));
+ toneDistant(bimage.data,o,source.patches,mirror);bctx.putImageData(bimage,0,0);
  const canvas=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;const x=c.getContext('2d')!;return {c,x,image:x.createImageData(320,180)};},behind=canvas(),front=canvas();
  const work:FloraLayer={rgba:new Uint8ClampedArray(57600*4),root:new Int16Array(57600)},sway=new Int8Array(raster.trees);let pose:string|null=null;
  const at=(seconds?:number)=>{
@@ -84,4 +87,28 @@ export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanv
  };
  at();
  return {plants,behind:behind.c,front:front.c,at};
+}
+
+/** Most common value among the district's patches (the world's dominant biome and its ground, as seen here). */
+function commonest<T>(values:readonly T[]):T|undefined {const n=new Map<T,number>();let best:T|undefined,top=0;for(const v of values){const c=(n.get(v)??0)+1;n.set(v,c);if(c>top){top=c;best=v;}}return best;}
+/** Distant ridges, hills and plain take the near ground's tone and a faint grain (B2d2, Human review). Snow is kept. */
+function toneDistant(rgba:Uint8ClampedArray,o:GeneratedSceneObservation,patches:readonly (FloraPatch|null)[],mirror:boolean){
+ const views=patches.filter((p):p is FloraPatch=>p!==null).map(describeFloraPatch);if(!views.length)return;
+ const biome=commonest(views.map(v=>v.biome)) as BiomeKind,material=commonest(views.filter(v=>v.biome===biome).map(v=>v.ground)) as GroundMaterial;
+ const render=o.ground.terrain.sites[o.ground.site].render,layers=new Uint8Array(320*96),cv=document.createElement('canvas');cv.width=320;cv.height=96;
+ const c=cv.getContext('2d',{willReadFrequently:true})!;
+ for(let y=53;y<96;y++)layers.fill(1,y*320,y*320+320);
+ const mark=(polygon:readonly (readonly [number,number])[],label:number)=>{
+  c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,320,96);if(mirror)c.setTransform(-1,0,0,1,320,0);
+  c.fillStyle='#000';c.beginPath();c.moveTo(polygon[0]![0],polygon[0]![1]);for(const q of polygon.slice(1))c.lineTo(q[0],q[1]);c.closePath();c.fill();
+  const d=c.getImageData(0,0,320,96).data;for(let k=0;k<320*96;k++)if(d[k*4+3]!>=128)layers[k]=label;
+ };
+ render.far.forEach((p,n)=>mark(p,2+n));for(const p of render.middle)mark(p,255);
+ const keep=new Uint8Array(320*96);
+ for(let k=0;k<320*96;k++){const i=k*4,r=rgba[i],g=rgba[i+1],b=rgba[i+2];if((r===0xe1&&g===0xe5&&b===0xd9)||(r===0xcd&&g===0xd6&&b===0xce))keep[k]=1;}
+ // The near ground as drawn (tint and materials), on stable land within 24 px of the horizon.
+ const physics=readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),sum=[0,0,0];let n=0;
+ for(let y=96;y<120;y++)for(let x=0;x<320;x++){const z=y*320+(mirror?319-x:x);if(physics.surface[z]!==1||physics.bearing[z]!==0)continue;for(let j=0;j<3;j++)sum[j]=sum[j]!+rgba[(y*320+x)*4+j]!;n++;}
+ if(!n)return;
+ toneDistantLand(rgba,layers,sum.map(v=>v/n) as [number,number,number],[0xbd,0xc9,0xbb],material,render.far.length,keep);
 }

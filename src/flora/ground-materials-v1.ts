@@ -59,3 +59,25 @@ export function paintGroundMaterials(rgba:Uint8ClampedArray,patches:readonly (Fl
   for(let j=0;j<3;j++){let v=rgba[i+j]!*(1-GROUND_BASE_SHIFT)+col[0]![j]!*GROUND_BASE_SHIFT;if(fleck)v=v*(1-GROUND_FLECK_STRENGTH)+col[fleck]![j]!*GROUND_FLECK_STRENGTH;rgba[i+j]=Math.round(v);}
  }
 }
+
+/**
+ * Issue #47 B2d2 (Human review 2026-11-13): distant land takes the tone and a faint texture of the near ground.
+ * `layers` labels each screen pixel above y 96: 0 sky, 1 the plain below the mountains, 2+n far ridge n (farthest
+ * first), 255 the middle hills. `ground` is the mean colour of the near ground as drawn. Each layer moves toward
+ * that colour hazed toward the sky (more haze the farther it is), keeping part of its own colour so the ridges
+ * stay apart and the #34 climate tints still show; the hills get sparse single-pixel grains of the ground material.
+ * Snow (the #34 painting inside the ridges) is passed in `keep` and left as drawn.
+ */
+export const DISTANT_HAZE=Object.freeze({plain:.62,farthest:.42,nearFar:.3,middle:.12});
+export const DISTANT_TONE_STRENGTH=.55;
+export const DISTANT_GRAIN=Object.freeze({share:.035,strength:.3});
+export function toneDistantLand(rgba:Uint8ClampedArray,layers:Uint8Array,ground:readonly [number,number,number],sky:readonly [number,number,number],material:GroundMaterial,farLayers:number,keep?:Uint8Array):void {
+ const flecks=GROUND_COLORS[material].map(rgb);
+ for(let y=0;y<96;y++)for(let x=0;x<320;x++){
+  const k=y*320+x,layer=layers[k]!;if(layer===0||keep?.[k])continue;
+  const haze=layer===1?DISTANT_HAZE.plain:layer===255?DISTANT_HAZE.middle:layer-2===farLayers-1?DISTANT_HAZE.nearFar:DISTANT_HAZE.farthest;
+  const h=vh(x+977,y*5+11),fleck=layer===255&&(h%1000)<DISTANT_GRAIN.share*1000?flecks[1+((h>>>12)&1)]!:null,i=k*4;
+  for(let j=0;j<3;j++){const target=ground[j]!*(1-haze)+sky[j]!*haze;let v=rgba[i+j]!*(1-DISTANT_TONE_STRENGTH)+target*DISTANT_TONE_STRENGTH;
+   if(fleck)v=v*(1-DISTANT_GRAIN.strength)+(fleck[j]!*(1-haze)+sky[j]!*haze)*DISTANT_GRAIN.strength;rgba[i+j]=Math.round(v);}
+ }
+}
