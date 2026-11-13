@@ -156,7 +156,7 @@ try{
  forced.base={world:base.id,seed:base.seed,year:forcedYear};
 }finally{await browser?.close();server.kill();}
 
-// 4. Performance and size budgets (B2d: 150 ms per site preparation).
+// 4. Performance budget (B2d; Human decision in B2e: the median preparation per site stays within 150 ms).
 for(const t of timing)check(t.prepareMedianMs<=150,`${t.world}: scene preparation median ${t.prepareMedianMs} ms exceeds 150 ms`);
 
 // 5. Write the report and gallery.
