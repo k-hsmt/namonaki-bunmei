@@ -61,7 +61,7 @@ function scheduleChoice(){
 }
 
 let viewedYear:number|null=null;
-function stop(){clearChoiceTimer();if(timer!==null){clearInterval(timer);timer=null;}el('play').textContent='自動で見守る ▷';}
+function stop(){clearChoiceTimer();if(timer!==null){clearInterval(timer);timer=null;}el('play').textContent='自動で見守る ▷';if(throttledRender!==null)render();}
 function start(){if(timer!==null)clearInterval(timer);timer=setInterval(forward,speedDelays[speedInput.value]??850);el('play').textContent='自動進行を停止 Ⅱ';scheduleChoice();}
 function chapter(entries:RecordEntry[]){
  const has=(title:string)=>entries.some(e=>e.title===title);
@@ -74,7 +74,23 @@ function chapter(entries:RecordEntry[]){
 function format(v:number){return new Intl.NumberFormat('ja-JP').format(Math.round(v));}
 function label(v:number,good:string,bad:string){return v>=55?good:v>=30?'揺らいでいる':bad;}
 function inspect(year:number,record?:RecordEntry){stop();viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
+/**
+ * Issue #36 D3 (Human decisions after D1c): a step to a later confirmed year blends a changed season over 250 ms; at the
+ * fast and rapid speeds the whole observation (scene and year label together) is redrawn at most every 1400 ms, showing
+ * only the latest confirmed year, with a 350 ms blend. Stopping, or any other action, draws the latest year at once.
+ */
+const SEASON_BLEND_MS=250,THROTTLED_BLEND_MS=350,THROTTLE_MS=1400;
+let stepped=false,stepTransition=0,lastStepRender=0,throttledRender:ReturnType<typeof setTimeout>|null=null;
+function renderStep(){
+ const fast=timer!==null&&(speedInput.value==='fast'||speedInput.value==='rapid');
+ if(!fast){stepTransition=SEASON_BLEND_MS;render();return;}
+ const wait=lastStepRender+THROTTLE_MS-Date.now();
+ if(wait<=0){stepTransition=THROTTLED_BLEND_MS;render();return;}
+ if(throttledRender===null)throttledRender=setTimeout(()=>{throttledRender=null;stepTransition=THROTTLED_BLEND_MS;render();},wait);
+}
 function render(){
+ if(throttledRender!==null){clearTimeout(throttledRender);throttledRender=null;}
+ const seasonTransition=stepTransition;stepTransition=0;lastStepRender=Date.now();
  const economicButton=el('enable-economic') as HTMLButtonElement,economicNote=el('economic-note');
  const economicEligible=world.mode==='generated'&&world.review.format==='generated-bridge-review'&&Boolean(world.review.irrigation)&&world.review.review.growthPattern==='organic-v3';
  economicButton.hidden=!economicEligible;economicButton.disabled=busy||Boolean(state.pending)||lastObservedYear(state)>=10000;
@@ -98,7 +114,7 @@ function render(){
  const awaitingChoice=!viewingPast&&Boolean(state.pending);
  const historicalStats=viewingPast||awaitingChoice||estimating;
  const siteIndex=Number(siteSelect.value);
- const scene=motion.show(world,y,siteIndex);
+ const scene=motion.show(world,y,siteIndex,viewingPast?0:seasonTransition);
  const environment=motion.environment;el('site-environment').hidden=!environment;el('site-environment').textContent=environment?environmentLabel(environment):'';
  const channel=motion.channelView,waterline=el('site-waterway');waterline.hidden=!channel||siteIndex!==0;waterline.textContent=!channel?'':!channel.introduced?'水路の記録はまだありません':channel.channel?({active:'水路に水が流れています',idle:'水路は休止しています',damaged:'水路は傷み、水が止まっています',abandoned:'放棄された水路の跡があります',retired:'水路は埋め戻されています'}[channel.channel.status]):'記録された水路はありません';
  const terrainLine=el('site-terrain'),terrainInfo=siteIndex===1?worldTerrainDevelopmentAtYear(world,y):null;terrainLine.hidden=!terrainInfo;
@@ -178,9 +194,9 @@ async function forward(){
  if(busy)return;if(viewedYear!==null){viewedYear=null;render();return;}if(state.pending){render();scheduleChoice();return;}
  if(world.mode==='generated'&&world.review.format==='terrain-production-world-v1'&&lastObservedYear(state)>=10000){stop();render();return;}
  const source=world,ticket=++operation;setBusy(true);
- try{if(source.mode==='generated'&&source.review.format==='terrain-production-world-v1')await paintFeedback();const candidate=await advanceWorldSessionAsync(source);if(ticket!==operation||world!==source)return;adopt(candidate,true,true);}
+ try{if(source.mode==='generated'&&source.review.format==='terrain-production-world-v1')await paintFeedback();const candidate=await advanceWorldSessionAsync(source);if(ticket!==operation||world!==source)return;adopt(candidate,true,true,true);stepped=true;}
  catch{if(ticket===operation&&world===source){stop();el('feedback').textContent='時を進められませんでした。現在の歴史は保持しています。';}}
- finally{if(ticket===operation){setBusy(false);render();scheduleChoice();}}
+ finally{if(ticket===operation){setBusy(false);if(stepped){stepped=false;renderStep();}else render();scheduleChoice();}}
 }
 siteSelect.addEventListener('change',render);
 el('step').addEventListener('click',forward);
@@ -192,9 +208,9 @@ el('return-now').addEventListener('click',()=>{viewedYear=null;render();});
 scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===state.year?null:y;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
 function setBusy(value:boolean){busy=value;document.querySelectorAll<HTMLButtonElement>('#options button').forEach(b=>b.disabled=value);for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic','enable-terrain'])(el(id) as HTMLButtonElement).disabled=value;}
-function adopt(candidate:WorldSession,keepObservation=false,keepArchive=false){
+function adopt(candidate:WorldSession,keepObservation=false,keepArchive=false,deferRender=false){
  verifyWorldCandidate(candidate);const previous={world,state,viewedYear,expanded,active,input:input.value};
- try{world=candidate;state=world.state;viewedYear=keepObservation?previous.viewedYear:null;expanded=keepArchive?previous.expanded:false;active=keepObservation?(state.history.find(r=>r.id===previous.active.id)??state.history[0]!):state.history[0]!;input.value=String(state.seed);render();}
+ try{world=candidate;state=world.state;viewedYear=keepObservation?previous.viewedYear:null;expanded=keepArchive?previous.expanded:false;active=keepObservation?(state.history.find(r=>r.id===previous.active.id)??state.history[0]!):state.history[0]!;input.value=String(state.seed);if(!deferRender)render();}
  catch(error){world=previous.world;state=previous.state;viewedYear=previous.viewedYear;expanded=previous.expanded;active=previous.active;input.value=previous.input;try{render();}catch{}throw error;}
 }
 async function restart(seed:number){

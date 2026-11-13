@@ -5,17 +5,22 @@ import {type GeneratedSceneObservation} from './generated-scene-review.js';
 import {drawGeneratedSceneReview,type GeneratedStructurePainter} from './draw-generated-review.js';
 import {prepareSceneMotion,drawSceneMotion,sceneMotionVisualKey,type PreparedSceneMotion} from './motion-frame.js';
 import type {SiteSnapshot} from './model.js';
+import type {SeasonalView} from '../season/season-presentation-v1.js';
+/** Issue #36 D3: a season transition — the NEW year drawn in the previous phase, fading into its own phase. */
+interface SeasonTransition {readonly from:PreparedSceneMotion;readonly ms:number;readonly start:number}
 export const sceneMotionPreferenceKey='namonaki-scene-motion-v1';
 export class SceneMotionPlayer {
  get channelView(){return this.observation?.ground.channelView;}
  private world:WorldSession|null=null;private year=-1;private site=-1;private snapshot:SiteSnapshot|null=null;private observation:GeneratedSceneObservation|null=null;private prepared:PreparedSceneMotion|null=null;private visualKey:string|null=null;private terrain:object|null=null;private painter:GeneratedStructurePainter|undefined;
- private raf:number|null=null;private lastTimestamp:number|null=null;private seconds=0;private lastPaint=-Infinity;private preferred=true;private disposed=false;private frames=0;private builds=0;
+ private transition:SeasonTransition|null=null;private pendingTransition:{from:PreparedSceneMotion;ms:number}|null=null;private season:SeasonalView|null=null;private raf:number|null=null;private lastTimestamp:number|null=null;private seconds=0;private lastPaint=-Infinity;private preferred=true;private disposed=false;private frames=0;private builds=0;
  private readonly media=matchMedia('(prefers-reduced-motion: reduce)');
  constructor(private readonly canvas:HTMLCanvasElement,private readonly control:HTMLInputElement){
   try{this.preferred=localStorage.getItem(sceneMotionPreferenceKey)!=='off';}catch{}
   control.addEventListener('change',this.change);this.media.addEventListener('change',this.configure);document.addEventListener('visibilitychange',this.visibility);this.configure();
  }
  get environment(){return this.observation?.ground.environment;}
+ /** Issue #36 D3: a season blend is running or waiting for the moving view to start. */
+ get isTransitioning(){return this.transition!==null||this.pendingTransition!==null;}
  get paintedFrames(){return this.frames;}get preparations(){return this.builds;}get isRunning(){return this.raf!==null;}
  private change=()=>{this.preferred=this.control.checked;try{localStorage.setItem(sceneMotionPreferenceKey,this.preferred?'on':'off');}catch{}this.configure();};
  private visibility=()=>{this.stopClock();if(!document.hidden)this.configure();};
@@ -23,27 +28,47 @@ export class SceneMotionPlayer {
   if(this.disposed)return;const supported=this.world?.mode==='generated';this.control.disabled=!supported||this.media.matches;this.control.checked=Boolean(supported&&this.preferred&&!this.media.matches);
   this.control.title=this.media.matches?'端末のモーション軽減設定に従い静止画で表示しています':!supported?'この情景は静止画で表示します':'';
   if(this.control.checked&&!document.hidden&&this.observation){
-   if(!this.prepared){this.prepared=prepareSceneMotion(this.observation,this.painter);this.builds++;}if(this.raf===null){this.paint();this.raf=requestAnimationFrame(this.tick);}
+   if(!this.prepared){this.prepared=prepareSceneMotion(this.observation,this.painter);this.builds++;}
+   if(this.pendingTransition){this.transition={...this.pendingTransition,start:performance.now()};this.pendingTransition=null;}
+   if(this.raf===null){this.paint();this.raf=requestAnimationFrame(this.tick);}
   }else{this.stopClock();if(this.observation)drawGeneratedSceneReview(this.canvas,this.observation,undefined,undefined,this.painter);}
  };
- private paint(){if(this.prepared){drawSceneMotion(this.canvas,this.prepared,this.seconds);this.lastPaint=this.seconds;this.frames++;}}
+ private paint(){
+  if(!this.prepared)return;drawSceneMotion(this.canvas,this.prepared,this.seconds);
+  const t=this.transition;
+  if(t){const a=Math.min(1,(performance.now()-t.start)/t.ms);
+   if(a>=1)this.transition=null;
+   else{const old=document.createElement('canvas');drawSceneMotion(old,t.from,this.seconds);const c=this.canvas.getContext('2d')!;c.save();c.globalAlpha=1-a;c.drawImage(old,0,0);c.restore();}}
+  this.lastPaint=this.seconds;this.frames++;
+ }
  private tick=(timestamp:number)=>{
   this.raf=null;if(this.disposed||document.hidden||!this.control.checked||this.media.matches)return;
   if(this.lastTimestamp!==null)this.seconds+=Math.max(0,Math.min(.25,(timestamp-this.lastTimestamp)/1000));this.lastTimestamp=timestamp;
-  if(this.seconds-this.lastPaint>=1/12-1e-8)this.paint();this.raf=requestAnimationFrame(this.tick);
+  if(this.transition||this.seconds-this.lastPaint>=1/12-1e-8)this.paint();this.raf=requestAnimationFrame(this.tick);
  };
- private stopClock(){if(this.raf!==null)cancelAnimationFrame(this.raf);this.raf=null;this.lastTimestamp=null;}
- show(world:WorldSession,year:number,site:number):SiteSnapshot {
+ private stopClock(){if(this.raf!==null)cancelAnimationFrame(this.raf);this.raf=null;this.lastTimestamp=null;this.transition=null;}
+/**
+  * `seasonTransitionMs` (Issue #36 D3): when the caller advances the same site to a later confirmed year and the season
+  * phase changes, the new year's scene fades in from the same year drawn in the previous phase. Only while the moving
+  * view runs; never for past observation, site changes, reloads, reduced motion or a stopped view (the caller passes 0).
+  */
+ show(world:WorldSession,year:number,site:number,seasonTransitionMs=0):SiteSnapshot {
   if(this.disposed)throw Error('Disposed scene player');if(this.world===world&&this.year===year&&this.site===site)return this.snapshot!;
   if(world.mode==='generated'){
    const observation=observeGeneratedWorldSession(world,year,site),painter=worldStructurePainter(world),key=sceneMotionVisualKey(observation)+(painter?.flora?(f=>JSON.stringify([f.views.map(v=>v?.stage??-1),f.season??null]))(painter.flora(observation)):'');
+   const season=painter?.flora?.(observation).season??null,previous=this.season,from=this.prepared;
    if(this.terrain!==observation.ground.terrain||this.visualKey!==key||(this.painter===undefined)!==(painter===undefined)){this.stopClock();this.prepared=null;}
+   this.season=season;
+   // The old phase is drawn for the NEW year (never the previous year's buildings: D0 §7).
+   if(seasonTransitionMs>0&&painter&&season&&previous&&from&&previous.phase!==season.phase&&site===this.site&&year>this.year&&this.control.checked&&!this.media.matches&&!document.hidden){
+    this.pendingTransition={from:prepareSceneMotion(observation,{...painter,flora:o=>({...painter.flora!(o),season:previous})}),ms:seasonTransitionMs};
+   }else this.pendingTransition=null;
    // A painter draws fixed birth styles; a new building already changes the visual key, so layers are reused as before.
    this.painter=painter;
    this.terrain=observation.ground.terrain;this.visualKey=key;this.observation=observation;this.snapshot=observation.snapshot;
-  }else{this.stopClock();this.prepared=null;this.visualKey=null;this.terrain=null;this.observation=null;this.painter=undefined;this.snapshot=drawWorldSession(this.canvas,world,year,site);}
+  }else{this.stopClock();this.prepared=null;this.visualKey=null;this.terrain=null;this.observation=null;this.painter=undefined;this.season=null;this.pendingTransition=null;this.snapshot=drawWorldSession(this.canvas,world,year,site);}
   this.world=world;this.year=year;this.site=site;
   this.configure();return this.snapshot;
  }
- dispose(){this.disposed=true;this.stopClock();this.control.removeEventListener('change',this.change);this.media.removeEventListener('change',this.configure);document.removeEventListener('visibilitychange',this.visibility);this.prepared=null;this.observation=null;this.world=null;this.snapshot=null;this.terrain=null;this.visualKey=null;}
+ dispose(){this.disposed=true;this.stopClock();this.control.removeEventListener('change',this.change);this.media.removeEventListener('change',this.configure);document.removeEventListener('visibilitychange',this.visibility);this.prepared=null;this.transition=null;this.pendingTransition=null;this.observation=null;this.world=null;this.snapshot=null;this.terrain=null;this.visualKey=null;}
 }
