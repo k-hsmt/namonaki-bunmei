@@ -12,6 +12,7 @@ import type {GeneratedSceneObservation} from './generated-scene-review.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {planFloraScene,rasterizeFlora,composeFlora,treeSwayAt,tintFloraSoil,type FloraLayer,type ScenePlant,type ScenePlot} from '../flora/flora-scene-v1.js';
 import type {FloraPatch} from '../flora/local-flora-v1.js';
+import {paintGroundMaterials} from '../flora/ground-materials-v1.js';
 import type {FloraPatchView} from '../flora/flora-growth-v1.js';
 
 export interface SceneFloraSource {readonly seed:number;readonly patches:readonly (FloraPatch|null)[];readonly views:readonly (FloraPatchView|null)[]}
@@ -67,7 +68,8 @@ export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanv
  for(const it of raster.items){for(let n=0;n<it.x.length&&!covered;n++)for(const d of it.crown[n]?[-1,0,1]:[0]){const x=it.x[n]!+d;if(x>=0&&x<320&&s[(it.y[n]!*320+x)*4+3]!==0){covered=true;break;}}if(covered)break;}
  const lines=covered?structureGroundLines(o,presentation,draw):null;
  const bctx=backdrop.getContext('2d',{willReadFrequently:true})!,bimage=bctx.getImageData(0,0,320,180);
- tintFloraSoil(bimage.data,source.patches,physics,mirror);bctx.putImageData(bimage,0,0);
+ // Ground: the biome tint (B2d), then each patch's material (B2d2), except on built ground, plazas and bridges.
+ tintFloraSoil(bimage.data,source.patches,physics,mirror);paintGroundMaterials(bimage.data,source.patches,physics,mirror,sceneOccupiedPlots(o));bctx.putImageData(bimage,0,0);
  const canvas=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;const x=c.getContext('2d')!;return {c,x,image:x.createImageData(320,180)};},behind=canvas(),front=canvas();
  const work:FloraLayer={rgba:new Uint8ClampedArray(57600*4),root:new Int16Array(57600)},sway=new Int8Array(raster.trees);let pose:string|null=null;
  const at=(seconds?:number)=>{
