@@ -15,6 +15,8 @@ import type {BiomeKind} from '../climate/initial-climate-v1.js';
 import {describeFloraPatch,type FloraPatch,type PlantArchetype} from './local-flora-v1.js';
 import type {FloraPatchView} from './flora-growth-v1.js';
 import {expressiveSprite,restrainedSprite,PLANT_VARIANTS,type PlantSprite,type SpriteStage} from './plant-sprites-v1.js';
+import {plantSeasonLook,type SeasonalView} from '../season/season-presentation-v1.js';
+import {seasonSprite} from '../season/season-sprites-v1.js';
 
 export const FLORA_SCENE_RULE_ID='flora-scene-v1' as const;
 /** Reviewed B1b caps per site (trees, undergrowth) and soil tint (colour, strength) per biome. */
@@ -104,11 +106,18 @@ export const SWAY_TRUNK_SHARE=.4;
 interface RasterItem {readonly root:number;readonly tree:number;readonly x:Int16Array;readonly y:Int16Array;readonly crown:Uint8Array;readonly rgba:Uint8ClampedArray}
 /** Screen pixels of every plant, in drawing order (root y, undergrowth before trees on a tie, then x). `tree` numbers trees in that order (−1 for undergrowth). */
 export interface FloraRaster {readonly items:readonly RasterItem[];readonly trees:number}
-export function rasterizeFlora(plants:readonly ScenePlant[],mirror:boolean):FloraRaster {
+/** Issue #36 D1a (development input only): the plant's sprite in a season. Cached per look; the plant's own hash varies autumn hues. */
+const seasonal=new Map<string,PlantSprite>();
+function seasonalSpriteOf(p:ScenePlant,v:SeasonalView):PlantSprite {
+ const look=plantSeasonLook(p.id,v),salt=terrainHash(['season-plant',p.x,p.y])%997;
+ const key=p.painter+'/'+p.id+'/'+p.stage+'/'+(p.painter==='restrained'?p.variant:0)+'/'+JSON.stringify(look)+'/'+(look.tint?.color==='autumn'||look.leaves<1?salt:0);
+ let s=seasonal.get(key);if(!s){s=seasonSprite(spriteOf(p),p.id,look,salt);seasonal.set(key,s);}return s;
+}
+export function rasterizeFlora(plants:readonly ScenePlant[],mirror:boolean,season?:SeasonalView):FloraRaster {
  const ordered=[...plants].sort((a,b)=>a.y-b.y||Number(a.kind==='tree')-Number(b.kind==='tree')||a.x-b.x||a.id.localeCompare(b.id));
  let trees=0;const items:RasterItem[]=[];
  for(const p of ordered){
-  const s=spriteOf(p),k=plantScale(p),w=Math.max(1,Math.round(s.width*k)),hh=Math.max(1,Math.round(s.height*k));
+  const s=season?seasonalSpriteOf(p,season):spriteOf(p),k=plantScale(p),w=Math.max(1,Math.round(s.width*k)),hh=Math.max(1,Math.round(s.height*k));
   const left=Math.round((mirror?318-p.x:p.x)-s.originX*k),top=Math.round(p.y-s.originY*k),xs:number[]=[],ys:number[]=[],cols:number[]=[];
   for(let y=Math.max(0,top);y<Math.min(180,top+hh);y++){
    const V=Math.floor((y-top+.5)*s.height/hh);
@@ -140,7 +149,7 @@ export function composeFlora(r:FloraRaster,sway?:ArrayLike<number>,into?:FloraLa
 }
 /** Sideways crown offset of tree t at a wall-clock second (same rule as the earlier scene trees). */
 export function treeSwayAt(t:number,seconds:number):number {return Math.round(Math.sin(seconds*.7+t*2.3));}
-export function renderFloraLayer(plants:readonly ScenePlant[],mirror:boolean):FloraLayer {return composeFlora(rasterizeFlora(plants,mirror));}
+export function renderFloraLayer(plants:readonly ScenePlant[],mirror:boolean,season?:SeasonalView):FloraLayer {return composeFlora(rasterizeFlora(plants,mirror,season));}
 
 /**
  * Soil tint of each land pixel by its patch's biome (B1b colours), on a screen RGBA image. Record column x

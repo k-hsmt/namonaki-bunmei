@@ -167,6 +167,16 @@ jobs:
           name: biome47-b1b-scene-comparison
           path: artifacts/biome47-b1b/*
           if-no-files-found: warn
+      # Issue 36 D1a: the same real scenes in the 4 season phases (development input only; never saved).
+      - name: Render Issue 36 D1a season comparison
+        run: node scripts/preview-season-d1a.mjs
+        timeout-minutes: 6
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: season36-d1a-comparison
+          path: artifacts/season36-d1a/*
+          if-no-files-found: warn
       # B2e acceptance audit, quick set (3 worlds to year 1000). The full audit (10 worlds to year
       # 10000) runs locally: node scripts/audit-issue47-b2e.mjs (see docs/issue47-b2-plan.md §3.6).
       - name: Audit Issue 47 B2e acceptance (quick)

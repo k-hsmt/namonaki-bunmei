@@ -15,10 +15,14 @@ import {planFloraScene,rasterizeFlora,composeFlora,treeSwayAt,tintFloraSoil,type
 import type {FloraPatch,GroundMaterial} from '../flora/local-flora-v1.js';
 import type {BiomeKind} from '../climate/initial-climate-v1.js';
 import {paintGroundMaterials,toneDistantLand} from '../flora/ground-materials-v1.js';
+import {paintGroundSeason} from '../season/season-ground-v1.js';
+import type {SeasonalView} from '../season/season-presentation-v1.js';
 import {describeFloraPatch} from '../flora/local-flora-v1.js';
 import type {FloraPatchView} from '../flora/flora-growth-v1.js';
 
-export interface SceneFloraSource {readonly seed:number;readonly patches:readonly (FloraPatch|null)[];readonly views:readonly (FloraPatchView|null)[]}
+export interface SceneFloraSource {readonly seed:number;readonly patches:readonly (FloraPatch|null)[];readonly views:readonly (FloraPatchView|null)[];
+ /** Issue #36 D1a: a forced season for development comparison only. The live game never sets it (D0 §3, §10). */
+ readonly season?:SeasonalView}
 /** Draws one structure-only layer of a (filtered) observation; supplied by the scene drawer. */
 export type StructureLayerDrawer=(canvas:HTMLCanvasElement,o:GeneratedSceneObservation,marks:{festival:boolean;fire:boolean;cart:boolean})=>void;
 type Presentation={readonly festival:{x:number;y:number}|null;readonly fire:{x:number;y:number}|null;readonly cart:{x:number;y:number}|null};
@@ -65,7 +69,7 @@ export interface PreparedSceneFlora {
 export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanvasElement,o:GeneratedSceneObservation,source:SceneFloraSource,presentation:Presentation,draw:StructureLayerDrawer):PreparedSceneFlora {
  const physics=readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),mirror=o.ground.terrain.sites[o.ground.site].render.mirrorX===true;
  const plants=planFloraScene({seed:source.seed,site:o.ground.site,patches:source.patches,views:source.views,physics,occupied:sceneOccupiedPlots(o)});
- const raster=rasterizeFlora(plants,mirror);
+ const raster=rasterizeFlora(plants,mirror,source.season);
  const s=structures.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,320,180).data;
  // Ground lines are needed only when a plant (in any pose: crowns move by at most one pixel) can cover a structure.
  let covered=false;
@@ -74,6 +78,7 @@ export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanv
  const bctx=backdrop.getContext('2d',{willReadFrequently:true})!,bimage=bctx.getImageData(0,0,320,180);
  // Ground: the biome tint (B2d), then each patch's material (B2d2), except on built ground, plazas and bridges.
  tintFloraSoil(bimage.data,source.patches,physics,mirror);paintGroundMaterials(bimage.data,source.patches,physics,mirror,sceneOccupiedPlots(o));
+ if(source.season)paintGroundSeason(bimage.data,source.patches,physics,mirror,source.season);
  toneDistant(bimage.data,o,source.patches,mirror);bctx.putImageData(bimage,0,0);
  const canvas=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;const x=c.getContext('2d')!;return {c,x,image:x.createImageData(320,180)};},behind=canvas(),front=canvas();
  const work:FloraLayer={rgba:new Uint8ClampedArray(57600*4),root:new Int16Array(57600)},sway=new Int8Array(raster.trees);let pose:string|null=null;
