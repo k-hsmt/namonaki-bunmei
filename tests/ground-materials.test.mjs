@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {Raster} from '../scripts/lib/pixel-raster.mjs';
 import {paintGround} from '../scripts/lib/plant-prototype.mjs';
-import {paintGroundMaterials,GROUND_COLORS,GROUND_BASE_SHIFT,GROUND_FLECK_STRENGTH,GROUND_EDGE_JITTER} from '../dist/flora/ground-materials-v1.js';
+import {toneDistantLand,DISTANT_HAZE,DISTANT_TONE_STRENGTH,DISTANT_GRAIN,paintGroundMaterials,GROUND_COLORS,GROUND_BASE_SHIFT,GROUND_FLECK_STRENGTH,GROUND_EDGE_JITTER} from '../dist/flora/ground-materials-v1.js';
 import {GROUND_MATERIALS,FLORA_SITES,describeFloraPatch} from '../dist/flora/local-flora-v1.js';
 import {BIOME_KINDS,generateClimateBaseline} from '../dist/climate/initial-climate-v1.js';
 import {createNewArchitectureWorld} from '../dist/story/new-world.js';
@@ -78,3 +78,22 @@ test('B2d2: ground painting uses no random source and is not read by civilisatio
  for(const file of walk('src').filter(f=>/\/(story|irrigation|terrain|architecture|engine|environment|vegetation|climate)\//.test(f)))
   assert.doesNotMatch(readFileSync(file,'utf8'),/ground-materials-v1/,file);
 });
+
+test('B2d2: distant land moves toward the near ground, hazed more the farther it is; sky and snow stay as drawn',()=>{
+ const ground=[150,130,90],sky=[0xbd,0xc9,0xbb],orig=[0x9d,0xa9,0x91];
+ // One row per layer: sky, plain, farthest ridge, nearer ridge, middle hills; a snow pixel on the farthest ridge.
+ const layers=new Uint8Array(320*96),labels=[0,1,2,3,255];for(let y=0;y<96;y++)layers.fill(labels[Math.min(4,Math.floor(y/19))],y*320,y*320+320);
+ const rgba=new Uint8ClampedArray(57600*4);for(let k=0;k<320*96;k++)rgba.set([...orig,255],k*4);
+ const keep=new Uint8Array(320*96);keep[40*320+5]=1;
+ toneDistantLand(rgba,layers,ground,sky,'sand',2,keep);
+ const at=k=>[...rgba.subarray(k*4,k*4+3)];
+ assert.deepEqual(at(0),orig,'sky untouched');assert.deepEqual(at(40*320+5),orig,'snow untouched');
+ const expected=haze=>orig.map((c,j)=>Math.round(c*(1-DISTANT_TONE_STRENGTH)+(ground[j]*(1-haze)+sky[j]*haze)*DISTANT_TONE_STRENGTH));
+ for(const [row,haze] of [[19,DISTANT_HAZE.plain],[38,DISTANT_HAZE.farthest],[57,DISTANT_HAZE.nearFar]])for(let x=0;x<320;x++)assert.deepEqual(at(row*320+x),expected(haze));
+ assert.ok(DISTANT_HAZE.plain>DISTANT_HAZE.farthest&&DISTANT_HAZE.farthest>DISTANT_HAZE.nearFar&&DISTANT_HAZE.nearFar>DISTANT_HAZE.middle,'more haze the farther it is');
+ let grains=0,hills=0;for(let y=76;y<96;y++)for(let x=0;x<320;x++){hills++;if(at(y*320+x).join()!==expected(DISTANT_HAZE.middle).join())grains++;}
+ assert.ok(grains/hills>DISTANT_GRAIN.share*.5&&grains/hills<DISTANT_GRAIN.share*1.5,'sparse grains on the middle hills only');
+ const again=new Uint8ClampedArray(57600*4);for(let k=0;k<320*96;k++)again.set([...orig,255],k*4);toneDistantLand(again,layers,ground,sky,'sand',2,keep);
+ assert.deepEqual(Buffer.from(again),Buffer.from(rgba),'deterministic');
+});
+
