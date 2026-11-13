@@ -167,6 +167,20 @@ jobs:
           name: biome47-b1b-scene-comparison
           path: artifacts/biome47-b1b/*
           if-no-files-found: warn
+      # B2e acceptance audit, quick set (3 worlds to year 1000). The full audit (10 worlds to year
+      # 10000) runs locally: node scripts/audit-issue47-b2e.mjs (see docs/issue47-b2-plan.md §3.6).
+      - name: Audit Issue 47 B2e acceptance (quick)
+        run: node scripts/audit-issue47-b2e.mjs
+        timeout-minutes: 6
+        env:
+          B2E_QUICK: '1'
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: biome47-b2e-acceptance
+          path: artifacts/biome47-b2e/*
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:
