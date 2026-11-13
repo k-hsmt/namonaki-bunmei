@@ -42,7 +42,8 @@
       "vegetation": true,
       "year": 1000,
       "site": 2,
-      "sha256": "120a127ea92521283dd481276c5baba670bc70c4b11d8d83b2e4787d97657aa1"
+      "sha256": "3ce9ae820ba40a9cbe54074542b65724b344815d5709b59d77621f0ab63abe65",
+      "note": "Issue #47 B3: fields are drawn before buildings; 8-12 pixels inside the field footprint now show the building in front."
     },
     {
       "seed": 1,
@@ -63,7 +64,8 @@
       "vegetation": false,
       "year": 300,
       "site": 2,
-      "sha256": "b37d8c8755eea17097d1178babe3ed669e9edcc5a8fe9bf16a130f3cf2bf5a77"
+      "sha256": "e29379ff2c865dbe2a3f1011ec39150fdd759581434124670b3a997c4d412c2f",
+      "note": "Issue #47 B3: fields are drawn before buildings; 8-12 pixels inside the field footprint now show the building in front."
     }
   ]
 }
