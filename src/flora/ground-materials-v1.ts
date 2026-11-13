@@ -3,7 +3,7 @@
  * (rendererId ground-materials-v1): sand, rock, bare soil, leaf litter, wet soil and cold ground.
  *
  * The B2d biome soil tint stays the ground colour. On top of it each land pixel takes, by its patch's material,
- * a shift toward the material's base colour and the material's flecks. The fleck pattern is the B1a pattern laid
+ * a shift toward the material's base colour and the material's flecks. The fleck pattern is the B1a pattern (sand: grains) laid
  * over the whole district in record coordinates (column x appears at screen 319−x in a mirrored scene), so it
  * stays put when years or plants change. Pure; appearance only, never read by history.
  */
@@ -22,7 +22,7 @@ export const GROUND_BASE_SHIFT=.2,GROUND_FLECK_STRENGTH=.55;
 export const GROUND_EDGE_JITTER=3;
 
 const rgb=(c:string)=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16)) as [number,number,number];
-/** B1a paintGround over the district (320×84 from y 96): 0 none, 1 fleck 1, 2 fleck 2. Same rules and hashes as B1a. */
+/** B1a paintGround over the district (320×84 from y 96): 0 none, 1 fleck 1, 2 fleck 2. Same rules and hashes as B1a, except sand (grains). */
 function fleckField(id:GroundMaterial):Uint8Array {
  const w=320,h=84,f=new Uint8Array(w*h),put=(x:number,y:number,len:number,v:number)=>{for(let k=0;k<len&&x+k<w;k++)f[y*w+x+k]=v;};
  for(let yy=0;yy<h;yy++)for(let xx=0;xx<w;xx++){
@@ -31,7 +31,8 @@ function fleckField(id:GroundMaterial):Uint8Array {
   else if(id==='leafLitter'){if(v<3)put(xx,yy,Math.min(2,w-xx),v?1:2);}
   else if(id==='wetSoil'){if(yy%4===1&&v<9)put(xx,yy,1,1);else if(v===0)put(xx,yy,1,2);}
   else if(id==='coldGround'){if(v<2)put(xx,yy,1,1);else if(v===2)put(xx,yy,1,2);}
-  else if(id==='sand'){if(yy%3===0&&(xx+yy)%7===0)put(xx,yy,Math.min(2,w-xx),1);else if(v===0)put(xx,yy,1,2);}
+  // Sand: single-pixel grains (Human review B2d2: the B1a 2 px dashes on every third row read as large streaks).
+  else if(id==='sand'){if(v===0)put(xx,yy,1,1);else if(v===1)put(xx,yy,1,2);}
   else if(v<2)put(xx,yy,1,v?1:2);
  }
  return f;

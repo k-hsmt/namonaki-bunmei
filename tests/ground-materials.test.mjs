@@ -15,8 +15,8 @@ const patchesOf=m=>Array.from({length:440},()=>[0,0,-1,-1,-1,GROUND_MATERIALS.in
 const grey=()=>new Uint8ClampedArray(57600*4).fill(128);
 const hex=c=>[1,3,5].map(i=>parseInt(c.slice(i,i+2),16));
 
-test('B2d2: every material uses the B1a flecks and colours, laid over the district in record coordinates',()=>{
- for(const m of GROUND_MATERIALS){
+test('B2d2: every material but sand uses the B1a flecks and colours, laid over the district in record coordinates',()=>{
+ for(const m of GROUND_MATERIALS.filter(m=>m!=='sand')){
   const ref=new Raster(320,84);paintGround(ref,m,0,0,320,84);
   const out=grey();paintGroundMaterials(out,patchesOf(m),allLand,false);
   const [base]=GROUND_COLORS[m].map(hex);
@@ -26,6 +26,19 @@ test('B2d2: every material uses the B1a flecks and colours, laid over the distri
     assert.equal(out[i+j],Math.round(v),m+' at '+x+','+y);}
   }
  }
+});
+
+test('B2d2: sand is single-pixel grains in the B1a sand colours (Human review)',()=>{
+ const out=grey();paintGroundMaterials(out,patchesOf('sand'),allLand,false);
+ const [base,a,b]=GROUND_COLORS.sand.map(hex),plain=[0,1,2].map(j=>Math.round(128*(1-GROUND_BASE_SHIFT)+base[j]*GROUND_BASE_SHIFT));
+ const grain=c=>[0,1,2].map(j=>Math.round((128*(1-GROUND_BASE_SHIFT)+base[j]*GROUND_BASE_SHIFT)*(1-GROUND_FLECK_STRENGTH)+c[j]*GROUND_FLECK_STRENGTH));
+ const at=(x,y)=>[...out.subarray((y*320+x)*4,(y*320+x)*4+3)],is=(p,q)=>p.every((v,j)=>v===q[j]);
+ let grains=0,runs=0;
+ for(let y=96;y<180;y++)for(let x=0;x<320;x++){const p=at(x,y);
+  assert.ok(is(p,plain)||is(p,grain(a))||is(p,grain(b)),'sand pixel '+x+','+y);
+  if(!is(p,plain)){grains++;if(x<319&&!is(at(x+1,y),plain))runs++;}}
+ const share=grains/(320*84);assert.ok(share>.03&&share<.1,'grain share '+share);
+ assert.ok(runs/grains<.15,'grains are single pixels, not dashes');
 });
 
 test('B2d2: only stable, unbuilt land is painted; a mirrored scene shows the same ground mirrored',()=>{
