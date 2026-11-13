@@ -57,11 +57,11 @@ test('D1a: without a season the plant layer is exactly the B2d layer',()=>{
  assert.notDeepEqual(Buffer.from(renderFloraLayer(plants,false,seasonalViewOf(2,climateOf('temperate_forest'))).rgba),Buffer.from(renderFloraLayer(plants,false).rgba));
 });
 
-test('D1a: the season prototype uses no random source, and neither civilisation code nor the live world passes a season',()=>{
+test('D2: the season uses no random source and is not read by civilisation code (only the drawing glue passes it)',()=>{
  for(const f of readdirSync('src/season'))assert.doesNotMatch(readFileSync('src/season/'+f,'utf8'),/Math\.random|Date\.now|performance\.now|new Date/,f);
  const walk=d=>readdirSync(d,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(d+'/'+e.name):[d+'/'+e.name]);
- for(const file of walk('src').filter(f=>/\/(story|irrigation|terrain|architecture|engine|environment|vegetation|climate|economy)\//.test(f)))
-  assert.doesNotMatch(readFileSync(file,'utf8'),/season\/season-|season:/,file+' must not set or read a season (D0 §10: no live integration before D2)');
+ for(const file of walk('src').filter(f=>/\/(story|irrigation|terrain|architecture|engine|environment|vegetation|climate|economy)\//.test(f)&&!f.endsWith('world-session.ts')))
+  assert.doesNotMatch(readFileSync(file,'utf8'),/season\/season-|season:/,file+' must not set or read a season (appearance only)');
 });
 
 test('D1b: snow lies deep in the dormant phase of cold worlds, a little in spring and late autumn, never in warm worlds',async()=>{
@@ -81,3 +81,20 @@ test('D1b: tree snow sits on the upward edges of the seasonal sprite and never b
   assert.ok(snow>5,'conifer tiers carry snow');
  }
 });
+
+test('D2: the live world shows the season of the observed confirmed year; saves and history do not change',async()=>{
+ const {createNewArchitectureWorld}=await import('../dist/story/new-world.js'),{advanceArchitectureWorld}=await import('../dist/architecture/production-v1.js');
+ const S=await import('../dist/story/world-session.js');
+ const world=await advanceArchitectureWorld((await createNewArchitectureWorld(18)).architecture,130,'automatic'),session=S.architectureProductionSession(world),painter=S.worldStructurePainter(session);
+ for(const year of [0,24,25,60,99,100,125,130])for(let site=0;site<3;site++){
+  const f=painter.flora(S.observeGeneratedWorldSession(session,year,site));
+  assert.deepEqual(f.season,seasonalViewOf(seasonPhaseOfYear(year),session.climate),'year '+year);
+ }
+ const save=await S.prepareWorldSessionSave(session);
+ assert.deepEqual(Object.keys(save).sort(),['climate','flora','format','schemaVersion','version','world'],'D2 adds no save field');
+ assert.equal(JSON.stringify(save).includes('season'),false,'nothing about seasons is saved');
+ // Observing every year and site leaves the world untouched.
+ const before=JSON.stringify(save);for(let y=0;y<=130;y+=13)for(let i=0;i<3;i++)painter.flora(S.observeGeneratedWorldSession(session,y,i));
+ assert.equal(JSON.stringify(await S.prepareWorldSessionSave(session)),before);
+});
+

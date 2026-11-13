@@ -35,10 +35,11 @@ test('B2d: plants cover a structure only when rooted in front of its ground line
     const o=S.observeGeneratedWorldSession(session,year,si),paint=D.withoutLandscapePlants(D.projectScenePaint(o)),mirror=o.ground.terrain.sites[o.ground.site].render.mirrorX===true;
     const frame=document.createElement('canvas');S.drawWorldSession(frame,session,year,si);
     const again=document.createElement('canvas');S.drawWorldSession(again,S.restoreWorldSession(await decodeWorldSave(json)),year,si);
-    const structures=document.createElement('canvas');D.drawGeneratedSceneReview(structures,o,'structures',paint,painter);
+    // The live structure layer (with this year's roof snow, Issue #36 D2) as prepared for the moving view.
+    const structures=M.prepareSceneMotion(o,painter).structures;
     const lines=F.structureGroundLines(o,paint.presentation,D.sceneStructureDrawer(paint,painter)),f=painter.flora(o);
     const plants=P.planFloraScene({seed:f.seed,site:o.ground.site,patches:f.patches,views:f.views,physics:R.readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),occupied:F.sceneOccupiedPlots(o)});
-    const layer=P.renderFloraLayer(plants,mirror),fr=px(frame),st=px(structures);
+    const layer=P.renderFloraLayer(plants,mirror,f.season),fr=px(frame),st=px(structures);
     let front=0,behind=0,unlined=0,wrong=0;
     for(let i=0;i<57600;i++){
      const a=i*4;if(!st[a+3])continue;if(lines[i]<0)unlined++;
@@ -47,7 +48,7 @@ test('B2d: plants cover a structure only when rooted in front of its ground line
      if(fr[a]!==src[a]||fr[a+1]!==src[a+1]||fr[a+2]!==src[a+2])wrong++;
     }
     // Moving layers without the time-dependent smoke, still and at two swaying poses, checked per structure pixel.
-    const moving=M.prepareSceneMotion(o,painter),raster=P.rasterizeFlora(plants,mirror);M.drawSceneMotion(document.createElement('canvas'),moving,0);
+    const moving=M.prepareSceneMotion(o,painter),raster=P.rasterizeFlora(plants,mirror,f.season);M.drawSceneMotion(document.createElement('canvas'),moving,0);
     const composite=seconds=>{moving.flora.at(seconds);const mv=document.createElement('canvas');mv.width=320;mv.height=180;const mc=mv.getContext('2d');
      mc.drawImage(moving.backdrop,0,0);mc.drawImage(moving.flora.behind,0,0);mc.drawImage(moving.structures,0,0);mc.drawImage(moving.flora.front,0,0);return px(mv);};
     const still=composite(undefined);let differ=0,swayWrong=0,swayed=false;
