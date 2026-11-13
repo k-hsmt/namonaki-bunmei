@@ -21,6 +21,7 @@ import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '.
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import type {GeneratedStructurePainter} from '../scene/draw-generated-review.js';
 import type {SceneFloraSource} from '../scene/flora-draw.js';
+import {seasonalViewOf,seasonPhaseOfYear} from '../season/season-presentation-v1.js';
 import {assertProductionBoundary} from './trial-boundary.js';
 import {introduceProductionIrrigation,slowProductionClimate} from '../irrigation/production-progression-v1.js';
 import {ownProductionWorld} from '../irrigation/production-history-v1.js';
@@ -108,12 +109,14 @@ export function worldFloraAt(session:WorldSession,year:number,siteIndex:number):
  return floraSiteAt({seed:session.state.seed,climate:session.climate,flora:session.flora,environment:session.review.environment!,year,site,vegetation:observation.ground.vegetation??[]});
 }
 export function worldStructurePainter(session:WorldSession):GeneratedStructurePainter|undefined{return architecture(session)?painterOf(session.architecture):undefined;}
-/** Recorded birth styles plus (Issue #47 B2d) the world's flora of each observed year and site, cached per observation. */
+/** Recorded birth styles plus the world's flora (Issue #47 B2d) and season (Issue #36 D2) of each observed year and site, cached per observation. */
 function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{
  let p=painters.get(world);if(p)return p;
  const climate=worldClimate(world),flora=worldFlora(world),seen=new WeakMap<GeneratedSceneObservation,SceneFloraSource>();
  p={...createArchitecturePainter(world.architecture.births),flora:o=>{let f=seen.get(o);if(!f){
-  f={seed:world.terrain.review.state.seed,patches:flora.sites[o.ground.site],views:floraSiteAt({seed:world.terrain.review.state.seed,climate,flora,environment:world.terrain.environment!,year:o.snapshot.year,site:o.ground.site,vegetation:o.ground.vegetation??[]})};
+  f={seed:world.terrain.review.state.seed,patches:flora.sites[o.ground.site],views:floraSiteAt({seed:world.terrain.review.state.seed,climate,flora,environment:world.terrain.environment!,year:o.snapshot.year,site:o.ground.site,vegetation:o.ground.vegetation??[]}),
+   // Issue #36 D2: the season of the observed confirmed year (appearance only; derived, never saved).
+   season:seasonalViewOf(seasonPhaseOfYear(o.snapshot.year),climate)};
   seen.set(o,f);}return f;}};
  painters.set(world,p);return p;
 }
