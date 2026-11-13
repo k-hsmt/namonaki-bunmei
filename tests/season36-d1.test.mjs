@@ -30,11 +30,11 @@ test('D1: stable visual hash and projection do not consume an RNG',()=>{
  for(const invalid of [-1,4,5.5])assert.throws(()=>appearance(input,dev,invalid));
 });
 test('D1: rapid coalescing bounds visual updates and flushes last confirmed year',()=>{
- const events=Array.from({length:81},(_,i)=>({timeMs:i*75,year:180+i}));
+ const events=Array.from({length:82},(_,i)=>({timeMs:i*75,year:180+i}));
  const sampled=coalesceRapidFrames(events,700);
  assert.ok(sampled.length<12);
- assert.equal(sampled.at(-1).year,260);
- assert.equal(sampled.at(-1).phase,0);
+ assert.equal(sampled.at(-1).year,261);
+ assert.equal(sampled.at(-1).phase,1);
  assert.equal(sampled.at(-1).reason,'stop');
  assert.equal(events[0].year,180);
  for(const [i,frame]of sampled.entries())if(i>0&&frame.reason==='sample'){
