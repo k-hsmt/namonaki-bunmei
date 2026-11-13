@@ -4,7 +4,7 @@
  * Appearance only. The live game passes no season, so nothing here runs there yet (D0 §10: no default-world
  * integration before D2). The D1a gallery forces each of the 4 phases on real scenes for review.
  * Phase = floor(confirmed year / SEASON_PHASE_YEARS) mod 4 (0 sprouting, 1 lush, 2 declining/autumn, 3 dormant), a
- * representative-landscape abstraction (D0 §2; period on trial in D1c), never a calendar. Strengths come from the world's climate (initial-climate-v1): a large
+ * representative-landscape abstraction (D0 §2), never a calendar. Strengths come from the world's climate (initial-climate-v1): a large
  * annual range in a cool world makes a cold dormant phase; strongly seasonal rain in a warm world makes a dry one.
  * Pure functions; no random source; never read by history, economy or the civilisation RNG.
  */
@@ -35,8 +35,8 @@ const clamp01=(v:number)=>Math.max(0,Math.min(1,v));
 export const SEASON_PARAMETERS=Object.freeze({winterRange:.8,coldStart:-10,coldSpan:40,dryConcentration:35,drySpan:35,dryMoistureStart:40,dryMoistureSpan:80,hotForDry:0});
 
 /**
- * Years each phase lasts. D0 decided 1 (year mod 4); Human review of D1c (2026-11-13) found a phase change at almost
- * every auto-advance step restless and asked to TRY 25 years (a 100-year round of the four phases). Trial value.
+ * Years each phase lasts: 25, a 100-year round of the four phases (Human decision after D1c, 2026-11-13; D0 first
+ * chose 1 year, which changed the season at almost every auto-advance step).
  */
 export const SEASON_PHASE_YEARS=25;
 export function seasonPhaseOfYear(year:number):SeasonPhase {if(!Number.isSafeInteger(year)||year<0)throw Error('Invalid season year');return (Math.floor(year/SEASON_PHASE_YEARS)%4) as SeasonPhase;}
