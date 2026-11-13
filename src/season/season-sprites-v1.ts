@@ -19,11 +19,11 @@ const isLeaf=(d:Uint8ClampedArray,i:number)=>d[i+3]!==0&&d[i+1]!>=d[i]!-2&&d[i+1
 
 /** `salt` varies autumn hues between plants (a fixed hash of the plant, not a random number). */
 export function seasonSprite(s:PlantSprite,id:PlantArchetype,look:PlantSeasonLook,salt:number):PlantSprite {
- if(look.leaves>=1&&!look.tint)return s;
+ if(look.leaves>=1&&!look.tint&&!look.snow)return s;
  const d=new Uint8ClampedArray(s.data),W=s.width,H=s.height;
  let sum=0,n=0,minX=W,maxX=-1,minY=H,maxY=-1;
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(!isLeaf(d,i))continue;sum+=lum(d[i]!,d[i+1]!,d[i+2]!);n++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}
- if(!n)return s;
+ if(!n&&!look.snow)return s;
  const mean=sum/n,leafMask=new Uint8Array(W*H);
  for(let k=0;k<W*H;k++)leafMask[k]=+isLeaf(d,k*4);
  // Recolour, keeping each pixel's shading relative to the sprite's mean leaf brightness.
@@ -39,8 +39,17 @@ export function seasonSprite(s:PlantSprite,id:PlantArchetype,look:PlantSeasonLoo
   for(let k=0;k<W*H;k++)if(leafMask[k]&&vh(salt+17,k)%100>=look.leaves*100)d[k*4+3]=0;
   if(look.leaves<.5&&BRANCHED.includes(id))drawBranches(d,W,H,s.originX,{minX,maxX,minY,maxY},leafMask,W===72?2:1,salt);
  }
+ // Snow (D1b): on the upward-facing edge of the plant as it now looks (leaves or bare branches), never below the
+ // trunk base. Thicker on wide sprites (painter A is drawn smaller). A fixed per-pixel hash thins light snow.
+ if(look.snow){
+  const weight=W===72?2:1,base=s.originY-2,top=new Uint8Array(W*H);
+  for(let y=0;y<base;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4;if(d[i+3]===0)continue;if(y===0||d[i-W*4+3]===0)top[y*W+x]=1;}
+  for(let k=0;k<W*H;k++){if(!top[k]||vh(salt+31,k)%100>=look.snow*100)continue;
+   for(let t=0;t<weight+(look.snow>.6?1:0);t++){const y=Math.floor(k/W)+t,i=(y*W+k%W)*4;if(y>=base||d[i+3]===0)break;const c=(k+t)%5===0?SNOW_SHADE:SNOW;d[i]=c[0];d[i+1]=c[1];d[i+2]=c[2];}}
+ }
  return Object.freeze({...s,data:d});
 }
+const SNOW=rgb('#e9ede5'),SNOW_SHADE=rgb('#d3dad2');
 
 function drawBranches(d:Uint8ClampedArray,W:number,H:number,ox:number,box:{minX:number;maxX:number;minY:number;maxY:number},leaf:Uint8Array,weight:number,salt:number){
  const put=(x:number,y:number)=>{for(let a=0;a<weight;a++)for(let b=0;b<weight;b++){const X=x+a,Y=y+b;if(X<0||Y<0||X>=W||Y>=H)continue;const i=(Y*W+X)*4;

@@ -20,6 +20,15 @@ export interface SeasonalView {
  readonly cold:number;
  /** 0..1: how dry the dry phase is (warm worlds with concentrated rain). */
  readonly dry:number;
+ /** 0..1: snow cover of this phase (D1b): deep in the dormant phase of cold worlds, a little early and late snow. */
+ readonly snow:number;
+}
+/** Snow cover by phase from the cold strength (D1b parameters, to be calibrated by review). */
+export const SNOW_PARAMETERS=Object.freeze({winterStart:.3,winterSpan:.5,lateStart:.8,lateSpan:.2,lateShare:.45,earlyStart:.9,earlySpan:.1,earlyShare:.2});
+export function snowCoverOf(phase:SeasonPhase,cold:number):number {
+ const p=SNOW_PARAMETERS;
+ const v=phase===3?clamp01((cold-p.winterStart)/p.winterSpan):phase===0?clamp01((cold-p.lateStart)/p.lateSpan)*p.lateShare:phase===2?clamp01((cold-p.earlyStart)/p.earlySpan)*p.earlyShare:0;
+ return Math.round(v*100)/100;
 }
 const clamp01=(v:number)=>Math.max(0,Math.min(1,v));
 /** D1a parameters (to be calibrated by review). */
@@ -31,7 +40,8 @@ export function seasonalViewOf(phase:SeasonPhase,climate:WorldClimateBaseline):S
  const cold=clamp01((p.coldStart-winter)/p.coldSpan);
  // A dry season matters where it is not cold: warm worlds whose rain falls in a few months.
  const dry=clamp01((climate.rainfallConcentrationIndex-p.dryConcentration)/p.drySpan)*clamp01((p.dryMoistureStart-climate.effectiveMoisture)/p.dryMoistureSpan+.3)*(1-cold);
- return Object.freeze({ruleId:SEASON_RULE_ID,phase,cold:Math.round(cold*100)/100,dry:Math.round(dry*100)/100});
+ const c=Math.round(cold*100)/100;
+ return Object.freeze({ruleId:SEASON_RULE_ID,phase,cold:c,dry:Math.round(dry*100)/100,snow:snowCoverOf(phase,c)});
 }
 
 /** What a plant form shows in a season. */
@@ -40,11 +50,16 @@ export interface PlantSeasonLook {
  readonly leaves:number;
  /** Leaf recolouring: target colour and strength 0..1. `autumn` picks warm colours per plant. */
  readonly tint:{readonly color:'fresh'|'deep'|'autumn'|'straw'|'dull'|'rust';readonly strength:number}|null;
+ /** 0..1: snow on the plant's upward-facing edges (D1b). */
+ readonly snow?:number;
 }
 const DECIDUOUS:readonly PlantArchetype[]=['deciduous','riparian'];
 const STILL:PlantSeasonLook=Object.freeze({leaves:1,tint:null});
 /** The look of one plant form in a season (D1a table; see docs/issue36-d1a-season-gallery.md). */
 export function plantSeasonLook(id:PlantArchetype,v:SeasonalView):PlantSeasonLook {
+ const base=plantLeafLook(id,v);return v.snow>0?Object.freeze({...base,snow:v.snow}):base;
+}
+function plantLeafLook(id:PlantArchetype,v:SeasonalView):PlantSeasonLook {
  const {phase,cold,dry}=v,look=(leaves:number,color:NonNullable<PlantSeasonLook['tint']>['color']|null,strength:number):PlantSeasonLook=>
   Object.freeze({leaves:Math.round(clamp01(leaves)*100)/100,tint:color&&strength>.02?Object.freeze({color,strength:Math.round(clamp01(strength)*100)/100}):null});
  const stress=Math.max(cold,dry);

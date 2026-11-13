@@ -62,3 +62,21 @@ test('D1a: the season prototype uses no random source, and neither civilisation 
  for(const file of walk('src').filter(f=>/\/(story|irrigation|terrain|architecture|engine|environment|vegetation|climate|economy)\//.test(f)))
   assert.doesNotMatch(readFileSync(file,'utf8'),/season\/season-|season:/,file+' must not set or read a season (D0 §10: no live integration before D2)');
 });
+
+test('D1b: snow lies deep in the dormant phase of cold worlds, a little in spring and late autumn, never in warm worlds',async()=>{
+ const {snowCoverOf}=await import('../dist/season/season-presentation-v1.js');
+ for(const b of ['tropical_rainforest','grassland','desert'])for(const p of [0,1,2,3])assert.equal(seasonalViewOf(p,climateOf(b)).snow,0,b);
+ const boreal=[0,1,2,3].map(p=>seasonalViewOf(p,climateOf('boreal_forest')).snow);
+ assert.equal(boreal[1],0);assert.ok(boreal[3]>=.99);assert.ok(boreal[0]>0&&boreal[0]<boreal[3]);assert.ok(boreal[2]<=boreal[0]);
+ assert.ok(seasonalViewOf(3,climateOf('temperate_forest')).snow>.5);
+ for(const c of [0,.3,.5,.8,1])for(const p of [0,1,2,3]){const s=snowCoverOf(p,c);assert.ok(s>=0&&s<=1);}
+});
+
+test('D1b: tree snow sits on the upward edges of the seasonal sprite and never below the trunk base',()=>{
+ const v=seasonalViewOf(3,climateOf('boreal_forest'));
+ for(const s of [restrainedSprite('conifer','mature',0),expressiveSprite('conifer','mature')]){
+  const snowy=seasonSprite(s,'conifer',plantSeasonLook('conifer',v),5),W=s.width;let snow=0;
+  for(let y=0;y<s.height;y++)for(let x=0;x<W;x++){const i=(y*W+x)*4,d=snowy.data;if(d[i]===0xe9&&d[i+1]===0xed&&d[i+2]===0xe5||d[i]===0xd3&&d[i+1]===0xda&&d[i+2]===0xd2){snow++;assert.ok(y<s.originY-2);assert.ok(s.data[i+3]!==0,'snow only on the plant itself');}}
+  assert.ok(snow>5,'conifer tiers carry snow');
+ }
+});

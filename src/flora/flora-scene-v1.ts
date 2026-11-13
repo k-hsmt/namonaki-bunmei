@@ -110,7 +110,7 @@ export interface FloraRaster {readonly items:readonly RasterItem[];readonly tree
 const seasonal=new Map<string,PlantSprite>();
 function seasonalSpriteOf(p:ScenePlant,v:SeasonalView):PlantSprite {
  const look=plantSeasonLook(p.id,v),salt=terrainHash(['season-plant',p.x,p.y])%997;
- const key=p.painter+'/'+p.id+'/'+p.stage+'/'+(p.painter==='restrained'?p.variant:0)+'/'+JSON.stringify(look)+'/'+(look.tint?.color==='autumn'||look.leaves<1?salt:0);
+ const key=p.painter+'/'+p.id+'/'+p.stage+'/'+(p.painter==='restrained'?p.variant:0)+'/'+JSON.stringify(look)+'/'+(look.tint?.color==='autumn'||look.leaves<1||look.snow?salt:0);
  let s=seasonal.get(key);if(!s){s=seasonSprite(spriteOf(p),p.id,look,salt);seasonal.set(key,s);}return s;
 }
 export function rasterizeFlora(plants:readonly ScenePlant[],mirror:boolean,season?:SeasonalView):FloraRaster {
