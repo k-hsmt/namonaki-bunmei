@@ -46,7 +46,8 @@
     {
       "year": 1000,
       "site": 2,
-      "sha256": "fffb83dd4c180c98466879c6ffd95775931d6857a338e89a7fd364fbe0f3867d"
+      "sha256": "a7517221767fa7eacba85ca2d2e92ff285803aa7784c692ef0e76417da673229",
+      "note": "Issue #47 B3: fields are drawn before buildings; pixels inside the field footprint now show the building in front."
     }
   ]
 }

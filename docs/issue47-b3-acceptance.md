@@ -76,7 +76,10 @@ B2eの監査（`node scripts/audit-issue47-b2e.mjs`）の結果。根拠の詳�
 **畑の描画順の修正**：畑は平らな地面だが、建物の層の中で家や施設と同じリストの順に描かれていた。手前の家（例：接地線y=135）より後に奥の畑（y=118）が描かれると、家の上部が畑に塗られる。#47以前（B0のマージ前）のコミットでも同じ7件が起きるため、#47で生じた問題ではない。
 
 - 修正：畑を、屋根・人・公共建築・その他の建物より先に描く（`src/scene/structure-order.ts`）。畑は自分の敷地の中しか塗らないので、先に描いても隠すべきものを隠さない。植物の前後判定（接地線の図）とB1bの比較スクリプトも同じ順にした。
-- 影響：画素が変わるのは、畑と手前の建物が重なる所だけ。旧形式の世界の静止画の照合（`tests/fixtures/scene-motion-static-reference-v1.json`）では9件中2件が変わり、変わった画素（8px・12px）はすべて畑の敷地の中だった。この2件の値を更新した。保存・歴史は変わらない。
+- 影響：画素が変わるのは、畑と手前の建物が重なる所だけ。旧形式の世界の画素基準のうち次の値を更新した。いずれも修正前のコードでは基準どおりで、変わった画素（4〜12px）はすべて畑の敷地の中だった。保存・歴史は変わらない。
+  - `tests/fixtures/scene-motion-static-reference-v1.json`：9件中2件
+  - `tests/fixtures/environment-v3-static-reference.json`・`environment-v4-static-reference.json`：各1件
+  - `tests/fixtures/terrain-trial-preproduction-rgba.json`：6件（seed 42、99・401・599年）
 - テスト：`tests/browser/structure-order.test.mjs`（畑と手前の建物が重なる画素に、静止画でも動きのある表示でも畑が出ない）。修正前のコードでは失敗、修正後は合格することを確認した。
 
 ## 7. #47で扱わないこと・残課題
