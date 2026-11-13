@@ -24,13 +24,14 @@ import {architectureProductionSession,advanceWorldSessionAsync,chooseWorldSessio
 import {encodeWorldSave} from '../dist/story/world-storage.js';
 import {lastObservedYear} from '../dist/story/engine.js';
 
-const out='artifacts/season36-d1c',YEARS_NEEDED=Number(process.env.SEASON_D1C_YEARS??120),SECONDS=Number(process.env.SEASON_D1C_SECONDS??8);
+const out='artifacts/season36-d1c',YEARS_NEEDED=Number(process.env.SEASON_D1C_YEARS??220),SECONDS=Number(process.env.SEASON_D1C_SECONDS??16);
 await rm(out,{recursive:true,force:true});await mkdir(out+'/video',{recursive:true});
 const firstSeed=b=>{for(let s=1;s<20000;s++){const c=generateClimateBaseline(s);if(c.dominantBiome===b&&!c.transition)return s;}};
 const SPEEDS={slow:2100,normal:850,fast:250,rapid:75};
+// Human review (D1c): transitions at every speed; fast and rapid redraw every 1400 ms with a blend. Each with its reference.
 const POLICIES=[
- ...['slow','normal'].flatMap(speed=>[0,150,250,350].map(t=>({speed,mode:'blend',ms:0,blend:t,label:t?`遷移${t}ms`:'遷移なし'}))),
- ...['fast','rapid'].flatMap(speed=>[[0,0],[700,0],[1400,0],[700,250],[1400,350]].map(([ms,blend])=>({speed,mode:'throttle',ms,blend,label:(ms?`${ms}msごとに更新`:'毎回描き直す（現状）')+(blend?`＋遷移${blend}ms`:'')}))),
+ ...['slow','normal'].flatMap(speed=>[0,250].map(t=>({speed,mode:'blend',ms:0,blend:t,label:t?`遷移${t}ms`:'遷移なし'}))),
+ ...['fast','rapid'].flatMap(speed=>[[0,0],[1400,350]].map(([ms,blend])=>({speed,mode:'throttle',ms,blend,label:(ms?`${ms}msごとに更新`:'毎回描き直す（現状）')+(blend?`＋遷移${blend}ms`:'')}))),
 ];
 const worlds=[];
 for(const biome of ['temperate_forest','boreal_forest']){
@@ -52,11 +53,11 @@ try{
   await prep.route('**/__d1c__',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><title>d1c</title>'}));
   await prep.goto(`http://127.0.0.1:${PORT}/__d1c__`);
   const frames=await prep.evaluate(async({json,years})=>{
-   const {decodeWorldSave}=await import('/story/world-storage.js'),S=await import('/story/world-session.js'),D=await import('/scene/draw-generated-review.js'),V=await import('/season/season-presentation-v1.js');
+   const {decodeWorldSave}=await import('/story/world-storage.js'),S=await import('/story/world-session.js'),D=await import('/scene/draw-generated-review.js'),V=await import('/season/season-presentation-v1.js'),ph=V.seasonPhaseOfYear;
    const session=S.restoreWorldSession(await decodeWorldSave(json)),painter=S.worldStructurePainter(session),out=[],times=[];
    const draw=(y,phase)=>{const o=S.observeGeneratedWorldSession(session,y,0),c=document.createElement('canvas');D.drawGeneratedSceneReview(c,o,undefined,undefined,{...painter,flora:x=>({...painter.flora(x),season:V.seasonalViewOf(phase,session.climate)})});return c.toDataURL('image/png');};
-   for(let k=0;k<years.length;k++){const y=years[k],t=performance.now(),own=draw(y,y%4);times.push(performance.now()-t);const phases=[0,1,2,3].map(p=>p===y%4?own:draw(y,p));out.push({year:y,phases});}
-   return {frames:out,prepareMs:times};
+   for(let k=0;k<years.length;k++){const y=years[k],t=performance.now(),own=draw(y,ph(y));times.push(performance.now()-t);const phases=[0,1,2,3].map(p=>p===ph(y)?own:draw(y,p));out.push({year:y,phases});}
+   return {frames:out.map(f=>({...f,phase:ph(f.year)})),prepareMs:times};
   },{json:w.json,years:w.years});
   await prep.close();
   for(const p of POLICIES){
@@ -66,12 +67,12 @@ try{
    await page.goto(`http://127.0.0.1:${PORT}/__d1c__`);
    const metrics=await page.evaluate(async({frames,interval,policy,seconds,title})=>{
     const load=src=>new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.src=src;});
-    const ph=await Promise.all(frames.map(f=>Promise.all(f.phases.map(load)))),own=ph.map((p,k)=>p[frames[k].year%4]);
+    const ph=await Promise.all(frames.map(f=>Promise.all(f.phases.map(load)))),own=ph.map((p,k)=>p[frames[k].phase]);
     const c=document.getElementById('c'),g=c.getContext('2d'),label=document.getElementById('label');g.imageSmoothingEnabled=false;
     const probe=document.createElement('canvas');probe.width=80;probe.height=45;const pg=probe.getContext('2d',{willReadFrequently:true});
     const lum=()=>{pg.drawImage(c,0,0,80,45);const d=pg.getImageData(0,0,80,45).data,l=new Float32Array(3600);for(let i=0;i<3600;i++)l[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];return l;};
     let last=null,changes=0,flash=0,maxFlash=0;const sample=()=>{const l=lum();if(last){let s=0;for(let i=0;i<l.length;i++)s+=Math.abs(l[i]-last[i]);s/=l.length;if(s>.5){changes++;flash+=s;maxFlash=Math.max(maxFlash,s);}}last=l;};
-    const show=(k,img)=>{g.globalAlpha=1;g.drawImage(img,0,0);label.textContent=`${title}｜${frames[k].year}年（位相${frames[k].year%4}）`;};
+    const show=(k,img)=>{g.globalAlpha=1;g.drawImage(img,0,0);label.textContent=`${title}｜${frames[k].year}年（位相${frames[k].phase}）`;};
     show(0,own[0]);sample();
     const t0=performance.now();let confirmed=0,shown=0,lastDraw=t0,blend=null;
     await new Promise(done=>{const tick=now=>{
@@ -79,9 +80,9 @@ try{
      if(due>confirmed)confirmed=due;
      // A new scene is shown when a step is due (blend: every confirmed year; throttle: at most every policy.ms).
      const ready=confirmed>shown&&(policy.mode==='blend'||now-lastDraw>=policy.ms);
-     if(ready){const from=frames[shown].year%4;shown=confirmed;lastDraw=now;
+     if(ready){const from=frames[shown].phase;shown=confirmed;lastDraw=now;
       // Blend from the NEW year drawn in the previously shown phase to the new year in its own phase.
-      if(policy.blend&&from!==frames[shown].year%4){blend={k:shown,from,start:now};show(shown,ph[shown][from]);}else{blend=null;show(shown,own[shown]);}}
+      if(policy.blend&&from!==frames[shown].phase){blend={k:shown,from,start:now};show(shown,ph[shown][from]);}else{blend=null;show(shown,own[shown]);}}
      if(blend){const a=Math.min(1,(now-blend.start)/policy.blend);g.globalAlpha=1;g.drawImage(ph[blend.k][blend.from],0,0);g.globalAlpha=a;g.drawImage(own[blend.k],0,0);g.globalAlpha=1;if(a>=1)blend=null;}
      sample();
      if(now-t0<seconds*1000)requestAnimationFrame(tick);else{

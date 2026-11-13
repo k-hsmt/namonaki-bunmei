@@ -4,15 +4,16 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {generateClimateBaseline} from '../dist/climate/initial-climate-v1.js';
 import {PLANT_ARCHETYPES} from '../dist/flora/local-flora-v1.js';
-import {seasonPhaseOfYear,seasonalViewOf,plantSeasonLook,groundSeasonLook} from '../dist/season/season-presentation-v1.js';
+import {seasonPhaseOfYear,SEASON_PHASE_YEARS,seasonalViewOf,plantSeasonLook,groundSeasonLook} from '../dist/season/season-presentation-v1.js';
 import {seasonSprite} from '../dist/season/season-sprites-v1.js';
 import {restrainedSprite,expressiveSprite} from '../dist/flora/plant-sprites-v1.js';
 import {renderFloraLayer} from '../dist/flora/flora-scene-v1.js';
 
 const climateOf=b=>{for(let s=1;s<5000;s++){const c=generateClimateBaseline(s);if(c.dominantBiome===b&&!c.transition)return c;}};
 
-test('D1a: the phase is the confirmed year mod 4 (a representative landscape, not a calendar)',()=>{
- assert.deepEqual([0,1,2,3,4,99,100,10000].map(seasonPhaseOfYear),[0,1,2,3,0,3,0,0]);
+test('D1c trial: each phase lasts SEASON_PHASE_YEARS confirmed years and the four phases make one round (not a calendar)',()=>{
+ assert.equal(SEASON_PHASE_YEARS,25);
+ assert.deepEqual([0,24,25,49,50,75,99,100,124,125,10000].map(seasonPhaseOfYear),[0,0,1,1,2,3,3,0,0,1,0]);
  assert.throws(()=>seasonPhaseOfYear(-1));assert.throws(()=>seasonPhaseOfYear(1.5));
 });
 
