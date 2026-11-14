@@ -7,9 +7,11 @@
  * abandoned, years since it became a ruin) and a world climate, and compares the results.
  *  - Two clocks (D0 §3): `abandonedYears` starts surface cover (fading, moss, vines, sand) and roof wear; `ruinedYears`
  *    starts the loss of walls. A building that is only vacant never loses walls here.
- *  - At ruinedYears 0 the outline is the live ruin (architecture-ruin-v1, `drawRuin`): same 3 px steps, same hashes,
- *    same weathered colours for stone. Later years lower each column towards a floor that depends on the wall material,
- *    so time alone never removes a building completely (D0 §6); the foundation always stays.
+ *  - A fresh ruin has lost its roof but its walls still stand to the eaves with a broken top (Human decision on D1a,
+ *    2026-11-14: start taller so that the years show). Within a few decades (`freshTau`) the walls settle to the live ruin
+ *    outline (architecture-ruin-v1, `drawRuin`: same 3 px steps, same hashes, same weathered colours for stone), and later
+ *    years lower each column towards a floor that depends on the wall material, so time alone never removes a building
+ *    completely (D0 §6); the foundation always stays.
  *  - Moss and vines are drawn only on pixels of the building that still exist in that year (D0 §7); vines root only at
  *    the foot of a remaining wall. Nothing is drawn where the building has no pixel, except rubble and drifted sand at
  *    its foot.
@@ -47,14 +49,15 @@ const roofClassOf:Readonly<Record<RoofMaterial,RuinRoofClass>>={thatch:'thatch',
 /**
  * D1a parameters (to be calibrated by Human review).
  *  wall: tau = years for about 63% of the remaining height above the floor to fall; floor = share of the full height
- *        that stays in the long run; posts = timber posts that stand longer.
+ *        that stays in the long run; posts = timber posts that stand longer; fresh = years for about 63% of the standing
+ *        walls of a fresh ruin to fall down to the live ruin outline.
  *  roof: wear of a roof that still stands (vacant only): the share of roof pixels that become holes in the long run.
  */
 export const RUIN_PARAMETERS=Object.freeze({
  wall:Object.freeze({
-  timber:{tau:110,floor:.04,posts:true},wattle:{tau:100,floor:.06,posts:true},earth:{tau:260,floor:.12,posts:false},
-  rubble:{tau:600,floor:.18,posts:false},ashlar:{tau:1200,floor:.24,posts:false},mixed:{tau:150,floor:.18,posts:false},modern:{tau:300,floor:.12,posts:false},
- } as Readonly<Record<RuinWallClass,{readonly tau:number;readonly floor:number;readonly posts:boolean}>>),
+  timber:{tau:110,floor:.04,posts:true,fresh:15},wattle:{tau:100,floor:.06,posts:true,fresh:12},earth:{tau:260,floor:.12,posts:false,fresh:25},
+  rubble:{tau:600,floor:.18,posts:false,fresh:40},ashlar:{tau:1200,floor:.24,posts:false,fresh:60},mixed:{tau:150,floor:.18,posts:false,fresh:25},modern:{tau:300,floor:.12,posts:false,fresh:40},
+ } as Readonly<Record<RuinWallClass,{readonly tau:number;readonly floor:number;readonly posts:boolean;readonly fresh:number}>>),
  roof:Object.freeze({thatch:{tau:40,max:.4},shingle:{tau:60,max:.28},fired:{tau:120,max:.14},earth:{tau:80,max:.22},modern:{tau:150,max:.1}} as Readonly<Record<RuinRoofClass,{readonly tau:number;readonly max:number}>>),
  /** Fading of a vacant building (a ruin is fully weathered as in architecture-ruin-v1). */
  fadeTau:50,fadeMax:.55,
@@ -85,8 +88,12 @@ export interface RuinAppearance {
  readonly roofWear:number;
  /** Years for the walls of this material in this climate (see RUIN_PARAMETERS.wall). */
  readonly wallTau:number;
- /** 0..1 progress of wall loss since the building became a ruin (0 = the live ruin outline). */
+ /** 0..1 progress of wall loss since the building became a ruin, below the live ruin outline. */
  readonly wallLoss:number;
+ /** Years for the standing walls of a fresh ruin to settle to the live ruin outline, in this climate. */
+ readonly freshTau:number;
+ /** 0..1 share of the standing walls of a fresh ruin still above the live ruin outline (1 when it has just become a ruin). */
+ readonly freshness:number;
  /** 0..1 moss, vines, sand reached by surface cover since abandonment. */
  readonly moss:number;readonly vine:number;readonly sand:number;
  /** Growth rates of this climate (moss, vine), kept so that newly exposed faces can be aged separately. */
@@ -108,13 +115,13 @@ export function ruinAppearanceOf(spec:{readonly wall:WallMaterial;readonly roofM
  // rot in wet and warm worlds; rain washes earth away; freeze and thaw opens stone joints; dry worlds keep everything longer
  const woody=wall==='timber'||wall==='wattle'||wall==='mixed';
  const speed=woody?.6+.8*wet*(.5+.5*warm):wall==='earth'?(.5+1.2*wet)*(1+.5*frost*wet):.8+.8*frost*wet;
- const wallTau=Math.round(P.wall[wall].tau/speed);
+ const wallTau=Math.round(P.wall[wall].tau/speed),freshTau=Math.max(1,Math.round(P.wall[wall].fresh/speed));
  const roofP=P.roof[roof],mossRate=mossRateOf(climate,wall),vineRate=vineRateOf(climate);
  const vacant=clocks.abandonedYears!==null;
  return Object.freeze({ruleId:RUIN_WEATHERING_RULE_ID,wall,roof,clocks:Object.freeze({...clocks}),
   weathering:r!==null?1:vacant?r2(P.fadeMax*grow(a,P.fadeTau)):0,
   roofWear:vacant&&r===null?r2(roofP.max*(.6+.4*wet)*grow(a,roofP.tau)):0,
-  wallTau,wallLoss:r===null?0:r2(grow(r,wallTau)),
+  wallTau,wallLoss:r===null?0:r2(grow(r,wallTau)),freshTau,freshness:r===null?0:r2(Math.exp(-r/freshTau)),
   moss:r2(P.moss.max*mossRate*grow(a,P.moss.tau)),vine:r2(vineRate*grow(a,P.vine.tau)),sand:r2(climate.arid*grow(a,P.sand.tau)),
   mossRate:r2(mossRate),vineRate:r2(vineRate)});
 }
@@ -161,17 +168,24 @@ export function drawWeatheredArchitecture(g:RectTarget,key:string,draw:(t:RectTa
  const seed=fnv(key),H=(x:number,y:number,salt:number)=>mixHash(seed,x-left,y-base,salt);
  const ruined=ap.clocks.ruinedYears!==null,a=ap.clocks.abandonedYears,r=ap.clocks.ruinedYears??0,P=RUIN_PARAMETERS.wall[ap.wall];
 
- // 2. which pixels remain: the live ruin outline (3 px steps), lowered towards the material's floor
+ // 2. which pixels remain: walls standing to the eaves with a broken top, settling to the live ruin outline (3 px steps),
+ //    then lowered towards the material's floor. The roof is gone from the first year of the ruin.
  const remain=new Map<number,number>();
  if(ruined){
+  const wallTop=new Map<number,number>();
+  for(const [k,p] of px)if(p.part==='wall'||p.part==='opening'){const x=k%8192-4096,y=Math.floor(k/8192)-4096;if(y<(wallTop.get(x)??Infinity))wallTop.set(x,y);}
   const raw:number[]=[];
   for(let x=left;x<right;x++){
    const n=Math.floor(x/3),h=ruinHash(key,n);
    const start=h<25?Math.min(2,height):Math.round(height*(20+ruinHash(key+'~',n)%26)/100);
+   // the fresh ruin: up to the wall top, 0-30% broken off per 3 px step; about half of the live breaches are already open
+   const wallH=wallTop.has(x)?base-wallTop.get(x)!:0;
+   const standing=Math.round(wallH*(h<25&&ruinHash(key+'v',n)%2?.45:1-(ruinHash(key+'^',n)%31)/100));
+   const fresh=Math.max(start,standing);
    const post=P.posts&&mixHash(seed,x-left,0,11)<.16;
    const floor=Math.min(start,Math.round(height*(post?.4:P.floor)*(.6+.8*mixHash(seed,ap.wall==='timber'||ap.wall==='wattle'?x-left:n,0,12))));
    const loss=post?1-Math.exp(-r/(ap.wallTau*2.5)):ap.wallLoss;
-   raw.push(floor+(start-floor)*(1-loss));
+   raw.push(floor+(start-floor)*(1-loss)+(fresh-start)*ap.freshness);
   }
   for(let i=0;i<raw.length;i++){
    let v=raw[i]!;
@@ -183,7 +197,7 @@ export function drawWeatheredArchitecture(g:RectTarget,key:string,draw:(t:RectTa
    remain.set(left+i,Math.round(v));
   }
  }
- const kept=(x:number,y:number)=>{const p=px.get(K(x,y));if(!p)return undefined;if(!ruined||p.part==='foundation')return p;
+ const kept=(x:number,y:number)=>{const p=px.get(K(x,y));if(!p)return undefined;if(!ruined||p.part==='foundation')return p;if(p.part==='roof')return undefined;
   const h=remain.get(x);return h!==undefined&&y>=base-h?p:undefined;};
 
  // 3. the building, weathered; a standing roof wears into holes

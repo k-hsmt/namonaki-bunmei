@@ -4,8 +4,8 @@
  *
  *   npm run build && node scripts/preview-ruin-d1a.mjs  →  artifacts/ruin37-d1a/{gallery.html,report.json,*.png}
  *
- *  1. ages_<biome>:     7 wall/roof materials × 6 times (in use … 500 years) in one climate
- *  2. biomes_<years>:   7 biomes × 7 materials at 50 / 200 / 500 years after abandonment
+ *  1. ages_<biome>:     7 wall/roof materials × 7 times (in use … 500 years) in one climate
+ *  2. biomes_<years>:   7 biomes × 7 materials at 30 / 50 / 200 / 500 years after abandonment
  *  3. stage_<biome>_<years>: 320×180 stage of abandoned houses, workshops and a hall next to one building in use
  * The timeline is a development scenario: vacated at year 0, a ruin from year 30 (RUIN_AT).
  */
@@ -37,7 +37,7 @@ const MATERIALS=[
  {id:'ashlar',label:'整形石＋瓦',spec:{structure:'S05',roofFamily:'R03',roofMaterial:'tile',window:'W2',palette:'P03'}},
  {id:'mixed',label:'木石混合＋木板（C6）',spec:{structure:'S06',roofFamily:'R08',roofMaterial:'shingle',window:'W4',entrance:'E4',ornaments:['O6'],palette:'P05'}},
 ];
-const TIMES=[{id:'use',label:'使用中',a:null},{id:'a0',label:'放棄直後',a:0},{id:'a25',label:'空き家25年',a:25},{id:'a50',label:'50年（廃墟20年）',a:50},{id:'a200',label:'200年',a:200},{id:'a500',label:'500年',a:500}];
+const TIMES=[{id:'use',label:'使用中',a:null},{id:'a0',label:'放棄直後',a:0},{id:'a25',label:'空き家25年',a:25},{id:'a30',label:'30年（廃墟化直後）',a:30},{id:'a50',label:'50年（廃墟20年）',a:50},{id:'a200',label:'200年',a:200},{id:'a500',label:'500年',a:500}];
 const clocksOf=a=>a===null?{abandonedYears:null,ruinedYears:null}:{abandonedYears:a,ruinedYears:a>=RUIN_AT?a-RUIN_AT:null};
 const specOf=(m,use='house')=>normalizeSpec({use,...m.spec});
 
@@ -63,7 +63,7 @@ for(const w of worlds){
  await save('ages_'+w.biome,r);
 }
 // ---- 2. biomes × materials at 50 / 200 / 500 years ----
-for(const a of [50,200,500]){
+for(const a of [30,50,200,500]){
  const r=new Raster(CW*MATERIALS.length,CH*worlds.length);
  worlds.forEach((w,i)=>MATERIALS.forEach((m,j)=>{const cell=new Raster(CW,CH);backdrop(cell,w,GY);paint(cell,'sample:'+m.id,specOf(m),CW>>1,GY,a,w);r.blit(cell,j*CW,i*CH);}));
  await save('biomes_'+a,r);
@@ -78,7 +78,7 @@ const STAGE=[
  {key:'stage:inuse',m:'mixed',use:'house',x:294,gy:160,inUse:true},
 ];
 const PARTS=[['log',0],['earth',1],['rubble',2],['wattle',3],['plank',4],['ashlar',5],['mixed',6],['log',7],['earth',8],['rubble',9],['wattle',10],['plank',11]];
-const STAGE_TIMES=[0,50,200,500];
+const STAGE_TIMES=[0,30,50,200,500];
 for(const w of worlds)for(const a of STAGE_TIMES){
  const r=new Raster(320,180);r.rect(0,0,320,180,SKY);r.rect(0,120,320,60,w.look.ground);r.rect(0,118,320,2,w.look.ground);
  // housing parts (near size) in the live miniature drawing, abandoned at the same time
@@ -122,10 +122,10 @@ const html=`<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="vie
 <main><h1>Issue #37 D1a｜廃墟の風化・苔・蔦（独立描画）</h1>
 <p><b>PROTOTYPE。</b>開発用の時計（放棄0年目に空き家、${RUIN_AT}年目に廃墟化）と各バイオームの代表seedの気候で描いた比較。世界・保存・歴史には接続していない。地表の植物・地面の回復はD1b。</p>
 <h2>1. 建材×経過年数</h2>${worlds.map(w=>`<h3>${LABEL[w.biome]} <small>seed ${w.seed}／湿潤 ${w.climate.wet}・温暖 ${w.climate.warm}・凍結 ${w.climate.frost}・乾燥 ${w.climate.arid}</small></h3><div class="scroll">${grid(TIMES.map(t=>t.label),MATERIALS.map(m=>m.label),'ages_'+w.biome,3)}</div>`).join('')}
-<h2>2. バイオーム×建材</h2>${[50,200,500].map(a=>`<h3>放棄から${a}年</h3><div class="scroll">${grid(MATERIALS.map(m=>m.label),worlds.map(w=>LABEL[w.biome]),'biomes_'+a,3)}</div>`).join('')}
+<h2>2. バイオーム×建材</h2>${[30,50,200,500].map(a=>`<h3>放棄から${a}年</h3><div class="scroll">${grid(MATERIALS.map(m=>m.label),worlds.map(w=>LABEL[w.biome]),'biomes_'+a,3)}</div>`).join('')}
 <h2>3. 320×180の舞台（右端の家だけ使用中）</h2>${worlds.map(w=>`<h3>${LABEL[w.biome]}</h3><div class="scroll"><div class="stages">${STAGE_TIMES.map(a=>`<figure>${img(`stage_${w.biome}_${a}`,2)}<figcaption>放棄から${a}年${a>=RUIN_AT?`（廃墟${a-RUIN_AT}年）`:''}</figcaption></figure>`).join('')}</div></div>`).join('')}
 <h3>原寸</h3><div class="stages">${STAGE_TIMES.map(a=>`<figure>${img(`stage_temperate_forest_${a}`,1)}<figcaption>温帯林 ${a}年</figcaption></figure>`).join('')}</div>
-<h2>4. 本編の廃墟（上）と、この試作の廃墟化0年・被覆なし（下）</h2><p>輪郭は本編と同じ。違いは、本編が切り取っていた基礎を残すこと（D0 §6：基礎の痕跡）。</p><div class="scroll">${img('live_ruin_vs_d1a',3)}</div>
+<h2>4. 本編の廃墟（上）と、この試作の廃墟化0年・被覆なし（下）</h2><p>試作の廃墟は屋根を失い、壁が軒まで立った状態から始まり、数十年で本編の輪郭まで崩れる。基礎は残す（D0 §6：基礎の痕跡）。</p><div class="scroll">${img('live_ruin_vs_d1a',3)}</div>
 <h2>5. 気候係数と200年後の値</h2><table><tr><th>バイオーム</th><th>湿潤</th><th>温暖</th><th>凍結</th><th>乾燥</th>${MATERIALS.map(m=>`<th>${esc(m.id)} 壁τ</th>`).join('')}<th>苔(石)</th><th>蔦</th><th>砂</th></tr>
 ${worlds.map(w=>{const at=id=>appearances.find(x=>x.biome===w.biome&&x.material===id&&x.time==='a200');return `<tr><th>${LABEL[w.biome]}</th><td>${w.climate.wet}</td><td>${w.climate.warm}</td><td>${w.climate.frost}</td><td>${w.climate.arid}</td>${MATERIALS.map(m=>`<td>${at(m.id).wallTau}</td>`).join('')}<td>${at('rubble').moss}</td><td>${at('rubble').vine}</td><td>${at('rubble').sand}</td></tr>`;}).join('')}</table>
 </main></html>`;

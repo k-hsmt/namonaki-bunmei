@@ -47,15 +47,32 @@ test('D1a: a building in use is drawn exactly as before',()=>{
  }
 });
 
-test('D1a: at ruinedYears 0 without cover the outline is the live ruin plus the kept foundation; stone keeps the live colours too',()=>{
+/** Pixels whose final (last painted) part is `part` in the plain drawing. */
+const partPixels=(s,part)=>{const owner=new Map();let cur;drawArchitecture({rect(x,y,w,h){for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)owner.set(xx+','+yy,cur);},part(p){cur=p;}},s,40,60);
+ return new Set([...owner].filter(([,p])=>p===part).map(([k])=>k));};
+
+test('D1a: a fresh ruin has lost its roof but stands taller than the live ruin, keeping every live wall pixel',()=>{
+ for(const id of Object.keys(SPECS)){
+  const s=spec(id),live=pixels(g=>drawRuin(g,'k:'+id,t=>drawArchitecture(t,s,40,60)));
+  const fresh=weathered(id,{abandonedYears:0,ruinedYears:0}),roof=partPixels(s,'roof'),foundation=partPixels(s,'foundation');
+  const ap=ruinAppearanceOf(s,{abandonedYears:0,ruinedYears:0},NONE);assert.equal(ap.freshness,1);
+  for(const k of fresh.keys())assert.ok(!roof.has(k)||foundation.has(k)||Number(k.split(',')[1])>=58,id+' roof pixel in a ruin '+k);
+  const rubbleRows=k=>(id==='earth'||id==='wattle')&&Number(k.split(',')[1])>=58;
+  for(const k of live.keys())if(!roof.has(k)&&!rubbleRows(k))assert.ok(fresh.has(k),id+' fresh ruin lost a live pixel '+k);
+  assert.ok(fresh.size>live.size,id+' fresh ruin is not taller');
+ }
+});
+
+test('D1a: once settled (freshness 0, no further loss) the outline is the live ruin plus the kept foundation; stone keeps the live colours too',()=>{
  for(const id of ['rubble','ashlar','log','mixed','earth']){
   const s=spec(id),live=pixels(g=>drawRuin(g,'k:'+id,t=>drawArchitecture(t,s,40,60)));
-  const proto=weathered(id,{abandonedYears:0,ruinedYears:0});
-  const foundation=new Set();let cur;drawArchitecture({rect(x,y,w,h){if(cur==='foundation')for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)foundation.add(xx+','+yy);},part(p){cur=p;}},s,40,60);
+  const ap={...ruinAppearanceOf(s,{abandonedYears:0,ruinedYears:0},NONE),freshness:0};
+  const proto=pixels(g=>drawWeatheredArchitecture(g,'k:'+id,t=>drawArchitecture(t,s,40,60),ap,look));
+  const foundation=partPixels(s,'foundation'),roof=partPixels(s,'roof');
   const stone=id==='rubble'||id==='ashlar';
-  // earth and wattle slump into a low mound instead of the live stone rubble (the two bottom rows)
+  // earth slumps into a low mound instead of the live stone rubble (the two bottom rows); a ruin keeps no roof pixels
   const rubbleRows=k=>id==='earth'&&Number(k.split(',')[1])>=58;
-  for(const [k,c] of live)if(!foundation.has(k)&&!rubbleRows(k)){assert.ok(proto.has(k),id+' missing '+k);if(stone)assert.equal(proto.get(k),c,id+' '+k);}
+  for(const [k,c] of live)if(!foundation.has(k)&&!rubbleRows(k)&&!roof.has(k)){assert.ok(proto.has(k),id+' missing '+k);if(stone)assert.equal(proto.get(k),c,id+' '+k);}
   for(const k of proto.keys())if(!live.has(k))assert.ok(foundation.has(k),id+' extra pixel outside the foundation '+k);
  }
 });
@@ -67,7 +84,7 @@ test('D1a: walls only fall after the ruin, never come back, and time alone never
   const standing=pixels(g=>drawArchitecture(g,spec(id),40,60)).size;
   assert.equal(weathered(id,{abandonedYears:300,ruinedYears:null},{...climate,arid:0}).size>=standing,true,id);
   let last=Infinity;
-  for(const r of [0,10,50,100,200,500,1000,3000,10000]){
+  for(const r of [0,5,10,20,50,100,200,500,1000,3000,10000]){
    const m=weathered(id,{abandonedYears:r+30,ruinedYears:r},{...NONE,frost:climate.frost,wet:climate.wet,warm:climate.warm});
    const n=above(m,60);assert.ok(n<=last,`${id} r=${r}: ${n}>${last}`);last=n;
    assert.ok(m.size>0,id+' vanished at '+r);
