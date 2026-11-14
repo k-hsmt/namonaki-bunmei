@@ -105,10 +105,32 @@ export function trialBackdrop(biome){
  r.rect(92,138,2,2,'#d4bd96');r.rect(92,140,2,4,'#6b6758');r.rect(92,144,1,3,'#494c47');
  return r;
 }
+/** Existing ruin profile plus material-dependent standing fragments selected from the
+ * SAME genuine birth geometry. These are only an illustrative damage shape;
+ * no physical wall persists/vanishes in game state as a result of this trial.
+ */
+function survivingColumns(ruin,source,materialId,years){
+ const survival={timber:[.29,.18],earth:[.58,.38],stone:[.86,.64],mixed:[.71,.51]}[materialId];
+ const height={timber:[10,7],earth:[16,11],stone:[22,18],mixed:[19,13]}[materialId];
+ const index=years>=500?1:0;
+ for(let x=124;x<=196;x++){
+  const group=Math.floor(x/3);
+  if(trialHash('pier',materialId,group)%1000/1000>=survival[index])continue;
+  const bottom=145,top=Math.max(118,bottom-height[index]+trialHash('pier-top',materialId,group)%4);
+  for(let y=top;y<bottom;y++){
+   if(!opaque(source,x,y))continue;
+   const k=pos(x,y);
+   ruin.data.set(source.data.subarray(k,k+4),k);
+  }
+ }
+}
 function buildingOf(spec,appearance){
  const b=new Raster(WIDTH,HEIGHT),draw=g=>drawArchitecture(g,spec,160,145,{width:72,height:27});
- if(appearance.state==='ruined')drawRuin(b,'issue37-d1a-same-building',draw);
- else draw(b);
+ if(appearance.state==='ruined'){
+  const birth=new Raster(WIDTH,HEIGHT);draw(birth);
+  drawRuin(b,'issue37-d1a-same-building',draw);
+  survivingColumns(b,birth,spec.wall==='plank'?'timber':spec.wall==='earth'?'earth':spec.wall==='ashlar'?'stone':'mixed',appearance.years);
+ }else draw(b);
  return b;
 }
 function modifyColor(r,k,color){const v=rgb(color);r.data[k]=v[0];r.data[k+1]=v[1];r.data[k+2]=v[2];}
