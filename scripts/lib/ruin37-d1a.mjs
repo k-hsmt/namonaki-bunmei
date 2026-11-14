@@ -125,7 +125,7 @@ function ageBuilding(building,material,biome,app){
    building.data[k+3]=0;missing++;continue;
   }
   const original=colorAt(building.data,k);
-  const shade=(wearNoise-.5)*.13+(app.weathering*.52);
+  const shade=app.years===0?0:(wearNoise-.5)*.13+(app.weathering*.52);
   modifyColor(building,k,mix(original,material.soil,clamp(shade)));
   if(app.weathering>0)worn++;
   // Surface moss clusters, humidity-dependent, with no new plant entity or history.
