@@ -1,0 +1,50 @@
+name: Issue 37 D1a — ruin weathering comparison
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - scripts/lib/ruin37-d1a.mjs
+      - scripts/preview-ruin37-d1a.mjs
+      - tests/ruin37-d1a.test.mjs
+      - docs/issue37-d1a-review.md
+      - .github/workflows/issue37-d1a.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue37-d1a-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Install
+        run: npm ci
+      - name: Build canonical architecture
+        run: npm run build
+      - name: Validate controlled timeline and material/climate projection
+        run: node --test tests/ruin37-d1a.test.mjs
+      - name: Render 112 native-resolution comparisons
+        run: node scripts/preview-ruin37-d1a.mjs
+        env:
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ruin37-d1a-scene-comparison
+          path: artifacts/ruin37-d1a/**
+          if-no-files-found: warn
+          retention-days: 21
