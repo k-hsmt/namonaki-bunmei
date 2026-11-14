@@ -177,6 +177,16 @@ jobs:
           name: season36-d1a-comparison
           path: artifacts/season36-d1a/*
           if-no-files-found: warn
+      # Issue 37 D1a: ruin weathering, moss, vines and sand — independent drawing with development clocks (never a world or save).
+      - name: Render Issue 37 D1a ruin weathering comparison
+        run: node scripts/preview-ruin-d1a.mjs
+        timeout-minutes: 3
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ruin37-d1a-comparison
+          path: artifacts/ruin37-d1a/*
+          if-no-files-found: warn
       # Issue 36 D4 season audit, quick set (3 worlds to year 1075). The full audit (9 worlds to year 10000)
       # runs locally: node scripts/audit-issue36-d4.mjs (see docs/issue36-season-design.md §15).
       - name: Audit Issue 36 D4 seasons (quick)
