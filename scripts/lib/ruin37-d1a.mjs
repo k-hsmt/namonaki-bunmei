@@ -160,22 +160,41 @@ function ageBuilding(building,material,biome,app){
    mossPixels++;
   }
  }
- // Controlled visual root proxy only, not a persisted/confirmed vegetation root.
- // The actual rooted vine / local habitat eligibility is D1b's responsibility.
+ // Controlled *visual* vine support, anchored to surviving wall pixels.
+ // It neither creates nor saves a root. D1b must verify a real ground-root
+ // opportunity before this appearance can ever enter the main game.
  if(app.vines>.05){
-  const extent=Math.max(0,Math.round(app.vines*32));
-  const roots=[128,199];
-  for(let ri=0;ri<roots.length;ri++){
-   const root=roots[ri];
+  const extent=Math.max(0,Math.round(6+app.vines*50));
+  for(const [ri,root] of [130,163,188].entries()){
+   let x=root,misses=0;
    for(let dy=0;dy<extent;dy++){
-    const y=141-dy,x=root+(ri===0?1:-1)*Math.floor(dy/9)+(trialHash('vine',ri,Math.floor(dy/5))%3-1);
-    if(!opaque(building,x,y))continue;
-    if(trialHash('vine-leaf',material.id,x,y)%100<24&&dy>6)continue;
+    const y=141-dy;
+    const direction=(ri%2?1:-1);
+    const drift=direction*Math.floor(dy/9);
+    const target=root+drift+(trialHash('vine-curve',ri,Math.floor(dy/4))%3-1);
+    let found=null;
+    // Follow the actual wall instead of drawing unattached green strokes.
+    for(let distance=0;distance<=4&&found===null;distance++){
+     for(const side of [0,-1,1]){
+      const next=target+distance*side;
+      if(Math.abs(next-x)>5)continue;
+      if(opaque(building,next,y)){found=next;break;}
+     }
+    }
+    if(found===null){if(++misses>=3)break;continue;}
+    misses=0;x=found;
     const k=pos(x,y);
-    modifyColor(building,k,mix(colorAt(building.data,k),ri?'#477150':'#53774b',.76));
+    modifyColor(building,k,mix(colorAt(building.data,k),'#396b44',.82));
     vinePixels++;
-    if(dy%5===0&&opaque(building,x+1,y)&&trialHash('vine-side',dy)%3===0){
-     modifyColor(building,pos(x+1,y),'#67835e');vinePixels++;
+    if(dy%3===0){
+     for(const side of [-1,1]){
+      const px=x+side;
+      if(!opaque(building,px,y))continue;
+      if(trialHash('vine-leaf',material.id,ri,dy,side)%100>=68)continue;
+      const j=pos(px,y);
+      modifyColor(building,j,mix(colorAt(building.data,j),'#7d955d',.76));
+      vinePixels++;
+     }
     }
    }
   }
