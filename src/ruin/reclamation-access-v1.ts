@@ -7,7 +7,8 @@
  * over widening the existing 8×8 patch `release`:
  *  - Zones open from confirmed state changes of one owner (D0 §3): housing opens its perimeter while `vacant` and its
  *    exposed interior while `ruined`; a facility opens both when it becomes a ruin (`building-abandoned`). A repair or
- *    reuse closes the zones from that year; a new abandonment opens a new period with a new `openedYear`.
+ *    reuse closes both zones from that year (Human decision on D1b, 2026-11-14: a repaired vacant block closes its
+ *    perimeter too); a new vacancy or ruin opens a new period with a new `openedYear`.
  *  - Construction occupancy is never changed: the masks are a separate, finer view (D0 §4). Protected structure plans
  *    (the remaining walls and foundations) and a clearance around them never take roots; unknown places stay protected.
  *  - Growth on an opened zone counts from its own `openedYear` and passes 0 → grass → shrubs → young → mature (the
@@ -53,8 +54,12 @@ export type ReclamationOwner=
  {readonly kind:'facility';readonly id:string;readonly footprint:ScenePlot;readonly protectedPlans:readonly ScenePlot[];readonly changes:readonly FacilityStateChange[]};
 export interface ZonePeriod {readonly zone:ReclamationZone;readonly openedYear:number;readonly closedYear:number|null;readonly sourceKey:string}
 
-const opens=(o:ReclamationOwner,c:HousingStateChange|FacilityStateChange):Record<ReclamationZone,boolean>=>{
- if(o.kind==='housing'){const h=c as HousingStateChange;return {perimeter:h.use==='vacant','exposed-interior':h.condition==='ruined'};}
+/**
+ * Which zones a state opens. `repaired` is true for a housing state reached by a repair (ruined → not ruined) and every
+ * later state while the block stays vacant and is not ruined again: the repair work keeps the ground clear.
+ */
+const opens=(o:ReclamationOwner,c:HousingStateChange|FacilityStateChange,repaired:boolean):Record<ReclamationZone,boolean>=>{
+ if(o.kind==='housing'){const h=c as HousingStateChange;return {perimeter:h.use==='vacant'&&!repaired,'exposed-interior':h.condition==='ruined'};}
  const f=c as FacilityStateChange;return {perimeter:f.condition==='ruined','exposed-interior':f.condition==='ruined'};
 };
 /**
@@ -69,10 +74,15 @@ export function reclamationPeriods(o:ReclamationOwner):readonly ZonePeriod[] {
   if(o.kind==='housing'){const h=x as HousingStateChange;if(!['occupied','underused','vacant'].includes(h.use)||!['sound','damaged','ruined'].includes(h.condition)||h.condition==='ruined'&&h.use!=='vacant')throw Error('Invalid housing state');}
   else if(!['intact','damaged','ruined'].includes((x as FacilityStateChange).condition))throw Error('Invalid facility state');
  }
- if(Object.values(opens(o,c[0]!)).some(Boolean))throw Error('A building cannot start abandoned');
+ if(Object.values(opens(o,c[0]!,false)).some(Boolean))throw Error('A building cannot start abandoned');
  const out:ZonePeriod[]=[],open:Partial<Record<ReclamationZone,{year:number;key:string}>>={};
+ let repaired=false,prev:HousingStateChange|FacilityStateChange|null=null;
  for(const x of c){
-  const now=opens(o,x);
+  if(o.kind==='housing'){const h=x as HousingStateChange;
+   if(prev&&(prev as HousingStateChange).condition==='ruined'&&h.condition!=='ruined')repaired=true;
+   if(h.use!=='vacant'||h.condition==='ruined')repaired=false;}
+  prev=x;
+  const now=opens(o,x,repaired);
   for(const zone of ['perimeter','exposed-interior'] as const){
    const was=open[zone];
    if(now[zone]&&!was)open[zone]={year:x.year,key:x.sourceKey};
@@ -170,10 +180,11 @@ export function facilityWallPlans(f:ScenePlot):readonly ScenePlot[] {
 }
 /**
  * Assumed ground plan of the houses of a block (D1b): each roof part stands on its drawn width plus 1 px, and this many
- * rows behind its ground line. The live model records no plan depth for a part, so the plan is generous (D0 §4: unknown
- * places stay protected). Human review decides whether it is right.
+ * rows behind its ground line. The live model records no plan depth for a part. The first D1b plan (far 3, middle 4,
+ * near 5) left only 2 px lanes between the rows; Human review (2026-11-14) chose a shallower plan so that yards and lanes
+ * between the houses can take roots. Far rows (4 px apart) still leave no lane.
  */
-export const HOUSE_PLAN_DEPTH=Object.freeze({far:3,middle:4,near:5} as const);
+export const HOUSE_PLAN_DEPTH=Object.freeze({far:1,middle:2,near:3} as const);
 const PART_WIDTH={far:5,middle:9,near:13} as const;
 export function housingPartPlans(parts:readonly {readonly x:number;readonly y:number;readonly depth:'far'|'middle'|'near'}[]):readonly ScenePlot[] {
  return Object.freeze(parts.map(p=>{const w=PART_WIDTH[p.depth],d=HOUSE_PLAN_DEPTH[p.depth];return Object.freeze({x:p.x-Math.floor(w/2)-1,y:p.y-d,width:w+2,depth:d+1});}));

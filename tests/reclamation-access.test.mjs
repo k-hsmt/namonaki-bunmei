@@ -20,16 +20,19 @@ const views=(ceiling=4)=>patches.map((_,i)=>({index:i,stage:ceiling,ceiling,age:
 const plan=(owner,year,o={})=>{const ph=o.physics??physics(),standing=o.standing??[],mask=reclamationMask(owner,ph,standing);
  return {mask,...planReclamation({seed:7,site:'river-bank',owner,year,mask,patches,views:views(o.ceiling),existing:o.existing??[],standing})};};
 
-test('D1b: zones open from confirmed changes — perimeter while vacant, interior while ruined; a repair or reuse closes them, a new vacancy reopens',()=>{
+test('D1b: zones open from confirmed changes — perimeter while vacant, interior while ruined; a repair or reuse closes both, a new vacancy reopens',()=>{
  assert.deepEqual(reclamationPeriods(block(LIFE)).map(p=>[p.zone,p.openedYear,p.closedYear,p.sourceKey]),[
-  ['perimeter',110,335,'h:110'],['exposed-interior',140,320,'h:140'],['perimeter',400,null,'h:400']]);
+  ['perimeter',110,320,'h:110'],['exposed-interior',140,320,'h:140'],['perimeter',400,null,'h:400']]);
+ // a repaired vacant block that falls into ruin again reopens both zones at the new ruin
+ assert.deepEqual(reclamationPeriods(block([H(0,'occupied','sound'),H(10,'vacant','sound'),H(20,'vacant','ruined'),H(40,'vacant','sound'),H(50,'vacant','damaged'),H(70,'vacant','ruined')])).map(p=>[p.zone,p.openedYear,p.closedYear]),[
+  ['perimeter',10,40],['exposed-interior',20,40],['exposed-interior',70,null],['perimeter',70,null]]);
  const fac={kind:'facility',id:'f',footprint:{x:100,y:146,width:18,depth:7},protectedPlans:facilityWallPlans({x:100,y:146,width:18,depth:7}),changes:[F(0,'intact'),F(50,'damaged'),F(120,'ruined'),F(420,'intact')]};
  assert.deepEqual(reclamationPeriods(fac).map(p=>[p.zone,p.openedYear,p.closedYear]),[['exposed-interior',120,420],['perimeter',120,420]]);
  // damaged alone opens nothing
  assert.deepEqual(reclamationPeriods(block([H(0,'occupied','sound'),H(10,'occupied','damaged')])),[]);
  const p=reclamationPeriods(block(LIFE));
  assert.deepEqual(openZonesAt(p,100),[]);assert.deepEqual(openZonesAt(p,110).map(x=>x.zone),['perimeter']);
- assert.deepEqual(openZonesAt(p,200).map(x=>x.zone),['perimeter','exposed-interior']);assert.deepEqual(openZonesAt(p,330).map(x=>x.zone),['perimeter']);
+ assert.deepEqual(openZonesAt(p,200).map(x=>x.zone),['perimeter','exposed-interior']);assert.deepEqual(openZonesAt(p,330),[]);
  assert.deepEqual(openZonesAt(p,350),[]);assert.deepEqual(openZonesAt(p,401).map(x=>x.openedYear),[400]);
 });
 
