@@ -1,7 +1,7 @@
 # Issue #37 D1c｜実際の世界での統合比較：風化（D1a）＋植物の回帰（D1b）（Humanレビュー用）
 
 - 設計：[issue37-ruin-reclamation-d0.md](issue37-ruin-reclamation-d0.md)（D0）、前工程：[D1a](issue37-d1a-ruin-weathering.md)・[D1b](issue37-d1b-reclamation.md)（いずれも承認済み）
-- 状態：**試作。本編・保存・歴史・植生の正本・年次エンジンには接続しない**。開発用のpainterで描いた比較で、本編の画面は変わらない。D0 §11「合否のないままD2へ移らない」に従い、Humanの判断を待つ。
+- 状態：**試作。本編・保存・歴史・植生の正本・年次エンジンには接続しない**。開発用のpainterで描いた比較で、本編の画面は変わらない。**Humanレビュー（2026-11-15）：「いいと思います」**（統合した見た目を承認）。D2へ進む時期は別途判断（D0 §11）。
 - 生成：`npm run build && node scripts/preview-ruin-d1c.mjs` → `artifacts/ruin37-d1c/`（gallery.html・report.json・画像80枚、4世界で約35秒）。CIでは1世界（seed 6）で生成し `ruin37-d1c-comparison` として保存。
 
 ## 1. 何を作ったか
