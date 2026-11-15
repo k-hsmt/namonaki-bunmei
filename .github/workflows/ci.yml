@@ -197,6 +197,18 @@ jobs:
           name: ruin37-d1b-comparison
           path: artifacts/ruin37-d1b/*
           if-no-files-found: warn
+      # Issue 37 D1c: D1a + D1b on real worlds' confirmed ruins (development painter; one world in CI, four locally).
+      - name: Render Issue 37 D1c real-world comparison
+        run: node scripts/preview-ruin-d1c.mjs
+        timeout-minutes: 8
+        env:
+          RUIN_D1C_WORLDS: '[{"seed":6}]'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ruin37-d1c-comparison
+          path: artifacts/ruin37-d1c/*
+          if-no-files-found: warn
       # Issue 36 D4 season audit, quick set (3 worlds to year 1075). The full audit (9 worlds to year 10000)
       # runs locally: node scripts/audit-issue36-d4.mjs (see docs/issue36-season-design.md §15).
       - name: Audit Issue 36 D4 seasons (quick)

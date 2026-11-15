@@ -136,8 +136,12 @@ export function planReclamation(input:{seed:number;site:RecordSite;owner:Reclama
  const zoneOf=(i:number)=>mask[i]===1?'perimeter':mask[i]===2?'exposed-interior':null;
  for(const period of open){
   const code=ZONE_CODE[period.zone],H=(...k:(string|number)[])=>terrainHash([RECLAMATION_RULE_ID,seed,site,owner.id,period.zone,period.openedYear,...k]);
-  for(let i=0;i<57600;i++)if(mask[i]===code)area++;
-  for(let cy=96;cy<180;cy+=P.cell)for(let cx=0;cx<320;cx+=P.cell){
+  // only the cells that can hold this zone: the same grid, limited to the zone's bounding box (same result, fewer hashes)
+  let x0=320,x1=-1,y0=180,y1=-1;
+  for(let i=0;i<57600;i++)if(mask[i]===code){area++;const x=i%320,y=(i-x)/320;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  if(x1<0)continue;
+  const cy0=96+Math.floor((Math.max(96,y0-P.cell)-96)/P.cell)*P.cell,cx0=Math.floor(Math.max(0,x0-P.cell)/P.cell)*P.cell;
+  for(let cy=cy0;cy<180&&cy<=y1;cy+=P.cell)for(let cx=cx0;cx<320&&cx<=x1;cx+=P.cell){
    const h=H(cx,cy),x=cx+h%(P.cell-1),y=cy+(h>>>8)%(P.cell-1);
    if(![[x,y],[x+1,y],[x,y+1],[x+1,y+1]].every(([a,b])=>a!<320&&b!<180&&zoneOf(b!*320+a!)===period.zone))continue;
    const pi=Math.floor((y-96)/8)*40+Math.floor(x/8),p=patches[pi],v=views[pi];if(!p||!v)continue;

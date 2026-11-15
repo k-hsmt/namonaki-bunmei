@@ -96,3 +96,11 @@ test('D1b: nothing in the live game imports the ruin prototypes',()=>{
  for(const f of walk('src').filter(f=>!f.startsWith(join('src','ruin'))))assert.ok(!/ruin\/(ruin-weathering|reclamation-access)/.test(readFileSync(f,'utf8')),f);
  assert.ok(!/reclamation-access/.test(readFileSync('index.html','utf8')));
 });
+
+test('D1c: only development code sets the extra plants of a scene; the live game never does',()=>{
+ const walk=d=>readdirSync(d).flatMap(f=>{const p=join(d,f);return statSync(p).isDirectory()?walk(p):[p];});
+ const users=walk('src').filter(f=>/extraPlants/.test(readFileSync(f,'utf8')));
+ assert.deepEqual(users,[join('src','scene','flora-draw.ts')]);
+ const text=readFileSync(join('src','scene','flora-draw.ts'),'utf8');
+ assert.ok(/source\.extraPlants\?\.length\?\[\.\.\.planted,\.\.\.source\.extraPlants\]:planted/.test(text),'without extra plants the planting is the live one');
+});
