@@ -5,6 +5,9 @@ import {readFile} from 'node:fs/promises';
 import {drawArchitecture,measureArchitecture} from '../dist/architecture/draw-v1.js';
 import {drawMiniature,miniatureSizes} from '../dist/architecture/miniature-v1.js';
 import {createArchitecturePainter} from '../dist/architecture/scene-v1.js';
+import {ruinContextOf} from '../dist/ruin/ruin-history-v1.js';
+/** No recorded building changes: ruins are drawn as the settled outline (their age is not guessed). */
+const NO_HISTORY=ruinContextOf({},{effectiveTemperature:0,effectiveMoisture:0,annualTemperatureRangeIndex:30},'#7d8456');
 
 const probe=()=>{const rects=[];return {rects,rect:(x,y,w,h,c)=>rects.push([x,y,w,h,c])};};
 const bounds=rects=>({x0:Math.min(...rects.map(r=>r[0])),x1:Math.max(...rects.map(r=>r[0]+r[2])),y0:Math.min(...rects.map(r=>r[1])),y1:Math.max(...rects.map(r=>r[1]+r[3]))});
@@ -44,7 +47,7 @@ test('D2-c/H1: 手前は屋根の系統の輪郭が違い、中は3つの形、�
 const birth=(ref,use,features=house)=>{const {use:_,...f}=features;return {status:'ok',ref,source:{kind:'built',year:5},use,traditionSite:'river-bank',features:{eaves:'normal',window:'W1',entrance:'E1',ornaments:[],storeys:1,wall:'wattle',...f},adjustments:[],substitutions:[]};};
 
 test('D2-c/D4-b: 描き方の差し替えは、field・記録のない建物では本番の絵に戻し、廃墟はその世代の様式の廃墟で描く',()=>{
- const painter=createArchitecturePainter([birth({kind:'facility',siteId:'river-bank',id:'f1'},'house')]);
+ const painter=createArchitecturePainter([birth({kind:'facility',siteId:'river-bank',id:'f1'},'house')],NO_HISTORY);
  const o=(id,kind,condition='intact')=>({id,kind,x:50,y:60,builtYear:5,condition});
  const plot={x:41,y:57,width:18,depth:7};
  assert.equal(painter.facility(ctx(),o('f1','house'),plot,9999),true);
@@ -64,7 +67,7 @@ test('D2-c/D4-b: 描き方の差し替えは、field・記録のない建物で�
 test('D2-c: 共同建築は敷地の幅で描き、住宅の部品は部品番号の範囲の記録で描く',()=>{
  const civic={id:'civic-river-bank-40-great-hall',kind:'hall',x:60,y:80,builtYear:40,condition:'intact',civic:{architectureStyle:'great-hall',footprint:{x:38,y:63,width:44,depth:22},constructionRecordId:'40-1'}};
  const painter=createArchitecturePainter([birth({kind:'facility',siteId:'river-bank',id:civic.id,civic:{style:'great-hall',constructionRecordId:'40-1'}},'hall'),
-  birth({kind:'housing',siteId:'river-bank',blockId:'b1',parts:{from:0,to:2}},'rowhouse',{...house,roofFamily:'R05',roofMaterial:'tile'})]);
+  birth({kind:'housing',siteId:'river-bank',blockId:'b1',parts:{from:0,to:2}},'rowhouse',{...house,roofFamily:'R05',roofMaterial:'tile'})],NO_HISTORY);
  const c=ctx();assert.equal(painter.facility(c,civic,civic.civic.footprint,9999),true);
  const xs=c.calls.filter(k=>k[0]==='fillRect').map(k=>[k[2],k[2]+k[4]]);
  assert.ok(Math.max(...xs.map(x=>x[1]))-Math.min(...xs.map(x=>x[0]))>=44);

@@ -1,6 +1,6 @@
 /**
  * Issue #37 D1c: D1a weathering and D1b reclamation together on real worlds' confirmed ruins (PROTOTYPE, development
- * painter only). Each world is generated and advanced as the game does; the painter reads the confirmed housing events
+ * painter only). Since D2 the live drawing already weathers ruins; the D1c column adds the D1b plants on top of it. Each world is generated and advanced as the game does; the painter reads the confirmed housing events
  * and building changes of the observed year and writes nothing.
  *
  *   npm run build && node scripts/preview-ruin-d1c.mjs  →  artifacts/ruin37-d1c/{gallery.html,report.json,*.png}
@@ -37,7 +37,7 @@ try{
    const {seasonalViewOf}=await import('/dist/season/season-presentation-v1.js');
    const {ruinDevPainter,ruinTimelines}=await import('/scripts/lib/ruin-d1c-painter.mjs');
    const session=S.architectureProductionSession(await advanceArchitectureWorld((await createNewArchitectureWorld(seed)).architecture,END,'automatic'));
-   const base=S.worldStructurePainter(session),dev=ruinDevPainter(session,base),off=ruinDevPainter(session,base,{weathering:false,reclamation:false});
+   const base=S.worldStructurePainter(session),dev=ruinDevPainter(session,base),off=ruinDevPainter(session,base,{reclamation:false});
    const SITES=['river-bank','hill-side','coast-inlet'],T=ruinTimelines(session.state);
    const canvas=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;return c;};
    const timings={live:[],d1c:[]};
@@ -47,7 +47,7 @@ try{
     return {o,live:live.toDataURL('image/png'),d1c:d.toDataURL('image/png')};};
    // ruins: housing ruin events and facility ruin periods (not fields), with the year they end (repair, reuse) or END
    const periods=[];
-   for(const [id,l] of T.facilities)for(let i=0;i<l.length;i++)if(l[i].condition==='ruined'&&l[i-1]?.condition!=='ruined')periods.push({kind:'facility',id,site:l[i].site,from:l[i].year,to:l.slice(i+1).find(c=>c.condition!=='ruined')?.year??END+1});
+   for(const [id,l] of T.facilities)for(let i=0;i<l.length;i++)if(l[i].condition==='ruined'&&l[i-1]?.condition!=='ruined')periods.push({kind:'facility',id,site:SITES.find(s=>id.includes(s)),from:l[i].year,to:l.slice(i+1).find(c=>c.condition!=='ruined')?.year??END+1});
    for(const e of session.state.housing?.events??[])if(e.kind==='ruined'){const l=T.housing.get(e.blockId),after=l.find(c=>c.year>e.year&&c.condition!=='ruined');
     const vac=[...l].reverse().find(c=>c.year<=e.year&&c.use==='vacant'&&!l.some(x=>x.year>c.year&&x.year<=e.year&&x.use!=='vacant'));
     periods.push({kind:'housing',id:e.blockId,site:e.after.siteId,from:e.year,vacated:vac?.year??e.year,to:after?.year??END+1});}

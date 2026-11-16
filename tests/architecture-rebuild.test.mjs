@@ -58,7 +58,9 @@ test('D4-a: 様式は「古い様式・その時の様式・混合」。古い�
 
 test('D4-a: 風景は、その年に建っていた世代の様式で描く（過去の年には前の世代）',async()=>{
  await ready;
- const births=world.architecture.births,painter=createArchitecturePainter(births);
+ // generations only: no recorded building changes, so no weathering clock changes the drawing between years (#37 D2)
+ const {ruinContextOf}=await import('../dist/ruin/ruin-history-v1.js');
+ const births=world.architecture.births,painter=createArchitecturePainter(births,ruinContextOf({},{effectiveTemperature:0,effectiveMoisture:0,annualTemperatureRangeIndex:30},'#7d8456'));
  const b=births.find(x=>x.rebuild&&x.ref.kind==='facility'&&!x.ref.civic&&JSON.stringify(x.features)!==JSON.stringify(births.find(y=>y.ref.kind==='facility'&&y.ref.id===x.ref.id&&y.source.year<x.source.year)?.features));
  assert.ok(b,'a facility rebuilt in a different style');
  const ctx=()=>{const calls=[];return {calls,set fillStyle(v){calls.push(['fill',v]);},get fillStyle(){return '';},fillRect(...a){calls.push(['rect',...a]);},save(){},restore(){},translate(){},scale(){},beginPath(){},rect(){},clip(){}};};

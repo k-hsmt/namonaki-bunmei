@@ -17,6 +17,8 @@ import type {LocalFlora} from '../flora/local-flora-v1.js';
 import {floraSiteAt,type FloraPatchView} from '../flora/flora-growth-v1.js';
 import type {WorldClimateBaseline} from '../climate/initial-climate-v1.js';
 import {createArchitecturePainter} from '../architecture/scene-v1.js';
+import {ruinContextOf} from '../ruin/ruin-history-v1.js';
+import {BIOME_SCENE} from '../flora/flora-scene-v1.js';
 import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '../architecture/layout-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import type {GeneratedStructurePainter} from '../scene/draw-generated-review.js';
@@ -108,12 +110,15 @@ export function worldFloraAt(session:WorldSession,year:number,siteIndex:number):
  const observation=observeGeneratedWorldSession(session,year,siteIndex);
  return floraSiteAt({seed:session.state.seed,climate:session.climate,flora:session.flora,environment:session.review.environment!,year,site,vegetation:observation.ground.vegetation??[]});
 }
+/** Issue #37 D2: the weathering context of an architecture world (confirmed timelines, climate, cover colours). */
+export function worldRuinContext(world:ArchitectureProductionWorld){const climate=worldClimate(world);return ruinContextOf(world.terrain.review.state,climate,BIOME_SCENE[climate.dominantBiome].soil);}
 export function worldStructurePainter(session:WorldSession):GeneratedStructurePainter|undefined{return architecture(session)?painterOf(session.architecture):undefined;}
 /** Recorded birth styles plus the world's flora (Issue #47 B2d) and season (Issue #36 D2) of each observed year and site, cached per observation. */
 function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{
  let p=painters.get(world);if(p)return p;
  const climate=worldClimate(world),flora=worldFlora(world),seen=new WeakMap<GeneratedSceneObservation,SceneFloraSource>();
- p={...createArchitecturePainter(world.architecture.births),flora:o=>{let f=seen.get(o);if(!f){
+ // Issue #37 D2: vacant and ruined buildings weather by the confirmed history and the world's climate.
+ p={...createArchitecturePainter(world.architecture.births,worldRuinContext(world)),flora:o=>{let f=seen.get(o);if(!f){
   f={seed:world.terrain.review.state.seed,patches:flora.sites[o.ground.site],views:floraSiteAt({seed:world.terrain.review.state.seed,climate,flora,environment:world.terrain.environment!,year:o.snapshot.year,site:o.ground.site,vegetation:o.ground.vegetation??[]}),
    // Issue #36 D2: the season of the observed confirmed year (appearance only; derived, never saved).
    season:seasonalViewOf(seasonPhaseOfYear(o.snapshot.year),climate)};

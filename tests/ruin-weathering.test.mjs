@@ -134,8 +134,8 @@ test('D1a: clocks are validated and drawing is deterministic without any random 
  }finally{Math.random=random;}
 });
 
-test('D1a: nothing in the live game imports the ruin prototype',()=>{
+test('D2: the live scene weathers buildings only through the architecture painter and the world session',()=>{
  const walk=d=>readdirSync(d).flatMap(f=>{const p=join(d,f);return statSync(p).isDirectory()?walk(p):[p];});
- for(const f of walk('src').filter(f=>!f.startsWith(join('src','ruin'))))assert.ok(!/ruin\/ruin-weathering/.test(readFileSync(f,'utf8')),f);
- assert.ok(!readFileSync('index.html','utf8').includes('ruin-weathering'));
+ const users=walk('src').filter(f=>!f.startsWith(join('src','ruin'))&&/ruin\/ruin-(weathering|history)-v1/.test(readFileSync(f,'utf8'))).sort();
+ assert.deepEqual(users,[join('src','architecture','scene-v1.ts'),join('src','story','world-session.ts')]);
 });

@@ -29,7 +29,8 @@ for(const w of worlds){
   const {drawGeneratedSceneReview}=await import('/dist/scene/draw-generated-review.js');
   const {createArchitecturePainter}=await import('/dist/architecture/scene-v1.js');
   const world=await P.advanceArchitectureWorld((await createNewArchitectureWorld(seed)).architecture,10000,'automatic');
-  const a=world.architecture,births=a.births,painter=createArchitecturePainter(births),history=world.terrain.review.state.history,records=new Map(history.map(h=>[h.id,h]));
+  const {worldRuinContext}=await import('/dist/story/world-session.js');
+  const a=world.architecture,births=a.births,painter=createArchitecturePainter(births,worldRuinContext(world)),history=world.terrain.review.state.history,records=new Map(history.map(h=>[h.id,h]));
   const siteIds=['river-bank','hill-side','coast-inlet'];
   const draw=(year,site,arch=true)=>{const c=document.createElement('canvas');c.width=320;c.height=180;drawGeneratedSceneReview(c,observeTerrainProductionScene(world.terrain,year,site),undefined,undefined,arch?painter:undefined);return c.toDataURL();};
   const modeOf=b=>b.adjustments.find(x=>/^rebuild:(old|current|mixed)$/.test(x))?.slice(8);

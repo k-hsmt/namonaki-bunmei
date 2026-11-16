@@ -6,8 +6,11 @@
  *  - civic halls: the D1 hall widened to the civic plot (decision 4); courtyard-hall uses the D1
  *    courtyard composition at hall height
  *  - housing parts: architecture-miniature-v1 in the live roof-part grid (decision H1)
- *  - ruined buildings (D4-b, Human decision 5 on D4): the ruin of the generation that stood there, in its
- *    own style (architecture-ruin-v1); fields and anything without a recorded birth: the live drawing
+ *  - vacant and ruined buildings (Issue #37 D2): the generation that stood there, weathered by ruin-weathering-v1 with
+ *    clocks from the world's confirmed history (ruin-history-v1): fading, roof holes, moss, vines and sand from the year
+ *    it was abandoned; a ruin first stands to the eaves, settles to the architecture-ruin-v1 outline and then lower,
+ *    never to nothing. A ruin with no recorded change is drawn as the settled outline, its age not guessed.
+ *    Fields and anything without a recorded birth: the live drawing
  *  - damaged buildings: the live damage mark over the cultural drawing
  */
 import {drawResidentialRoofs} from '../scene/draw.js';
@@ -15,6 +18,8 @@ import type {GeneratedStructurePainter} from '../scene/draw-generated-review.js'
 import {drawArchitecture,type RectTarget} from './draw-v1.js';
 import {drawMiniature} from './miniature-v1.js';
 import type {BirthFeatures} from './grammar-v1.js';
+import {ruinAppearanceOf,settledRuinAppearance,drawWeatheredArchitecture,type RuinClimate,type RuinLook} from '../ruin/ruin-weathering-v1.js';
+import {ruinClocksAt,type RuinTimelines} from '../ruin/ruin-history-v1.js';
 
 const target=(c:CanvasRenderingContext2D):RectTarget=>({rect(x,y,w,h,col){c.fillStyle=col;c.fillRect(x,y,w,h);}});
 const partSize={far:[5,4],middle:[9,7],near:[13,10]} as const;
@@ -28,6 +33,8 @@ const weather=(c:string)=>{if(!hex.test(c))return c;const v=[1,3,5].map(i=>parse
 const RUBBLE=['#6e695b','#7f7867','#5e5a4f'];
 const ruinHash=(key:string,n:number)=>{let h=2166136261;for(const ch of key+':'+n){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0)%100;};
 /**
+ * architecture-ruin-v1, the reference outline of a settled ruin (Issue #35 D4-b). Since Issue #37 D2 the live scene
+ * draws ruins with ruin-weathering-v1, which settles to this outline (same steps and hashes) and keeps the foundation.
  * Draws `draw` as a ruin: roof and upper walls are gone above a broken line (20-45% of the height
  * remains, in 3 px steps fixed per building), about a quarter of the steps have fallen almost to the
  * ground, what remains is weathered, and rubble lies along the base. Human feedback on D4-b: the first
@@ -46,7 +53,12 @@ export function drawRuin(g:RectTarget,key:string,draw:(t:RectTarget)=>void):void
  for(let xi=left-1;xi<=right;xi++){const h=ruinHash(key+'#',xi);if(h<70)g.rect(xi,base-1-(h<20?1:0),1,1+(h<20?1:0),RUBBLE[h%3]!);}
 }
 
-export function createArchitecturePainter(births:readonly BirthFeatures[]):GeneratedStructurePainter {
+/** What the painter needs to weather vacant and ruined buildings (Issue #37 D2). */
+export interface ArchitectureRuinContext {readonly timelines:RuinTimelines;readonly climate:RuinClimate;readonly look:RuinLook}
+/** Bound of the weathered-drawing cache (the scene draws each building several times: layer, ground lines, snow). */
+const WEATHER_CACHE_LIMIT=4000;
+
+export function createArchitecturePainter(births:readonly BirthFeatures[],ruins:ArchitectureRuinContext):GeneratedStructurePainter {
  // D4: a building may have several generations (rebuilds); the one shown is the latest built by the observed year
  const facilities=new Map<string,BirthFeatures[]>(),housing=new Map<string,BirthFeatures[]>();
  for(const b of births){
@@ -56,6 +68,26 @@ export function createArchitecturePainter(births:readonly BirthFeatures[]):Gener
  const latest=(list:readonly BirthFeatures[]|undefined,year:number,covers:(b:BirthFeatures)=>boolean=()=>true)=>{
   let best:BirthFeatures|undefined;for(const b of list??[])if(b.source.year<=year&&covers(b)&&(!best||b.source.year>=best.source.year))best=b;return best;};
  const housingBirth=(blockId:string,index:number,year:number)=>latest(housing.get(blockId),year,b=>b.ref.kind==='housing'&&b.ref.parts.from<=index&&index<b.ref.parts.to);
+ const cache=new Map<string,[number,number,number,number,string][]>();
+ /**
+  * Draws a building of the observed year: as it is while in use, weathered while vacant or ruined. `where` names the
+  * drawing (position, size, generation) so cached pixels are reused only for the very same building and year state.
+  */
+ const paint=(c:CanvasRenderingContext2D,key:string,kind:'housing'|'facility',year:number,condition:string,spec:BirthFeatures['features']&{use:BirthFeatures['use']},where:string,draw:(t:RectTarget)=>void)=>{
+  const clocks=ruinClocksAt(kind==='housing'?ruins.timelines.housing.get(key.slice(0,key.lastIndexOf(':'))):ruins.timelines.facilities.get(key),year,kind);
+  const ruined=condition==='ruined';
+  if(!ruined&&clocks.abandonedYears===null){draw(target(c));return;}
+  const settled=ruined&&clocks.ruinedYears===null;
+  const id=key+'|'+where+'|'+(settled?'settled':clocks.abandonedYears+'/'+(ruined?clocks.ruinedYears:'-'));
+  let rects=cache.get(id);
+  if(!rects){
+   const appearance=settled?settledRuinAppearance(spec,ruins.climate):ruinAppearanceOf(spec,{abandonedYears:clocks.abandonedYears,ruinedYears:ruined?clocks.ruinedYears:null},ruins.climate);
+   const list:[number,number,number,number,string][]=[];
+   drawWeatheredArchitecture({rect:(x,y,w,h,col)=>{list.push([x,y,w,h,col]);}},key,draw,appearance,ruins.look);
+   if(cache.size>=WEATHER_CACHE_LIMIT)cache.clear();cache.set(id,rects=list);
+  }
+  for(const [x,y,w,h,col] of rects){c.fillStyle=col;c.fillRect(x,y,w,h);}
+ };
  return {
   residentialRoofs(c,scene,depth){
    const parts=scene.residentialBlocks.flatMap(b=>b.roofParts).filter(p=>p.depth===depth)
@@ -63,8 +95,8 @@ export function createArchitecturePainter(births:readonly BirthFeatures[]):Gener
    for(const p of parts){
     const index=Number(p.partId.slice(p.partId.lastIndexOf(':')+1)),birth=Number.isSafeInteger(index)?housingBirth(p.blockId,index,scene.year):undefined;
     if(!birth){drawResidentialRoofs(c,{...scene,residentialBlocks:[{...scene.residentialBlocks[0]!,roofParts:[p]}]},depth);continue;}
-    if(p.condition==='ruined'){drawRuin(target(c),p.partId,t=>drawMiniature(t,{use:birth.use,...birth.features},p.x,p.y,depth));continue;}
-    drawMiniature(target(c),{use:birth.use,...birth.features},p.x,p.y,depth);
+    const spec={use:birth.use,...birth.features};
+    paint(c,p.partId,'housing',scene.year,p.condition,spec,`${p.x},${p.y},${depth},${birth.source.year}`,t=>drawMiniature(t,spec,p.x,p.y,depth));
     if(depth!=='far'&&p.condition==='damaged'){const [w,h]=partSize[depth];c.fillStyle='#4d504b';c.fillRect(Math.round(p.x-w/2),p.y-h+3,3,2);}
    }
   },
@@ -78,8 +110,7 @@ export function createArchitecturePainter(births:readonly BirthFeatures[]):Gener
      else drawArchitecture(t,spec,o.x,o.y,{width:plot.width});
     }else drawArchitecture(t,spec,o.x,o.y);
    };
-   if(o.condition==='ruined'){drawRuin(target(c),o.id,draw);return true;}
-   draw(target(c));
+   paint(c,o.id,'facility',year,o.condition,spec,`${o.x},${o.y},${plot.width},${birth.source.year}`,draw);
    if(o.condition==='damaged'){c.fillStyle='#454e48';c.fillRect(o.x-6,o.y-2,6,2);}
    return true;
   },
