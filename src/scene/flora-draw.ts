@@ -23,8 +23,11 @@ import type {FloraPatchView} from '../flora/flora-growth-v1.js';
 export interface SceneFloraSource {readonly seed:number;readonly patches:readonly (FloraPatch|null)[];readonly views:readonly (FloraPatchView|null)[];
  /** Issue #36 D1a: a forced season for development comparison only. The live game never sets it (D0 §3, §10). */
  readonly season?:SeasonalView;
- /** Issue #37 D1c: plants added for development comparison only (reclamation of abandoned ground). The live game never sets it. */
- readonly extraPlants?:readonly ScenePlant[]}
+ /**
+  * Issue #37 D3: the plants that take root again on abandoned ground, given the live planting of the year (which they
+  * never change). Absent, the scene shows the live planting only.
+  */
+ readonly reclaim?:(planted:readonly ScenePlant[])=>readonly ScenePlant[]}
 /** Draws one structure-only layer of a (filtered) observation; supplied by the scene drawer. */
 export type StructureLayerDrawer=(canvas:HTMLCanvasElement,o:GeneratedSceneObservation,marks:{festival:boolean;fire:boolean;cart:boolean})=>void;
 type Presentation={readonly festival:{x:number;y:number}|null;readonly fire:{x:number;y:number}|null;readonly cart:{x:number;y:number}|null};
@@ -79,7 +82,7 @@ export interface PreparedSceneFlora {
 export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanvasElement,o:GeneratedSceneObservation,source:SceneFloraSource,presentation:Presentation,draw:StructureLayerDrawer):PreparedSceneFlora {
  const physics=readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),mirror=o.ground.terrain.sites[o.ground.site].render.mirrorX===true;
  const planted=planFloraScene({seed:source.seed,site:o.ground.site,patches:source.patches,views:source.views,physics,occupied:sceneOccupiedPlots(o)});
- const plants=source.extraPlants?.length?[...planted,...source.extraPlants]:planted;
+ const reclaimed=source.reclaim?.(planted)??[],plants=reclaimed.length?[...planted,...reclaimed]:planted;
  const raster=rasterizeFlora(plants,mirror,source.season);
  const s=structures.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,320,180).data;
  // Ground lines are needed only when a plant (in any pose: crowns move by at most one pixel) can cover a structure.

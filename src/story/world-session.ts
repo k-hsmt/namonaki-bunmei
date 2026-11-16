@@ -18,6 +18,7 @@ import {floraSiteAt,type FloraPatchView} from '../flora/flora-growth-v1.js';
 import type {WorldClimateBaseline} from '../climate/initial-climate-v1.js';
 import {createArchitecturePainter} from '../architecture/scene-v1.js';
 import {ruinContextOf} from '../ruin/ruin-history-v1.js';
+import {reclaimedPlants} from '../ruin/reclamation-scene-v1.js';
 import {BIOME_SCENE} from '../flora/flora-scene-v1.js';
 import {classifyLayout,layoutLabel,layoutThresholds,type LayoutBuilding} from '../architecture/layout-v1.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
@@ -118,10 +119,14 @@ function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{
  let p=painters.get(world);if(p)return p;
  const climate=worldClimate(world),flora=worldFlora(world),seen=new WeakMap<GeneratedSceneObservation,SceneFloraSource>();
  // Issue #37 D2: vacant and ruined buildings weather by the confirmed history and the world's climate.
- p={...createArchitecturePainter(world.architecture.births,worldRuinContext(world)),flora:o=>{let f=seen.get(o);if(!f){
-  f={seed:world.terrain.review.state.seed,patches:flora.sites[o.ground.site],views:floraSiteAt({seed:world.terrain.review.state.seed,climate,flora,environment:world.terrain.environment!,year:o.snapshot.year,site:o.ground.site,vegetation:o.ground.vegetation??[]}),
+ const ruins=worldRuinContext(world);
+ p={...createArchitecturePainter(world.architecture.births,ruins),flora:o=>{let f=seen.get(o);if(!f){
+  const seed=world.terrain.review.state.seed,patches=flora.sites[o.ground.site],views=floraSiteAt({seed,climate,flora,environment:world.terrain.environment!,year:o.snapshot.year,site:o.ground.site,vegetation:o.ground.vegetation??[]});
+  f={seed,patches,views,
    // Issue #36 D2: the season of the observed confirmed year (appearance only; derived, never saved).
-   season:seasonalViewOf(seasonPhaseOfYear(o.snapshot.year),climate)};
+   season:seasonalViewOf(seasonPhaseOfYear(o.snapshot.year),climate),
+   // Issue #37 D3: plants take root again on abandoned ground (appearance only; derived, never saved).
+   reclaim:planted=>reclaimedPlants(o,{seed,patches,views},ruins.timelines,planted)};
   seen.set(o,f);}return f;}};
  painters.set(world,p);return p;
 }
