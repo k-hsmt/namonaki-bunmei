@@ -1,7 +1,7 @@
 # Issue #37 D2｜廃墟の風化を本編の建物描画に接続
 
 - 設計：[issue37-ruin-reclamation-d0.md](issue37-ruin-reclamation-d0.md)（D0 §11 D2）、前工程：[D1a](issue37-d1a-ruin-weathering.md)・[D1b](issue37-d1b-reclamation.md)・[D1c](issue37-d1c-integration.md)（いずれもHuman承認済み）
-- 状態：**本編の描画に接続**。保存形式・歴史・文明RNG・年次処理・植生は変えない。植物の回帰（D1b）の本編接続はD3。
+- 状態：**本編の描画に接続**。保存形式・歴史・文明RNG・年次処理・植生は変えない。植物の回帰（D1b）の本編接続はD3。**Humanレビュー（2026-11-16）：mainとの比較を確認し承認（「OKです」）**。
 - 停止線（D0 §11）：風化を理由にした建物の倒壊・消滅の確定イベントは追加しない。確定した状態（`condition`・`use`）と敷地・世代は変えない。
 
 ## 1. 何が変わるか（本編の見た目）
