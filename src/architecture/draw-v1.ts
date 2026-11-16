@@ -5,8 +5,13 @@
  */
 import {normalizeSpec,type ArchitectureSpec,type PartialSpec,type Use} from './vocab-v1.js';
 
-/** Any target that paints integer rectangles: a pixel raster, a canvas adapter, or a bounds probe. */
-export interface RectTarget {rect(x:number,y:number,w:number,h:number,color:string):void}
+/** Building parts announced while drawing (Issue #37 D1a): the rectangles that follow belong to that part. */
+export type ArchitecturePart='foundation'|'wall'|'roof'|'opening'|'ornament';
+/**
+ * Any target that paints integer rectangles: a pixel raster, a canvas adapter, or a bounds probe.
+ * `part`, when present, is told which part the following rectangles belong to. It never changes what is drawn.
+ */
+export interface RectTarget {rect(x:number,y:number,w:number,h:number,color:string):void;part?(part:ArchitecturePart):void}
 
 const slots={
  P01:{timber:'#7a5f4a',plaster:'#b9a787',earth:'#a8926c',stone:'#9c9684',roof:'#5d554c',straw:'#8f7f58',accent:'#4f4a40'},
@@ -65,6 +70,7 @@ export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Us
  const ov=deep?4:s.structure==='S03'&&s.roofFamily==='R05'?0:1;
 
  // 1. foundation
+ g.part?.('foundation');
  if(s.foundation==='F1')R(x0,gy-1,w,1,dark(wallColor,.3));
  if(s.foundation==='F2'){R(x0-1,gy-2,w+2,2,p.stone);for(let x=x0;x<x0+w;x+=4)R(x,gy-2,1,1,dark(p.stone,.2));}
  if(s.foundation==='F3'){for(let x=x0+1;x<x0+w-1;x+=4)R(x,gy-2,1,2,dark(p.timber,.2));R(x0,gy-3,w,1,dark(p.timber,.1));}
@@ -136,6 +142,7 @@ export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Us
  const roofOn=(m:Mass,kind:'R01'|'R02'|'R03'|'R04'|'R05',o=ov):Crown=>{
   const xa=m.x-o,xb=m.x+m.w+o,half=(xb-xa)/2,mid=xa+half-.5,e=m.top+(deep?1:0);
   if(deep)R(m.x,m.top+1,m.w,1,dark(wallColor,.35));
+  g.part?.('roof');
   if(kind==='R01'||kind==='R02'){
    const H=Math.max(4,Math.round(half*(kind==='R02'?1.5:1)*pitchK*(s.roofMaterial==='thatch'?1.1:1)));
    paintRoof(xa,xb,x=>e-Math.max(2,Math.round(H*(1-Math.abs(x-mid)/(half+.5)))),e,0);
@@ -149,8 +156,10 @@ export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Us
   }
   if(kind==='R04'){
    const H=Math.max(3,Math.round((xb-xa)*.3*pitchK)),topOf=(x:number)=>e-1-Math.round(H*(xb-1-x)/(xb-xa-1));
+   g.part?.('wall');
    for(let x=m.x;x<m.x+m.w;x++){const t=topOf(x)+2;if(t<e)R(x,t,1,e-t,wallColor);}
    if(s.wall==='plank'||s.wall==='mixed')for(let x=m.x+2;x<m.x+m.w;x+=3){const t=topOf(x)+2;if(t<e)R(x,t,1,e-t,dark(wallColor,.14));}
+   g.part?.('roof');
    paintRoof(xa,xb,topOf,e+1,2);
    return {apex:[xa+1,e-1-H],H,xa,xb};
   }
@@ -160,8 +169,9 @@ export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Us
  };
  let crown:Crown|null=null;
  for(const m of masses){
+  g.part?.('wall');
   wallAt(m);
-  if(m.link){R(m.x,m.top-1,m.w,1,dark(roofColor,.1));continue;}
+  if(m.link){g.part?.('roof');R(m.x,m.top-1,m.w,1,dark(roofColor,.1));continue;}
   let kind:'R01'|'R02'|'R03'|'R04'|'R05';
   if(s.roofFamily==='R06')kind=s.roofMaterial==='plaster'?'R05':'R03';
   else if(s.roofFamily==='R08')kind=m.wing?'R04':'R01';
@@ -175,6 +185,7 @@ export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Us
  }
 
  // 4. openings
+ g.part?.('opening');
  const main=masses.find(m=>m.main)!,units=s.use==='rowhouse'?3:1,frame=s.ornaments.includes('O4');
  const openDark=DARK,winColor=s.structure==='X3'?tone(GLASS_HI):'#3f4741';
  type Door=readonly [number,number,number];
@@ -237,6 +248,7 @@ export function drawArchitecture(g:RectTarget,input:PartialSpec&{readonly use:Us
  }
 
  // 5. ornaments
+ g.part?.('ornament');
  const O=(k:string)=>(s.ornaments as readonly string[]).includes(k);
  const cr=crown as Crown|null;
  if(O('O1')&&cr){const [ax,ay]=cr.apex,c=dark(p.timber,.35);
