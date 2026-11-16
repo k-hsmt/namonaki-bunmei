@@ -38,7 +38,9 @@ test('B2d: plants cover a structure only when rooted in front of its ground line
     // The live structure layer (with this year's roof snow, Issue #36 D2) as prepared for the moving view.
     const structures=M.prepareSceneMotion(o,painter).structures;
     const lines=F.structureGroundLines(o,paint.presentation,D.sceneStructureDrawer(paint,painter)),f=painter.flora(o);
-    const plants=P.planFloraScene({seed:f.seed,site:o.ground.site,patches:f.patches,views:f.views,physics:R.readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),occupied:F.sceneOccupiedPlots(o)});
+    const planted=P.planFloraScene({seed:f.seed,site:o.ground.site,patches:f.patches,views:f.views,physics:R.readOwnedRecordPhysics(o.ground.terrain.sites[o.ground.site].physics),occupied:F.sceneOccupiedPlots(o)});
+    // Issue #37 D3: plants that took root again on abandoned ground are part of the scene's plants
+    const plants=[...planted,...(f.reclaim?.(planted)??[])];
     const layer=P.renderFloraLayer(plants,mirror,f.season),fr=px(frame),st=px(structures);
     let front=0,behind=0,unlined=0,wrong=0;
     for(let i=0;i<57600;i++){
