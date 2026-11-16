@@ -1,10 +1,10 @@
 /**
- * Issue #37 D1a PROTOTYPE: weathering, moss, vines and drifted sand on an abandoned building (ruleId ruin-weathering-v1,
- * parameters not final).
+ * Issue #37: weathering, moss, vines and drifted sand on an abandoned building (ruleId ruin-weathering-v1).
  *
- * Appearance only and not connected to anything: the live game never imports this module (D0 §11: D1a is an
- * independent drawing; D2 connects it). The D1a gallery gives each building development clocks (years since it was
- * abandoned, years since it became a ruin) and a world climate, and compares the results.
+ * D1a designed it as an independent drawing (parameters reviewed by Human, 2026-11-14); since D2 the live scene draws
+ * every vacant or ruined building with it (architecture/scene-v1), with clocks read from the world's confirmed history
+ * (ruin-history-v1). A change of these rules or parameters changes how existing worlds look and needs a new ruleId.
+ * Appearance only: never read by history, economy or the civilisation RNG.
  *  - Two clocks (D0 §3): `abandonedYears` starts surface cover (fading, moss, vines, sand) and roof wear; `ruinedYears`
  *    starts the loss of walls. A building that is only vacant never loses walls here.
  *  - A fresh ruin has lost its roof but its walls still stand to the eaves with a broken top (Human decision on D1a,
@@ -124,6 +124,14 @@ export function ruinAppearanceOf(spec:{readonly wall:WallMaterial;readonly roofM
   wallTau,wallLoss:r===null?0:r2(grow(r,wallTau)),freshTau,freshness:r===null?0:r2(Math.exp(-r/freshTau)),
   moss:r2(P.moss.max*mossRate*grow(a,P.moss.tau)),vine:r2(vineRate*grow(a,P.vine.tau)),sand:r2(climate.arid*grow(a,P.sand.tau)),
   mossRate:r2(mossRate),vineRate:r2(vineRate)});
+}
+
+/**
+ * A ruin whose age is not known from the history (no recorded change): the settled ruin outline (architecture-ruin-v1
+ * plus the kept foundation), weathered, with no cover. Its age is not guessed (D0 §9).
+ */
+export function settledRuinAppearance(spec:{readonly wall:WallMaterial;readonly roofMaterial:RoofMaterial},climate:RuinClimate):RuinAppearance {
+ return Object.freeze({...ruinAppearanceOf(spec,{abandonedYears:0,ruinedYears:0},climate),freshness:0});
 }
 
 /** Colours of the surface cover in a climate, and the ground colour the earth walls return to. */

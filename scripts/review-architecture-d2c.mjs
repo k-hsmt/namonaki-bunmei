@@ -30,7 +30,8 @@ for(const w of worlds){
   const {createArchitecturePainter}=await import('/dist/architecture/scene-v1.js');
   let world=P.introduceArchitectureProduction((await createNewTerrainWorld(seed)).review);
   world=await P.advanceArchitectureWorld(world,10000,'automatic');
-  const painter=createArchitecturePainter(world.architecture.births),reached=world.terrain.review.state.year;
+  const {worldRuinContext}=await import('/dist/story/world-session.js');
+  const painter=createArchitecturePainter(world.architecture.births,worldRuinContext(world)),reached=world.terrain.review.state.year;
   const siteIds=['river-bank','hill-side','coast-inlet'];
   // D2-c': a third image outlines the air space of births that needed a fallback (amber: stage 2-4, red: stage 5)
   const draw=(year,site,arch,marks=false)=>{const c=document.createElement('canvas');c.width=320;c.height=180;const o=observeTerrainProductionScene(world.terrain,year,site);

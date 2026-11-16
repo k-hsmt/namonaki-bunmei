@@ -93,7 +93,7 @@ test('D1b: later changes never alter an earlier year, existing plants are kept a
 
 test('D1b: nothing in the live game imports the ruin prototypes',()=>{
  const walk=d=>readdirSync(d).flatMap(f=>{const p=join(d,f);return statSync(p).isDirectory()?walk(p):[p];});
- for(const f of walk('src').filter(f=>!f.startsWith(join('src','ruin'))))assert.ok(!/ruin\/(ruin-weathering|reclamation-access)/.test(readFileSync(f,'utf8')),f);
+ for(const f of walk('src').filter(f=>!f.startsWith(join('src','ruin'))))assert.ok(!/ruin\/reclamation-access/.test(readFileSync(f,'utf8')),f);
  assert.ok(!/reclamation-access/.test(readFileSync('index.html','utf8')));
 });
 

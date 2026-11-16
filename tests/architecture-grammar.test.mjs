@@ -151,8 +151,9 @@ test('D2-a: 文明の乱数・時刻・本編の年次処理を読まない',asy
   const text=await readFile('src/architecture/'+f,'utf8');
   // The culture modules stay strict. production-v1 (D2-b1) may read the owned v8 production world
   // and its terrain-at-year, but never the civilization RNG or the annual engine directly.
-  // scene-v1 (D2-c, review only) paints into the live scene: it may read the live scene drawing only.
-  const allowed=f==='scene-v1.ts'?/^\.\/|^\.\.\/scene\/(draw|draw-generated-review)\.js$/
+  // scene-v1 (D2-c, review only) paints into the live scene: it may read the live scene drawing only, and since
+  // Issue #37 D2 the appearance-only weathering and its clocks from confirmed history (no RNG, no annual engine).
+  const allowed=f==='scene-v1.ts'?/^\.\/|^\.\.\/scene\/(draw|draw-generated-review)\.js$|^\.\.\/ruin\/ruin-(weathering|history)-v1\.js$/
    :f==='interaction-v1.ts'?/^\.\/|^\.\.\/story\/(economy-observer|regional-economy)\.js$|^\.\.\/terrain\/(terrain-production-types-v1|terrain-revision-wire-v1)\.js$/
    :f==='airspace-v1.ts'?/^\.\/|^\.\.\/scene\/composition\.js$|^\.\.\/terrain\/terrain-record-raster-v1\.js$/
    :f==='production-v1.ts'

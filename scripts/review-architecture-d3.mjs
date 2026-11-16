@@ -32,7 +32,8 @@ for(const w of worlds){
   const {createArchitecturePainter}=await import('/dist/architecture/scene-v1.js');
   let world=P.introduceArchitectureProduction((await createNewTerrainWorld(seed)).review);
   world=await P.advanceArchitectureWorld(world,YEARS,'automatic');
-  const a=world.architecture,painter=createArchitecturePainter(a.births),reached=world.terrain.review.state.year;
+  const {worldRuinContext}=await import('/dist/story/world-session.js');
+  const a=world.architecture,painter=createArchitecturePainter(a.births,worldRuinContext(world)),reached=world.terrain.review.state.year;
   const AXES=['structure','wall','foundation','roofMaterial','window','entrance','palette','roofFamily','eaves','pitch','ornaments'];
   const flat=t=>Object.fromEntries(AXES.map(k=>[k,k in t.choices?String(t.choices[k]):k==='ornaments'?[...t.shared.ornaments].sort().join('+'):String(t.shared[k])]));
   const siteIds=['river-bank','hill-side','coast-inlet'],sites=[];
