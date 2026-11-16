@@ -210,6 +210,19 @@ jobs:
           name: season36-d4-audit
           path: artifacts/season36-d4/*
           if-no-files-found: warn
+      # Issue 37 D4 ruin audit, quick set (3 worlds to year 1500). The full audit (9 worlds to year 10000)
+      # runs locally: node scripts/audit-issue37-d4.mjs (see docs/issue37-d4-acceptance.md).
+      - name: Audit Issue 37 D4 ruins (quick)
+        run: node scripts/audit-issue37-d4.mjs
+        timeout-minutes: 8
+        env:
+          D4_QUICK: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ruin37-d4-audit
+          path: artifacts/ruin37-d4/*
+          if-no-files-found: warn
       # B2e acceptance audit, quick set (3 worlds to year 1000). The full audit (10 worlds to year
       # 10000) runs locally: node scripts/audit-issue47-b2e.mjs (see docs/issue47-b2-plan.md §3.6).
       - name: Audit Issue 47 B2e acceptance (quick)
