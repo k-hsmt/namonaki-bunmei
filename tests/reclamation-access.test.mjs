@@ -91,16 +91,13 @@ test('D1b: later changes never alter an earlier year, existing plants are kept a
  try{assert.deepEqual(plan(owner,300).plants,plan(owner,300).plants);}finally{Math.random=random;}
 });
 
-test('D1b: nothing in the live game imports the ruin prototypes',()=>{
+test('D3: plants reach the live scene only through the world session, and the live planting itself is kept',()=>{
  const walk=d=>readdirSync(d).flatMap(f=>{const p=join(d,f);return statSync(p).isDirectory()?walk(p):[p];});
- for(const f of walk('src').filter(f=>!f.startsWith(join('src','ruin'))))assert.ok(!/ruin\/reclamation-access/.test(readFileSync(f,'utf8')),f);
- assert.ok(!/reclamation-access/.test(readFileSync('index.html','utf8')));
-});
-
-test('D1c: only development code sets the extra plants of a scene; the live game never does',()=>{
- const walk=d=>readdirSync(d).flatMap(f=>{const p=join(d,f);return statSync(p).isDirectory()?walk(p):[p];});
- const users=walk('src').filter(f=>/extraPlants/.test(readFileSync(f,'utf8')));
- assert.deepEqual(users,[join('src','scene','flora-draw.ts')]);
+ const users=walk('src').filter(f=>!f.startsWith(join('src','ruin'))&&/ruin\/reclamation-(access|scene)-v1/.test(readFileSync(f,'utf8')));
+ assert.deepEqual(users,[join('src','story','world-session.ts')]);
+ const setters=walk('src').filter(f=>/reclaim:planted=>/.test(readFileSync(f,'utf8')));
+ assert.deepEqual(setters,[join('src','story','world-session.ts')]);
  const text=readFileSync(join('src','scene','flora-draw.ts'),'utf8');
- assert.ok(/source\.extraPlants\?\.length\?\[\.\.\.planted,\.\.\.source\.extraPlants\]:planted/.test(text),'without extra plants the planting is the live one');
+ assert.ok(/const reclaimed=source\.reclaim\?\.\(planted\)\?\?\[\],plants=reclaimed\.length\?\[\.\.\.planted,\.\.\.reclaimed\]:planted;/.test(text),'reclaimed plants are added after the live planting, never instead of it');
+ assert.ok(/occupied:sceneOccupiedPlots\(o\)\}\);/.test(text),'the live planting still avoids every standing plot');
 });

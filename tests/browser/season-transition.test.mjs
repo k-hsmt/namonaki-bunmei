@@ -54,7 +54,10 @@ test('D3: at the rapid speed the scene and its year label are redrawn together a
  assert.ok(changes.length>=2,'years advance: '+changes.length);
  for(let i=1;i<changes.length;i++)assert.ok(changes[i]-changes[i-1]>=1300,'redraws are at least ~1400 ms apart: '+changes.join(','));
  await p.click('#play');await p.waitForTimeout(300);
- const [scene,label]=await p.evaluate(()=>[document.getElementById('scene-year').textContent,document.getElementById('year').textContent]);
+ const [scene,label,confirmed]=await p.evaluate(()=>[document.getElementById('scene-year').textContent,document.getElementById('year').textContent,Number(document.getElementById('rewind-year').max)]);
  const year=s=>Number(s.replace(/[^0-9]/g,' ').trim().split(/\s+/)[0]);
- assert.equal(year(scene),year(label),'after stopping, the scene shows the latest confirmed year: '+scene+' / '+label);
+ // The latest confirmed year is the rewind slider's end. The year label shows a pending choice's year as 「（未確定）」, so it
+ // equals the scene only when no choice is pending at the moment of stopping (which depends on the runner's speed).
+ assert.equal(year(scene),confirmed,'after stopping, the scene shows the latest confirmed year: '+scene+' / '+label+' / confirmed '+confirmed);
+ if(!label.includes('未確定'))assert.equal(year(label),confirmed,'without a pending choice the year label is the confirmed year: '+label);
 });
