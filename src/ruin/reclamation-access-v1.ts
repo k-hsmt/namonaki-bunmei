@@ -121,7 +121,8 @@ export function reclamationMask(o:ReclamationOwner,physics:FloraScenePhysics,sta
 
 export interface ReclamationRoot {readonly x:number;readonly y:number;readonly zone:ReclamationZone;readonly openedYear:number;readonly stage:FloraStage;readonly sourceKey:string}
 /**
- * Plants on the open zones of one owner in a confirmed year. `existing` are the plants the scene already shows (the live
+ * Plants on the open zones of one owner in a confirmed year. `mask` is that owner's reclamationMask (it marks only the
+ * footprint and its apron). `existing` are the plants the scene already shows (the live
  * planting): local plants keep the live spacing from them. `standing` as in reclamationMask; trees also keep the live
  * structure margins from those. Returns the plants (ScenePlant, drawable with rasterizeFlora) and their roots.
  */
@@ -137,8 +138,9 @@ export function planReclamation(input:{seed:number;site:RecordSite;owner:Reclama
  for(const period of open){
   const code=ZONE_CODE[period.zone],H=(...k:(string|number)[])=>terrainHash([RECLAMATION_RULE_ID,seed,site,owner.id,period.zone,period.openedYear,...k]);
   // only the cells that can hold this zone: the same grid, limited to the zone's bounding box (same result, fewer hashes)
-  let x0=320,x1=-1,y0=180,y1=-1;
-  for(let i=0;i<57600;i++)if(mask[i]===code){area++;const x=i%320,y=(i-x)/320;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+  // reclamationMask marks only the owner's footprint and its apron, so only that rectangle is scanned
+  let x0=320,x1=-1,y0=180,y1=-1;const f=owner.footprint,ax0=Math.max(0,f.x-P.apron),ax1=Math.min(320,f.x+f.width+P.apron),ay0=Math.max(0,f.y-P.apron),ay1=Math.min(180,f.y+f.depth+P.apron);
+  for(let y=ay0;y<ay1;y++)for(let x=ax0;x<ax1;x++)if(mask[y*320+x]===code){area++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
   if(x1<0)continue;
   const cy0=96+Math.floor((Math.max(96,y0-P.cell)-96)/P.cell)*P.cell,cx0=Math.floor(Math.max(0,x0-P.cell)/P.cell)*P.cell;
   for(let cy=cy0;cy<180&&cy<=y1;cy+=P.cell)for(let cx=cx0;cx<320&&cx<=x1;cx+=P.cell){
