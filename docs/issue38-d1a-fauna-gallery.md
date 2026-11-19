@@ -11,7 +11,7 @@
 | `src/fauna/fauna-sprites-v1.ts` | 新規。10種群の整数矩形スプライト（`faunaSprite`・`drawFauna`）、短い動作のループ（`faunaMotionAt`）、奥行き縮小の候補（`faunaDepthSize`）。何もimportせず、乱数・時刻・Canvasを使わない。本編からは読み込まれない |
 | `scripts/preview-fauna-d1a.mjs` | ギャラリー生成と、舞台の機械検査（違反があれば終了コード1） |
 | `tests/fauna-sprites.test.mjs` | 8件 |
-| `.github/workflows/ci.yml` | ギャラリー生成と成果物保存のステップ（`test`ジョブ、#37 D1bの直後） |
+| `.github/workflows/ci.yml` | ギャラリー生成と成果物保存のステップ（`visual-browser`ジョブ、#37 D1bの直後。ブラウザは使わないが、同ジョブのブラウザ導入が失敗すると実行されない） |
 
 本編のコード・保存形式・既存の描画は変更していない。
 
