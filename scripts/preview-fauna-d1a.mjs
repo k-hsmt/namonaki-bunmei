@@ -25,7 +25,7 @@ import {FAUNA_KINDS,FAUNA_GROUP,FAUNA_SIZE,FAUNA_POSES,FAUNA_PALETTE,FAUNA_AIR_P
 
 const out='artifacts/fauna38-d1a',SKY='#c9cdb8',WATER='#6f8f9a',FPS=12,LOOP=10,FRAMES=FPS*LOOP;
 await mkdir(out,{recursive:true});
-const LABEL={deer:'シカ類',horse:'野生ウマ類',bison:'野生ウシ類（バイソン型）',hare:'ノウサギ類',fox:'キツネ類',sparrow:'小鳥（スズメ型）',duck:'水鳥（カモ型）',heron:'水鳥（サギ型）',crow:'飛翔鳥（カラス型）',gull:'飛翔鳥（カモメ型）'};
+const LABEL={deer:'シカ類',horse:'野生ウマ類',bison:'野生ウシ類（バイソン型）',hare:'ノウサギ類',fox:'キツネ類',sparrow:'小鳥（スズメ型）',duck:'水鳥（カモ型）',heron:'水鳥（サギ型）',crow:'飛翔鳥（カラス型）',gull:'飛翔鳥（カモメ型）',gazelle:'ガゼル類（D1b追加）',boar:'イノシシ類（D1b追加）',lizard:'トカゲ類（D1b追加）',parrot:'飛翔鳥（インコ型、D1b追加）'};
 const POSE_LABEL={stand:'佇み',graze:'採食',walk:'歩行',rest:'休息（伏せ）',sit:'座り',hop:'跳躍',peck:'ついばみ',float:'水上浮遊',dabble:'逆立ち採食',wade:'水辺の歩行',fly:'羽ばたき',glide:'滑空'};
 const files=[];
 const save=async(name,raster,extra={})=>{const png=raster.png();await writeFile(`${out}/${name}.png`,png);files.push({name,width:raster.width,height:raster.height,sha256:createHash('sha256').update(png).digest('hex'),...extra});};
@@ -61,7 +61,7 @@ for(const kind of FAUNA_KINDS){
 }
 
 // ---------------------------------------------------------------- 2. scale candidates
-const CANDIDATES={deer:[8,10,12,14],horse:[8,11,14],bison:[8,11,14],hare:[3,5,7],fox:[5,7],sparrow:[2,3,4,5],duck:[4,6,8],heron:[5,7,8],crow:[4,7,10],gull:[4,8,10]};
+const CANDIDATES={deer:[8,10,12,14],horse:[8,11,14],bison:[8,11,14],hare:[3,5,7],fox:[5,7],sparrow:[2,3,4,5],duck:[4,6,8],heron:[5,7,8],crow:[4,7,10],gull:[4,8,10],gazelle:[8,10,12,14],boar:[8,10,12,14],lizard:[3,5,7],parrot:[4,6,8]};
 const SCW=24,SCH=40,SGY=34,REF=68;
 /** The pose a scale candidate is shown in: flying birds by their span (glide), the rest by their first pose. */
 const scalePose=kind=>FAUNA_GROUP[kind]==='flying-bird'?'glide':Object.keys(FAUNA_POSES[kind])[0];
@@ -111,6 +111,10 @@ const ACTIONS={
  duck:{start:[20,0],segments:[{pose:'float',seconds:3,fps:2},{pose:'float',seconds:2,fps:2,vx:3},{pose:'dabble',seconds:1.5,fps:2},{pose:'float',seconds:2,fps:2,vx:-3,facing:-1},{pose:'float',seconds:1.5,fps:2,facing:1}]},
  heron:{start:[22,0],segments:[{pose:'stand',seconds:3},{pose:'wade',seconds:2,fps:2,vx:2},{pose:'peck',seconds:2,fps:1.5},{pose:'wade',seconds:2,fps:2,vx:-2,facing:-1},{pose:'stand',seconds:1,facing:1}]},
  crow:{start:[-8,-14],segments:[{pose:'fly',seconds:2,fps:10,vx:12,vy:7},{pose:'stand',seconds:1},{pose:'peck',seconds:2.5,fps:3},{pose:'fly',seconds:2,fps:10,vx:12,vy:-7},{pose:'glide',seconds:1.5,vx:16},{pose:'absent',seconds:1}]},
+ gazelle:{start:[18,0],segments:[{pose:'stand',seconds:2},{pose:'graze',seconds:3,fps:2},{pose:'walk',seconds:1.5,fps:7,vx:5},{pose:'stand',seconds:1},{pose:'walk',seconds:1.5,fps:7,vx:-5,facing:-1},{pose:'rest',seconds:1,facing:1}]},
+ boar:{start:[18,0],segments:[{pose:'graze',seconds:3,fps:3},{pose:'walk',seconds:2,fps:6,vx:4},{pose:'graze',seconds:2,fps:3},{pose:'walk',seconds:2,fps:6,vx:-4,facing:-1},{pose:'stand',seconds:1,facing:1}]},
+ lizard:{start:[18,0],segments:[{pose:'stand',seconds:4},{pose:'walk',seconds:1,fps:8,vx:10},{pose:'stand',seconds:4},{pose:'walk',seconds:1,fps:8,vx:-10,facing:-1}]},
+ parrot:{start:[-10,-14],segments:[{pose:'fly',seconds:3,fps:10,vx:14},{pose:'glide',seconds:2,vx:16},{pose:'absent',seconds:5}]},
  gull:{start:[-10,-12],segments:[{pose:'glide',seconds:3,vx:10},{pose:'fly',seconds:1,fps:8,vx:8,vy:12},{pose:'float',seconds:3,fps:2},{pose:'fly',seconds:1.5,fps:10,vx:10,vy:-8},{pose:'glide',seconds:1.5,vx:16}]},
 };
 const ACW=64,ACH=30,AGY=24;

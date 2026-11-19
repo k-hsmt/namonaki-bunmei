@@ -12,13 +12,15 @@
  */
 export const FAUNA_SPRITES_RULE_ID='fauna-sprites-v1' as const;
 
-export const FAUNA_KINDS=['deer','horse','bison','hare','fox','sparrow','duck','heron','crow','gull'] as const;
+/** The D1a kinds (Human-accepted 2026-11-19), then the D1b additions (gazelle, boar, lizard, parrot: Human review pending). */
+export const FAUNA_KINDS=['deer','horse','bison','hare','fox','sparrow','duck','heron','crow','gull','gazelle','boar','lizard','parrot'] as const;
 export type FaunaKind=typeof FAUNA_KINDS[number];
 /** D0 §6 groups: silhouettes and (later) habitat rules. Not a livestock class. */
 export type FaunaGroup='large-herbivore'|'small-ground'|'small-bird'|'water-bird'|'flying-bird';
 export const FAUNA_GROUP:Readonly<Record<FaunaKind,FaunaGroup>>=Object.freeze({
  deer:'large-herbivore',horse:'large-herbivore',bison:'large-herbivore',hare:'small-ground',fox:'small-ground',
  sparrow:'small-bird',duck:'water-bird',heron:'water-bird',crow:'flying-bird',gull:'flying-bird',
+ gazelle:'large-herbivore',boar:'large-herbivore',lizard:'small-ground',parrot:'flying-bird',
 });
 /**
  * Size is a nominal length in px (wingspan for crow and gull) that sets the proportions; the painted width differs
@@ -32,6 +34,7 @@ export const FAUNA_SIZE:Readonly<Record<FaunaKind,{readonly band:readonly [numbe
  sparrow:{band:[2,5],min:2,preset:3},
  duck:{band:[4,8],min:4,preset:6},heron:{band:[4,8],min:5,preset:7},
  crow:{band:[4,10],min:3,preset:7},gull:{band:[4,10],min:3,preset:8},
+ gazelle:{band:[8,14],min:5,preset:10},boar:{band:[8,14],min:5,preset:10},lizard:{band:[3,7],min:3,preset:5},parrot:{band:[4,10],min:3,preset:6},
 });
 export type FaunaPose='stand'|'graze'|'walk'|'rest'|'sit'|'hop'|'peck'|'float'|'dabble'|'wade'|'fly'|'glide';
 /** Poses and their frame counts per kind. Only motions the kind can make are listed (D0 §12 D1a). */
@@ -41,6 +44,7 @@ export const FAUNA_POSES:Readonly<Record<FaunaKind,Readonly<Partial<Record<Fauna
  sparrow:{stand:1,peck:2,hop:2,fly:4},
  duck:{float:2,dabble:2,fly:4},heron:{stand:1,wade:4,peck:2,fly:4},
  crow:{stand:1,peck:2,fly:4,glide:1},gull:{float:2,fly:4,glide:1},
+ gazelle:{stand:1,graze:2,walk:4,rest:1},boar:{stand:1,graze:2,walk:4,rest:1},lizard:{stand:1,walk:2},parrot:{fly:4,glide:1},
 });
 export interface FaunaRect {readonly x:number;readonly y:number;readonly w:number;readonly h:number;readonly color:string}
 export interface FaunaBounds {readonly left:number;readonly top:number;readonly right:number;readonly bottom:number;readonly width:number;readonly height:number}
@@ -57,6 +61,10 @@ export const FAUNA_PALETTE=Object.freeze({
  heron:{coat:'#9aa1a1',back:'#6f7777',dark:'#3f4444',leg:'#5f6058',bill:'#c8b45a'},
  crow:{coat:'#2f3133',light:'#51555a'},
  gull:{coat:'#e6e4dc',dark:'#7f8784',tip:'#3d4245',bill:'#c9a24a',ripple:'#b0ccc7'},
+ gazelle:{coat:'#c49e6c',light:'#efe5cf',dark:'#5a4330',leg:'#9a7a52'},
+ boar:{coat:'#4d4137',ridge:'#2b2621',snout:'#7a6a5a',tusk:'#e2dccb'},
+ lizard:{coat:'#b39a68',dark:'#6a5838',light:'#d8c79c'},
+ parrot:{wing:'#3f9a55',body:'#c2412f',tip:'#e3b53a'},
 });
 
 /** Rows are given as heights above the lowest row: `r(x,h,w,n)` covers heights h..h+n-1, i.e. y = -(h+n-1) .. -h. */
@@ -133,6 +141,45 @@ function quadruped(r:Pen,kind:'deer'|'horse'|'bison',L:number,pose:FaunaPose,fra
  const half=Math.floor(nl/2);
  r(x1,nb,1,half,coat);r(x1+1,nb+half,1,nl-half,coat);
  head(x1+1,nb+nl-1);
+}
+
+// ---------------------------------------------------------------- D1b additions (separate from the accepted D1a drawings)
+/** A slender antelope: long legs, light belly, short dark horns curving back. */
+function gazelle(r:Pen,L:number,pose:FaunaPose,frame:number):void {
+ const P=FAUNA_PALETTE.gazelle,b=Math.max(3,round(L*.5)),bh=Math.max(2,round(L*.18)),lh=Math.max(2,round(L*.32)),nl=Math.max(2,round(L*.2));
+ const x0=-Math.floor(b/2),x1=x0+b-1,four=L>=10,lying=pose==='rest',base=lying?0:lh,top=base+bh-1;
+ if(!lying){const s=pose==='walk'?STRIDE[frame%4]!:[0,0,0,0];if(four){leg(r,x0+1,lh,s[1],P.dark);leg(r,x1-1,lh,s[3],P.dark);}leg(r,x0,lh,s[0],P.leg);leg(r,x1,lh,s[2],P.leg);}
+ else r(x1-1,0,2,1,P.leg);
+ r(x0,base,b,bh,P.coat);r(x0,base,b,1,P.light);if(bh>=3)r(x0+1,base+1,b-2,1,P.dark);
+ r(x0,top,1,1,P.light);r(x0-1,top,1,1,P.dark);
+ const head=(hx:number,hy:number)=>{r(hx,hy,2,1,P.coat);r(hx+2,hy,1,1,P.dark);r(hx,hy+1,1,1,P.coat);r(hx,hy+2,1,1,P.dark);r(hx-1,hy+3,1,1,P.dark);};
+ if(pose==='graze'){
+  const lift=frame%2;let nx=x1;
+  for(let h=top,i=0;h>=lift+2;h--,i++){nx=x1+1+Math.floor(i/2);r(nx,h,1,1,P.coat);}
+  r(nx+1,lift,2,1,P.coat);r(nx+2,lift,1,1,P.dark);r(nx+1,lift+1,1,1,P.coat);
+  return;
+ }
+ const nb=top+1,half=Math.floor(nl/2);r(x1,nb,1,half,P.coat);r(x1+1,nb+half,1,nl-half,P.coat);
+ head(x1+1,nb+nl-1);
+}
+/** A low, heavy forest pig: short legs, a dark bristled ridge, a long wedge head with a pale tusk. */
+function boar(r:Pen,L:number,pose:FaunaPose,frame:number):void {
+ const P=FAUNA_PALETTE.boar,b=Math.max(3,round(L*.55)),bh=Math.max(2,round(L*.3)),lh=2;
+ const x0=-Math.floor(b/2),x1=x0+b-1,four=L>=10,lying=pose==='rest',base=lying?0:lh,top=base+bh-1;
+ if(!lying){const s=pose==='walk'?STRIDE[frame%4]!:[0,0,0,0];if(four){leg(r,x0+1,lh,s[1],P.ridge);leg(r,x1-1,lh,s[3],P.ridge);}leg(r,x0,lh,s[0],P.ridge);leg(r,x1,lh,s[2],P.ridge);}
+ r(x0,base,b,bh,P.coat);
+ // the bristled ridge rises toward the shoulders
+ r(x0+1,top,b-2,1,P.ridge);r(x1-2,top+1,2,1,P.ridge);
+ r(x0-1,top-1,1,1,P.ridge);
+ const hy=pose==='graze'?frame%2:lying?0:Math.max(0,base-1),hw=L>=10?3:2;
+ r(x1+1,hy,hw,Math.min(2,bh),P.coat);r(x1+hw,hy,1,1,P.snout);if(L>=9)r(x1+hw,hy+1,1,1,P.tusk);r(x1+1,hy+2,1,1,P.ridge);
+}
+/** A small lizard flat on the ground: long tail, raised head; walking moves the legs at its sides. */
+function lizard(r:Pen,L:number,pose:FaunaPose,frame:number):void {
+ const P=FAUNA_PALETTE.lizard,big=L>=5,tail=big?3:2;
+ r(-1-tail,0,tail,1,P.light);r(-1,0,3,1,P.coat);r(2,0,1,1,P.coat);
+ r(-1,1,big?3:2,1,P.coat);r(0,1,1,1,P.dark);r(big?2:1,1,1,1,P.coat);
+ if(pose==='walk'){r(frame%2?-1:1,0,1,1,P.dark);}else if(big)r(2,2,1,1,P.coat);
 }
 
 // ---------------------------------------------------------------- small ground animals
@@ -228,7 +275,8 @@ function gull(r:Pen,L:number,pose:FaunaPose,frame:number):void {
 
 const DRAW:Record<FaunaKind,(r:Pen,L:number,pose:FaunaPose,frame:number)=>void>={
  deer:(r,L,p,f)=>quadruped(r,'deer',L,p,f),horse:(r,L,p,f)=>quadruped(r,'horse',L,p,f),bison:(r,L,p,f)=>quadruped(r,'bison',L,p,f),
- hare,fox,sparrow,duck,heron,crow,gull,
+ hare,fox,sparrow,duck,heron,crow,gull,gazelle,boar,lizard,
+ parrot:(r,L,p,f)=>flier(r,L,f,p==='glide',FAUNA_PALETTE.parrot.wing,FAUNA_PALETTE.parrot.body,FAUNA_PALETTE.parrot.tip),
 };
 
 /** Rows of clearance under the airborne frame of a hop (its lowest row is y=−lift). Every other ground frame touches y=0. */

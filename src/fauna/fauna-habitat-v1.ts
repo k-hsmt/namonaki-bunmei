@@ -14,7 +14,7 @@
  * Every choice comes from fixed thresholds and terrainHash(['fauna-habitat-v1', ...]); no RNG stream, no clock.
  */
 import {terrainHash} from '../terrain/terrain-hash-v1.js';
-import {FAUNA_SIZE,faunaSprite,faunaBounds,faunaDepthSize,type FaunaKind,type FaunaGroup,type FaunaPose} from './fauna-sprites-v1.js';
+import {FAUNA_SIZE,FAUNA_GROUP,faunaSprite,faunaBounds,faunaDepthSize,type FaunaKind,type FaunaGroup,type FaunaPose} from './fauna-sprites-v1.js';
 
 export const FAUNA_HABITAT_RULE_ID='fauna-habitat-v1' as const;
 type Site='river-bank'|'hill-side'|'coast-inlet';
@@ -42,15 +42,17 @@ export const HABITAT_PARAMETERS=Object.freeze({
  avoid:{'large-herbivore':[24,48],'small-ground':[8,20],'water-bird':[12,30]} as Readonly<Partial<Record<FaunaGroup,readonly [number,number]>>>,
  /** Fit of each biome per group (D0 §6 table). A riparian or wetland patch raises land groups to at least 0.8 (D0 §5). */
  biomeFit:{
-  'large-herbivore':{desert:.15,steppe:.9,grassland:1,temperate_forest:.9,tropical_rainforest:.35,boreal_forest:.8,tundra:.6},
-  'small-ground':{desert:.6,steppe:.9,grassland:.9,temperate_forest:1,tropical_rainforest:.8,boreal_forest:.8,tundra:.7},
-  'small-bird':{desert:.5,steppe:.8,grassland:.9,temperate_forest:1,tropical_rainforest:1,boreal_forest:.8,tundra:.5},
+  'large-herbivore':{desert:.6,steppe:.9,grassland:1,temperate_forest:.9,tropical_rainforest:.8,boreal_forest:.8,tundra:.6},
+  'small-ground':{desert:1,steppe:.9,grassland:.9,temperate_forest:1,tropical_rainforest:1,boreal_forest:.8,tundra:.7},
+  'small-bird':{desert:.8,steppe:.8,grassland:.9,temperate_forest:1,tropical_rainforest:1,boreal_forest:.8,tundra:.5},
   'water-bird':{desert:1,steppe:1,grassland:1,temperate_forest:1,tropical_rainforest:1,boreal_forest:1,tundra:1},
-  'flying-bird':{desert:.6,steppe:.8,grassland:.9,temperate_forest:1,tropical_rainforest:.8,boreal_forest:.9,tundra:.6},
+  'flying-bird':{desert:.8,steppe:.8,grassland:.9,temperate_forest:1,tropical_rainforest:1,boreal_forest:.9,tundra:.6},
  } as Readonly<Record<FaunaGroup,Readonly<Record<Biome,number>>>>,
  /** Largest group per kind of group, groups per site and year, animals per site and year, and the spacing of groups. */
  groupSize:{'large-herbivore':5,'small-ground':2,'small-bird':3,'water-bird':3,'flying-bird':3} as Readonly<Record<FaunaGroup,number>>,
  groupsPerSite:{'large-herbivore':2,'small-ground':1,'small-bird':1,'water-bird':1,'flying-bird':1} as Readonly<Record<FaunaGroup,number>>,
+ /** A site with sea may show this many water-bird groups (Human review D1b-2: more kinds at the coast). */
+ coastWaterGroups:2,
  animalsPerSite:10,
  groupSpacing:20,
  /** Margin (px) kept from standing building plots around each animal's body. */
@@ -145,26 +147,32 @@ const fitOf=(g:FaunaGroup,f:HabitatFeatures)=>{if(!f.biome)return 0;const base=H
 export function faunaSuitability(input:FaunaHabitatYear,c:HabitatCandidate):Readonly<Record<FaunaGroup,number>> {
  const R=HABITAT_PARAMETERS.radius,F=(g:FaunaGroup)=>habitatFeatures(input,c.x,c.y,R[g]),out={} as Record<FaunaGroup,number>;
  const large=F('large-herbivore'),small=F('small-ground'),bird=F('small-bird'),water=F('water-bird');
- out['large-herbivore']=large.land?round3(clamp(large.open+.3*large.cover)*fitOf('large-herbivore',large)*avoidance('large-herbivore',large)):0;
- out['small-ground']=small.land?round3(clamp(small.open+.8*small.cover)*fitOf('small-ground',small)*avoidance('small-ground',small)):0;
+ // in the rainforest the woodland itself is the habitat, so it does not empty as the forest matures (Human review
+ // D1b-4). Temperate and boreal forests keep the reviewed weights (their amounts were accepted in D1b-1).
+ const forest=(f:HabitatFeatures)=>f.biome==='tropical_rainforest';
+ out['large-herbivore']=large.land?round3(clamp(large.open+(forest(large)?.9:.3)*large.cover)*fitOf('large-herbivore',large)*avoidance('large-herbivore',large)):0;
+ out['small-ground']=small.land?round3(clamp(small.open+(forest(small)?1:.8)*small.cover)*fitOf('small-ground',small)*avoidance('small-ground',small)):0;
  // small birds: 0.7 away from people, up to 1.0 about 20 px from a building, 0.3 right next to one
  const edge=bird.human===Infinity?.7:bird.human<4?.3:.7+.3*Math.max(0,1-Math.abs(bird.human-20)/20);
- out['small-bird']=bird.land?round3(clamp(bird.open+.7*bird.cover+.3*bird.bare)*fitOf('small-bird',bird)*edge):0;
+ out['small-bird']=bird.land?round3(clamp(bird.open+(forest(bird)?.9:.7)*bird.cover+.3*bird.bare)*fitOf('small-bird',bird)*edge):0;
  out['water-bird']=water.waterNear?round3(clamp(water.water*1.5)*(water.freshNear||water.habitat==='wetland'||water.habitat==='coastal'?1:.6)*avoidance('water-bird',water)):0;
  if(c.row===0){
   const sky=F('flying-bird');
-  out['flying-bird']=round3(Math.max(clamp(sky.sea*1.5),clamp(sky.open+.5*sky.bare+.3*sky.cover)*fitOf('flying-bird',sky)));
+  out['flying-bird']=round3(Math.max(clamp(sky.sea*1.5),clamp(sky.open+.5*sky.bare+(forest(sky)?1:.3)*sky.cover)*fitOf('flying-bird',sky)));
  }else out['flying-bird']=0;
  return Object.freeze(out);
 }
 /** The provisional kind a group shows at a candidate (D0 §6 table; not a species decided by the world). */
 export function faunaKindAt(input:FaunaHabitatYear,c:HabitatCandidate,g:FaunaGroup):FaunaKind {
  const f=habitatFeatures(input,c.x,c.y,HABITAT_PARAMETERS.radius[g]),b=f.biome,h=terrainHash([FAUNA_HABITAT_RULE_ID,'kind',input.seed,c.id,g]);
- if(g==='large-herbivore')return b==='tundra'?'bison':b==='steppe'?(h%2?'horse':'bison'):b==='grassland'||b==='desert'?'horse':'deer';
- if(g==='small-ground')return b==='temperate_forest'||b==='boreal_forest'||b==='tropical_rainforest'?(h%3===0?'fox':'hare'):h%4===0?'fox':'hare';
+ if(g==='large-herbivore')return b==='tundra'?'bison':b==='steppe'?(['horse','bison','gazelle'] as const)[h%3]!:b==='grassland'?(h%3===0?'gazelle':'horse'):b==='desert'?'gazelle'
+  :b==='tropical_rainforest'?(h%3===0?'deer':'boar'):b==='temperate_forest'?(h%3===0?'boar':'deer'):'deer';
+ if(g==='small-ground')return b==='desert'?(h%2?'lizard':'hare'):b==='tropical_rainforest'?(['lizard','fox','hare'] as const)[h%3]!
+  :b==='temperate_forest'||b==='boreal_forest'?(h%3===0?'fox':'hare'):h%4===0?'fox':'hare';
  if(g==='small-bird')return 'sparrow';
- if(g==='water-bird')return f.freshNear&&f.habitat!=='coastal'&&h%3===0?'heron':'duck';
- return f.sea>.15?'gull':'crow';
+ // water birds: a heron on a shore, ducks or gulls on the water (at the sea both; Human review D1b-2 asked for variety)
+ if(g==='water-bird')return f.land?'heron':f.sea>.15?(h%2?'gull':'duck'):f.freshNear&&f.habitat!=='coastal'&&h%3===0?'heron':'duck';
+ return b==='tropical_rainforest'?(h%3===0?'crow':'parrot'):f.sea>.15?(h%3===0?'crow':'gull'):'crow';
 }
 
 /** Mean of a candidate's suitabilities over sampled years up to the observed one (the smoothing alternative, D0 §5). */
@@ -182,7 +190,7 @@ export interface FaunaAppearancePlan {
  /** Candidates above their threshold that showed nothing, by reason (counted, never moved elsewhere). */
  readonly dropped:Readonly<Record<'cap'|'spacing'|'no-room',number>>;
 }
-const restPose=(g:FaunaGroup,k:FaunaKind):FaunaPose=>g==='flying-bird'?'glide':k==='duck'?'float':k==='hare'?'sit':'stand';
+const restPose=(g:FaunaGroup,k:FaunaKind):FaunaPose=>g==='flying-bird'?'glide':g==='water-bird'&&k!=='heron'?'float':k==='hare'?'sit':'stand';
 const isLand=(input:FaunaHabitatYear,x:number,y:number)=>x>=0&&x<320&&y>=96&&y<180&&input.surface[y*320+x]===1&&input.grade[y*320+x]!<=1;
 const isWater=(input:FaunaHabitatYear,x:number,y:number)=>x>=0&&x<320&&y>=96&&y<180&&(input.surface[y*320+x]===2||input.surface[y*320+x]===3);
 /**
@@ -192,7 +200,7 @@ const isWater=(input:FaunaHabitatYear,x:number,y:number)=>x>=0&&x<320&&y>=96&&y<
  */
 export function faunaBodyFits(input:FaunaHabitatYear,kind:FaunaKind,size:number,pose:FaunaPose,x:number,y:number):boolean {
  validate(input);
- const rects=faunaSprite(kind,size,pose,0),b=faunaBounds(rects),group=GROUP_OF[kind],m=HABITAT_PARAMETERS.buildingMargin[group];
+ const rects=faunaSprite(kind,size,pose,0),b=faunaBounds(rects),group=FAUNA_GROUP[kind],m=HABITAT_PARAMETERS.buildingMargin[group];
  if(group==='flying-bird')return y+b.bottom<HABITAT_PARAMETERS.skyFloor&&y+b.top>=0&&x+b.left>=0&&x+b.right<320;
  const water=pose==='float'||pose==='dabble',room=HABITAT_PARAMETERS.stepRoom;
  for(const dx of [-room,0,room]){
@@ -203,11 +211,10 @@ export function faunaBodyFits(input:FaunaHabitatYear,kind:FaunaKind,size:number,
  if(kind==='heron'){let near=false;for(let dy=-4;dy<=4&&!near;dy++)for(let dx=-4;dx<=4;dx++)if(isWater(input,x+dx,y+dy)){near=true;break;}if(!near)return false;}
  return true;
 }
-const GROUP_OF:Readonly<Record<FaunaKind,FaunaGroup>>={deer:'large-herbivore',horse:'large-herbivore',bison:'large-herbivore',hare:'small-ground',fox:'small-ground',sparrow:'small-bird',duck:'water-bird',heron:'water-bird',crow:'flying-bird',gull:'flying-bird'};
 /** The box a member's body can cover facing either way (the sprite mirrored about its origin column). */
 const memberBox=(kind:FaunaKind,size:number,pose:FaunaPose,x:number,y:number)=>{const b=faunaBounds(faunaSprite(kind,size,pose,0)),reach=Math.max(-b.left,b.right);return {left:x-reach,right:x+reach,top:y+b.top,bottom:y+b.bottom};};
 /** Body size by depth (Human decision D1a-3); flying birds keep their near size. */
-const sizeAt=(kind:FaunaKind,y:number)=>GROUP_OF[kind]==='flying-bird'?FAUNA_SIZE[kind].preset:faunaDepthSize(kind,FAUNA_SIZE[kind].preset,Math.max(0,Math.min(1,(y-96)/84)));
+const sizeAt=(kind:FaunaKind,y:number)=>FAUNA_GROUP[kind]==='flying-bird'?FAUNA_SIZE[kind].preset:faunaDepthSize(kind,FAUNA_SIZE[kind].preset,Math.max(0,Math.min(1,(y-96)/84)));
 
 /**
  * The appearance plan of a site in a year. `suitability` may be the year's own values (fixed thresholds) or the
@@ -221,11 +228,14 @@ export function planFaunaAppearance(input:FaunaHabitatYear,suitability?:Readonly
  // a fixed priority per candidate and group (never the year's margin): a candidate that keeps qualifying keeps its
  // place, so near-equal candidates do not trade the group cap from year to year (D1b record §5)
  ranked.sort((a,b)=>H('rank',a.c.id,a.g)-H('rank',b.c.id,b.g)||(a.c.id<b.c.id?-1:a.c.id>b.c.id?1:0));
+ let coast=false;for(let i=96*320;i<57600&&!coast;i++)coast=input.surface[i]===3;
  const groups:FaunaGroupPlan[]=[],perGroup=new Map<FaunaGroup,number>(),dropped={cap:0,spacing:0,'no-room':0};let animals=0;
  for(const r of ranked){
-  if((perGroup.get(r.g)??0)>=P.groupsPerSite[r.g]||animals>=P.animalsPerSite){dropped.cap++;continue;}
+  const cap=r.g==='water-bird'&&coast?P.coastWaterGroups:P.groupsPerSite[r.g];
+  if((perGroup.get(r.g)??0)>=cap||animals>=P.animalsPerSite){dropped.cap++;continue;}
   if(groups.some(q=>{const o=cands.find(c=>c.id===q.candidate)!;return Math.abs(o.x-r.c.x)+Math.abs(o.y-r.c.y)<P.groupSpacing;})){dropped.spacing++;continue;}
-  const kind=faunaKindAt(input,r.c,r.g),pose=restPose(r.g,kind),want=Math.min(P.animalsPerSite-animals,1+Math.floor(clamp((r.s-r.t)/Math.max(.05,1-r.t))*(P.groupSize[r.g]-1)+.5));
+  // a second water-bird group shows the other floating kind, so a coast with two groups shows two kinds
+  const first=faunaKindAt(input,r.c,r.g),kind=r.g==='water-bird'&&first!=='heron'&&groups.some(q=>q.group===r.g&&q.kind===first)?(first==='gull'?'duck':'gull'):first,pose=restPose(r.g,kind),want=Math.min(P.animalsPerSite-animals,1+Math.floor(clamp((r.s-r.t)/Math.max(.05,1-r.t))*(P.groupSize[r.g]-1)+.5));
   const members:FaunaMember[]=[];
   for(let m=0;m<want;m++){
    // up to 6 fixed offsets near the candidate; a member that fits none is left out (no far move)
