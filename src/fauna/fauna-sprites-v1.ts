@@ -12,7 +12,7 @@
  */
 export const FAUNA_SPRITES_RULE_ID='fauna-sprites-v1' as const;
 
-/** The D1a kinds (Human-accepted 2026-11-19), then the D1b additions (gazelle, boar, lizard, parrot: Human review pending). */
+/** The D1a kinds (Human-accepted 2026-11-19), then the D1b additions (gazelle, boar, lizard, parrot: accepted in the D1b review). */
 export const FAUNA_KINDS=['deer','horse','bison','hare','fox','sparrow','duck','heron','crow','gull','gazelle','boar','lizard','parrot'] as const;
 export type FaunaKind=typeof FAUNA_KINDS[number];
 /** D0 §6 groups: silhouettes and (later) habitat rules. Not a livestock class. */
