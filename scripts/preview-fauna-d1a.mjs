@@ -9,7 +9,7 @@
  *  2. scale_<kind>:   size candidates in the D0 §9 band next to a person, a near housing part, a house and a tree
  *  3. depth_<mode>:   far / middle / near on a 320×180 stage, animals at a fixed size (as people) or scaled by depth
  *  4. action_<kind>:  a 10 s loop of short motions (12 fps strip, animated in the gallery)
- *  5. stage_<id>:     320×180 stages, 10 s at 12 fps (strip) and the still at 0 s, with mechanical checks:
+ *  5. stage_<id>:     320×180 stages (animals scaled by depth, Human decision 3), 10 s at 12 fps (strip) and the still at 0 s, with mechanical checks:
  *                     feet on land / water, no overlap with buildings, no appearing or vanishing inside the screen,
  *                     no jumps. The script fails if any check fails.
  */
@@ -195,6 +195,12 @@ STAGES.push({id:'tundra',label:'ツンドラ・ステップ',ground:'#a7aa9c',wa
   {kind:'sparrow',x:60,y:166,segments:[{pose:'peck',seconds:5,fps:4},{pose:'stand',seconds:5}]},
  ]});
 
+/**
+ * Human decision (2026-11-19, D1a review 3): animals shrink with depth like the plants. The size is fixed per animal
+ * from its ground row at the start of its loop (its home spot), so it never changes while it walks, hops or takes off.
+ * Birds whose loop starts in the sky (y<96) have no ground row and keep the near size (to be settled in D1c).
+ */
+const stageSize=a=>a.y<96?FAUNA_SIZE[a.kind].preset:faunaDepthSize(a.kind,FAUNA_SIZE[a.kind].preset,Math.min(1,(a.y-96)/84));
 const isGroundPose=p=>!FAUNA_AIR_POSES.includes(p)&&!FAUNA_WATER_POSES.includes(p);
 const stageInfo=[];
 for(const st of STAGES){
@@ -211,7 +217,7 @@ for(const st of STAGES){
   for(const p of st.people){const s=p(t);items.push({y:s.y,order:2,draw:g=>person(g,s.x,s.y,s.i,s.walking,s.step)});}
   const air=[];
   st.animals.forEach((a,i)=>{
-   const size=FAUNA_SIZE[a.kind].preset,m=faunaMotionAt(a.kind,a.segments,(t+phaseOf(st.id,i))%LOOP),was=prev.get(i);
+   const size=stageSize(a),m=faunaMotionAt(a.kind,a.segments,(t+phaseOf(st.id,i))%LOOP),was=prev.get(i);
    if(!m){if(was&&was.left>=0&&was.right<320)issues.push({frame:f,animal:i,kind:a.kind,issue:'vanished inside the screen'});prev.set(i,null);return;}
    const x=a.x+m.dx,y=a.y+m.dy,b=drawFauna({rect(){}},a.kind,size,m.pose,m.frame,x,y,m.facing);
    if(was===null&&f>0&&b.left>=0&&b.right<320)issues.push({frame:f,animal:i,kind:a.kind,issue:'appeared inside the screen'});
@@ -239,7 +245,7 @@ for(const st of STAGES){
  }
  await save('stage_'+st.id+'_motion',strip,{frames:FRAMES,frameHeight:180});
  const counts={};for(const a of st.animals)counts[a.kind]=(counts[a.kind]??0)+1;
- stageInfo.push({id:st.id,label:st.label,animals:counts,people:st.people.length,houses:st.houses.length,visibleAnimals:{min:minVisible,max:maxVisible},issues:issues.length,firstIssues:issues.slice(0,10)});
+ stageInfo.push({id:st.id,label:st.label,animals:counts,sizes:st.animals.map(a=>({kind:a.kind,y:a.y,size:stageSize(a)})),people:st.people.length,houses:st.houses.length,visibleAnimals:{min:minVisible,max:maxVisible},issues:issues.length,firstIssues:issues.slice(0,10)});
 }
 
 const failed=stageInfo.filter(s=>s.issues>0);
