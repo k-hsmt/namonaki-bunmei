@@ -126,7 +126,7 @@ play.addEventListener('click',()=>{
  start=performance.now()-seconds*1000;raf=requestAnimationFrame(tick);
 });
 reset.addEventListener('click',()=>{stop();seconds=0;refresh(true);});
-range.addEventListener('input',()=>{stop();seconds=TIMES[Number(range.value)];refresh(true);});
+range.addEventListener('input',()=>{const selected=Number(range.value);stop();seconds=TIMES[selected];refresh(true);});
 images.forEach(img=>img.addEventListener('click',()=>{
  zoomImage.src=img.src;
  zoomLabel.textContent=NAMES[animal.value]+' ／ '+(img.dataset.style==='restrained'?'A':'B')+' ／ '+img.dataset.depth+' ／ コマ'+range.value;
