@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issue #38 D1a｜動物のいる風景・造形と動きの比較</title>
+<style>
+:root{color-scheme:light}*{box-sizing:border-box}
+body{margin:0;color:#2f3c33;background:#eaede5;font:14px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN",sans-serif}
+header{background:#f7f5ed;border-bottom:1px solid #d3daca;padding:28px max(18px,calc((100vw - 1330px)/2))}
+h1{font-size:25px;letter-spacing:-.025em;line-height:1.3;margin:0 0 9px}
+header p{color:#566b5a;max-width:740px;margin:0}
+main{max-width:1330px;margin:auto;padding:20px 18px 80px}
+.controls{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:6px 0 14px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label,.timeline label{font-weight:600;font-size:12px;color:#637766}
+button,select{font:inherit;color:inherit;background:white;padding:9px 11px;cursor:pointer;border:1px solid #b8c6b8;border-radius:8px}
+button.primary{background:#4f6d56;border-color:#4f6d56;color:white}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid #8fad91;outline-offset:2px}
+#time{border:1px solid #c8d2c5;background:#e6eade;border-radius:30px;padding:6px 10px;color:#56715a;white-space:nowrap;font-size:12px}
+.timeline{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin:6px 0 20px}
+.timeline input{accent-color:#527356;width:min(240px,65vw)}
+.note{margin:0 0 22px;padding:11px 15px;background:#f6f5ef;border-left:3px solid #799678;color:#4c5f51}
+.note strong{color:#38553e}
+.row-title{display:flex;align-items:baseline;gap:12px;margin:23px 0 10px}
+h2{font-size:17px;line-height:1.3;margin:0}
+.row-title small{color:#6a796b}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.card{padding:10px 10px 11px;background:#f9f8f3;border:1px solid #d5d9cc;border-radius:10px;min-width:0}
+.card h3{margin:0 0 8px;font-size:13px;font-weight:600}
+.card img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;image-rendering:pixelated;background:#b9c7b9;border:1px solid #cbd3c7;cursor:zoom-in}
+.card footer{display:flex;justify-content:space-between;gap:6px;font-size:11px;color:#738273;margin-top:6px}
+details{border-top:1px solid #cfd8ca;margin-top:25px;padding:17px 0}
+details summary{font-weight:600;cursor:pointer}
+textarea{font:inherit;display:block;resize:vertical;min-height:125px;width:100%;border:1px solid #bdc8b8;border-radius:8px;background:#f9f8f3;padding:12px}
+.footer{font-size:12px;color:#6b7a6e;padding:26px 0 0}
+a{color:#3e7256}
+dialog{padding:16px;border:1px solid #b1bfb1;border-radius:10px;background:#f2f2e9;max-width:96vw;box-shadow:0 15px 80px #0008}
+dialog::backdrop{background:#182019c9}
+dialog img{display:block;width:min(95vw,960px);height:auto;image-rendering:pixelated}
+dialog .foot{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:10px}
+@media(max-width:900px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){h1{font-size:21px}.cards{grid-template-columns:1fr}header{padding:20px 18px}.controls{gap:8px}.row-title{display:block}}
+</style>
+</head>
+<body>
+<header><h1>Issue #38 D1a｜動物のいる風景</h1>
+<p>6種類の野生動物 × 2つの造形 × 遠景・中景・近景 × 8コマ。実際の320×180px画像で、建物や人物との縮尺と、小さな動作の自然さを比較します。</p></header>
+<main>
+<div class="controls">
+ <div class="field"><label for="animal">動物の種類</label>
+ <select id="animal">
+ <option value="deer">シカ類</option>
+ <option value="wild_equine">野生のウマ類</option>
+ <option value="hare">ノウサギ型の小動物</option>
+ <option value="songbird">小鳥</option>
+ <option value="waterbird">水鳥</option>
+ <option value="flying_bird">飛翔する鳥</option>
+ </select></div>
+ <button id="play" class="primary" aria-pressed="false">▶ 動きを再生</button>
+ <button id="reset">静止に戻す</button>
+ <span id="time">停止：コマ 0</span>
+</div>
+<div class="timeline">
+ <label for="frame">コマ送り</label>
+ <input id="frame" type="range" min="0" max="7" step="1" value="0">
+ <span id="index">0 / 7</span>
+</div>
+<div class="note"><strong>比較専用の試作です。</strong>
+動物が実際にその世界に生息することを記録・検証した結果ではありません。
+地面・池・樹木は比較用の舞台、建物は既存の建築描画、人物は現行の約2×6pxの表示サイズです。
+生息場所・地形衝突・自然回帰・群れ・実際の前後関係はD1b／D1cの担当です。
+野生のウマ類は<strong>家畜ではありません</strong>。
+</div>
+<section aria-label="控えめな輪郭">
+<div class="row-title"><h2>A｜控えめな輪郭</h2><small>周辺の建物・地形に自然に馴染む造形</small></div>
+<div class="cards">
+ <article class="card"><h3>遠景</h3><img data-style="restrained" data-depth="far" width="320" height="180" alt="控えめな輪郭の遠景"><footer><span>320×180px</span><span>タップで拡大</span></footer></article>
+ <article class="card"><h3>中景</h3><img data-style="restrained" data-depth="middle" width="320" height="180" alt="控えめな輪郭の中景"><footer><span>320×180px</span><span>タップで拡大</span></footer></article>
+ <article class="card"><h3>近景</h3><img data-style="restrained" data-depth="near" width="320" height="180" alt="控えめな輪郭の近景"><footer><span>320×180px</span><span>タップで拡大</span></footer></article>
+</div></section>
+<section aria-label="識別しやすい輪郭">
+<div class="row-title"><h2>B｜識別しやすい輪郭</h2><small>耳・脚・翼などの特徴を少し強調した造形</small></div>
+<div class="cards">
+ <article class="card"><h3>遠景</h3><img data-style="legible" data-depth="far" width="320" height="180" alt="識別しやすい輪郭の遠景"><footer><span>320×180px</span><span>タップで拡大</span></footer></article>
+ <article class="card"><h3>中景</h3><img data-style="legible" data-depth="middle" width="320" height="180" alt="識別しやすい輪郭の中景"><footer><span>320×180px</span><span>タップで拡大</span></footer></article>
+ <article class="card"><h3>近景</h3><img data-style="legible" data-depth="near" width="320" height="180" alt="識別しやすい輪郭の近景"><footer><span>320×180px</span><span>タップで拡大</span></footer></article>
+</div></section>
+<details>
+<summary>Humanレビュー用メモ</summary>
+<p>シルエット、縮尺、動作、不自然な浮き・瞬間移動などを記録できます。メモを保存したい場合はMarkdown形式でコピーしてください。</p>
+<textarea id="notes" placeholder="例：鹿の遠景はA案だと識別困難。小鳥のB案の翼は自然。水鳥の輪郭をもう少し細く…"></textarea>
+<button id="copy">Markdownをコピー</button>
+</details>
+<div class="footer"><a href="report.json">検証report.json</a> ｜ D1aは美術・動作の独立試作であり、文明の確定史／家畜／保存形式／本編描画には変更を加えません。</div>
+</main>
+<dialog id="zoom"><img id="zoom-image" width="320" height="180" alt="選択した景観の拡大表示"><div class="foot"><span id="zoom-label"></span><button id="close">閉じる</button></div></dialog>
+<script>
+'use strict';
+const NAMES={deer:'シカ類',wild_equine:'野生のウマ類',hare:'ノウサギ型の小動物',songbird:'小鳥',waterbird:'水鳥',flying_bird:'飛翔する鳥'};
+const TIMES=[0,2,4.2,6.2,8,8.5,9,9.5],CYCLE=12;
+const animal=document.getElementById('animal'),play=document.getElementById('play'),reset=document.getElementById('reset');
+const time=document.getElementById('time'),range=document.getElementById('frame'),index=document.getElementById('index');
+const images=[...document.querySelectorAll('.card img')],zoom=document.getElementById('zoom');
+const zoomImage=document.getElementById('zoom-image'),zoomLabel=document.getElementById('zoom-label');
+let running=false,seconds=0,start=0,raf=null,lastFrame=-1;
+function frameOf(s){const t=s%CYCLE;for(let n=TIMES.length-1;n>=0;n--)if(t>=TIMES[n])return n;return 0;}
+function refresh(force){
+ const n=frameOf(seconds);
+ if(!force&&lastFrame===n)return;
+ lastFrame=n;range.value=String(n);index.textContent=n+' / 7';
+ time.textContent=running?'再生中：約'+seconds.toFixed(1)+'秒':'停止：コマ '+n;
+ for(const img of images)img.src=animal.value+'_'+img.dataset.style+'_'+img.dataset.depth+'_'+n+'.png';
+}
+function tick(now){if(!running)return;seconds=(now-start)/1000;refresh(false);raf=requestAnimationFrame(tick);}
+function stop(){
+ if(!running)return;
+ running=false;play.textContent='▶ 動きを再生';play.setAttribute('aria-pressed','false');
+ if(raf!==null)cancelAnimationFrame(raf);
+ raf=null;refresh(true);
+}
+animal.addEventListener('change',()=>{seconds=0;if(running)start=performance.now();refresh(true);});
+play.addEventListener('click',()=>{
+ if(running){stop();return;}
+ running=true;play.textContent='❚❚ 停止';play.setAttribute('aria-pressed','true');
+ start=performance.now()-seconds*1000;raf=requestAnimationFrame(tick);
+});
+reset.addEventListener('click',()=>{stop();seconds=0;refresh(true);});
+range.addEventListener('input',()=>{stop();seconds=TIMES[Number(range.value)];refresh(true);});
+images.forEach(img=>img.addEventListener('click',()=>{
+ zoomImage.src=img.src;
+ zoomLabel.textContent=NAMES[animal.value]+' ／ '+(img.dataset.style==='restrained'?'A':'B')+' ／ '+img.dataset.depth+' ／ コマ'+range.value;
+ zoom.showModal();
+}));
+document.getElementById('close').addEventListener('click',()=>zoom.close());
+zoom.addEventListener('click',e=>{if(e.target===zoom)zoom.close();});
+document.getElementById('copy').addEventListener('click',async()=>{
+ const txt='# Issue #38 D1a レビュー\n\n動物：'+NAMES[animal.value]+'\nコマ：'+range.value+'\n\n'+document.getElementById('notes').value+'\n';
+ try{await navigator.clipboard.writeText(txt);document.getElementById('copy').textContent='コピーしました';}
+ catch{document.getElementById('notes').select();document.getElementById('copy').textContent='コピー不可：メモ欄を選択しました';}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+refresh(true);
+</script>
+</body>
+</html>
