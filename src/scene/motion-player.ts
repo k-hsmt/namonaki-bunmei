@@ -55,7 +55,9 @@ export class SceneMotionPlayer {
  show(world:WorldSession,year:number,site:number,seasonTransitionMs=0):SiteSnapshot {
   if(this.disposed)throw Error('Disposed scene player');if(this.world===world&&this.year===year&&this.site===site)return this.snapshot!;
   if(world.mode==='generated'){
-   const observation=observeGeneratedWorldSession(world,year,site),painter=worldStructurePainter(world),key=sceneMotionVisualKey(observation)+(painter?.flora?(f=>JSON.stringify([f.views.map(v=>v?.stage??-1),f.season??null]))(painter.flora(observation)):'');
+   const observation=observeGeneratedWorldSession(world,year,site),painter=worldStructurePainter(world),key=sceneMotionVisualKey(observation)+(painter?.flora?(f=>JSON.stringify([f.views.map(v=>v?.stage??-1),f.season??null]))(painter.flora(observation)):'')
+    // Issue #38 D2: the animals follow the exact year (population, plots, plants); never reuse an earlier year's animals
+    +(painter?.faunaKey?.(observation)??'');
    const season=painter?.flora?.(observation).season??null,previous=this.season,from=this.prepared;
    if(this.terrain!==observation.ground.terrain||this.visualKey!==key||(this.painter===undefined)!==(painter===undefined)){this.stopClock();this.prepared=null;}
    this.season=season;

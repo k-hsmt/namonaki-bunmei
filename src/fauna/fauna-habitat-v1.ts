@@ -118,9 +118,11 @@ export function habitatFeatures(input:FaunaHabitatYear,x:number,y:number,radius:
  validate(input);
  const S=input.surface,at=(px:number,py:number)=>px>=0&&px<320&&py>=96&&py<180?S[py*320+px]!:0;
  let n=0,open=0,cover=0,bare=0;
- for(let i=0;i<440;i++){
-  const p=input.patches[i],v=input.views[i];if(!p||!v)continue;
-  const cx=(i%40)*8+4,cy=96+Math.floor(i/40)*8+4;if(Math.abs(cx-x)+Math.abs(cy-y)>radius+4)continue;
+ // only the patches whose centre can be within reach (the same test below decides; Issue #38 D2 performance)
+ const reach=radius+4,c0=Math.max(0,Math.ceil((x-reach-4)/8)),c1=Math.min(39,Math.floor((x+reach-4)/8)),r0=Math.max(0,Math.ceil((y-reach-100)/8)),r1=Math.min(10,Math.floor((y+reach-100)/8));
+ for(let row=r0;row<=r1;row++)for(let col=c0;col<=c1;col++){
+  const i=row*40+col,p=input.patches[i],v=input.views[i];if(!p||!v)continue;
+  const cx=col*8+4,cy=96+row*8+4;if(Math.abs(cx-x)+Math.abs(cy-y)>reach)continue;
   n++;if(v.stage===0)bare++;else if(p[2]!>=0&&v.stage>=3)cover++;else open++;
  }
  let samples=0,water=0,sea=0;
@@ -196,16 +198,20 @@ const isWater=(input:FaunaHabitatYear,x:number,y:number)=>x>=0&&x<320&&y>=96&&y<
 /**
  * Whether a body of `kind` and `size` in `pose` fits with its origin at (x, y) in that year: every foot pixel on land
  * (gentle grade) or on water for a floating bird, the whole body clear of standing plots by the group margin, and
- * room for a short step to each side. A heron stands on land with water within 4 px. Flying birds stay in the sky.
+ * room for a short step to each side (`room` px; 0 checks the spot alone). `frame` picks the sprite frame. `facing`
+ * mirrors the sprite about its origin column; 'both' (the plan's default) requires both facings to fit, because a
+ * member turns while it moves. A heron stands on land with water within 4 px. Flying birds stay in the sky.
  */
-export function faunaBodyFits(input:FaunaHabitatYear,kind:FaunaKind,size:number,pose:FaunaPose,x:number,y:number):boolean {
+export function faunaBodyFits(input:FaunaHabitatYear,kind:FaunaKind,size:number,pose:FaunaPose,x:number,y:number,frame=0,room:number=HABITAT_PARAMETERS.stepRoom,facing:1|-1|'both'='both'):boolean {
  validate(input);
- const rects=faunaSprite(kind,size,pose,0),b=faunaBounds(rects),group=FAUNA_GROUP[kind],m=HABITAT_PARAMETERS.buildingMargin[group];
- if(group==='flying-bird')return y+b.bottom<HABITAT_PARAMETERS.skyFloor&&y+b.top>=0&&x+b.left>=0&&x+b.right<320;
- const water=pose==='float'||pose==='dabble',room=HABITAT_PARAMETERS.stepRoom;
- for(const dx of [-room,0,room]){
-  for(const r of rects){if(r.y+r.h-1!==0)continue;for(let k=0;k<r.w;k++){const px=x+dx+r.x+k;if(water?!isWater(input,px,y):!isLand(input,px,y))return false;}}
-  const L=x+dx+b.left-m,Rr=x+dx+b.right+m,T=y+b.top-m,B=y+b.bottom+m;
+ if(facing==='both')return faunaBodyFits(input,kind,size,pose,x,y,frame,room,1)&&faunaBodyFits(input,kind,size,pose,x,y,frame,room,-1);
+ const rects=faunaSprite(kind,size,pose,frame),b=faunaBounds(rects),group=FAUNA_GROUP[kind],m=HABITAT_PARAMETERS.buildingMargin[group];
+ const left=facing===1?b.left:-b.right,right=facing===1?b.right:-b.left,px=(r:{x:number;w:number},k:number)=>facing===1?r.x+k:-r.x-k;
+ if(group==='flying-bird')return y+b.bottom<HABITAT_PARAMETERS.skyFloor&&y+b.top>=0&&x+left>=0&&x+right<320;
+ const water=pose==='float'||pose==='dabble';
+ for(const dx of room?[-room,0,room]:[0]){
+  for(const r of rects){if(r.y+r.h-1!==0)continue;for(let k=0;k<r.w;k++){const fx=x+dx+px(r,k);if(water?!isWater(input,fx,y):!isLand(input,fx,y))return false;}}
+  const L=x+dx+left-m,Rr=x+dx+right+m,T=y+b.top-m,B=y+b.bottom+m;
   if(input.standing.some(p=>L<p.x+p.width&&Rr>=p.x&&T<p.y+p.depth&&B>=p.y))return false;
  }
  if(kind==='heron'){let near=false;for(let dy=-4;dy<=4&&!near;dy++)for(let dx=-4;dx<=4;dx++)if(isWater(input,x+dx,y+dy)){near=true;break;}if(!near)return false;}
