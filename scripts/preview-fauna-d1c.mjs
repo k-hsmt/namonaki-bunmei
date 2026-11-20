@@ -14,7 +14,7 @@
  * shows the scene at second 0; drawing twice gives the same pixels; the live frame below is left as it was outside
  * the animals' pixels.
  */
-import {mkdir,writeFile} from 'node:fs/promises';
+import {mkdir,writeFile,rm} from 'node:fs/promises';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {createHash} from 'node:crypto';
@@ -33,7 +33,7 @@ const YEARS=quick?[0,3050]:[0,1025,3050],END=3050,FPS=12,SECONDS=10;
 const MOVING=quick?[['temperate_forest',0,1],['tropical_rainforest',1025,0]]
  :[['steppe',0,1],['temperate_forest',0,1],['temperate_forest',1025,0],['tropical_rainforest',1025,0],['grassland',1025,2],['desert',1025,0],['tundra',1025,0],['boreal_forest',3050,2]];
 const SEASON_SCENES=quick?[['temperate_forest',0,1]]:[['temperate_forest',0,1],['tundra',1025,0]];
-await mkdir(out,{recursive:true});
+await rm(out,{recursive:true,force:true});await mkdir(out,{recursive:true});
 const firstSeed=b=>{for(let s=1;s<20000;s++){const c=generateClimateBaseline(s);if(c.dominantBiome===b&&!c.transition)return s;}throw Error('no seed');};
 const worlds=[];
 for(const biome of BIOMES){
