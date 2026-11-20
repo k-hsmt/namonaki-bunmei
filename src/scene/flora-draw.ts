@@ -72,6 +72,11 @@ export interface PreparedSceneFlora {
  readonly behind:HTMLCanvasElement;
  /** Plants in front of a structure: drawn after the structure layer. */
  readonly front:HTMLCanvasElement;
+ /**
+  * Issue #38 D2: the root y of the plant visible at each screen pixel (−1 none) in the pose of the last `at()` call.
+  * Read-only for depth tests of other layers (the animals); the same array is rewritten by `at()`.
+  */
+ readonly root:Int16Array;
  /** Redraws both layers with the tree crowns at that second (no-op when no crown moved). Without a time, trees stand still. */
  at(seconds?:number):void;
 }
@@ -110,7 +115,7 @@ export function prepareSceneFlora(backdrop:HTMLCanvasElement,structures:HTMLCanv
   behind.x.putImageData(behind.image,0,0);front.x.putImageData(front.image,0,0);
  };
  at();
- return {plants,behind:behind.c,front:front.c,at};
+ return {plants,behind:behind.c,front:front.c,at,root:work.root};
 }
 
 /** Most common value among the district's patches (the world's dominant biome and its ground, as seen here). */

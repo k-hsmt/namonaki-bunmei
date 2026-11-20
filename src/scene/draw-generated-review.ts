@@ -12,7 +12,7 @@ import {drawBuildingSprite,drawCivicArchitecture,drawHousingPlotSurface,drawResi
 import {projectGeneratedPresentation} from './generated-presentation-review.js';
 import {readOwnedRecordPhysics} from '../terrain/owned-record-physics.js';
 import {sceneFields,sceneBuildings} from './structure-order.js';
-import {prepareSceneFlora,type SceneFloraSource,type StructureLayerDrawer} from './flora-draw.js';
+import {prepareSceneFlora,type SceneFloraSource,type StructureLayerDrawer,type PreparedSceneFlora} from './flora-draw.js';
 /** Ground-level paint is clipped to the actual footprint; upper roofs may overhang. */
 function withinFootprint(c:CanvasRenderingContext2D,p:GroundPlot,draw:()=>void){
  c.save();c.beginPath();c.rect(0,0,320,p.y);c.rect(p.x,p.y,p.width,p.depth);c.clip();draw();c.restore();
@@ -66,7 +66,18 @@ export interface GeneratedStructurePainter {
  readonly facility?:(c:CanvasRenderingContext2D,o:GeneratedSceneObservation['snapshot']['objects'][number],plot:GroundPlot,year:number)=>boolean;
  /** Issue #47 B2d (v10 worlds): the world's flora of the observed year and site. Present, plants follow it. */
  readonly flora?:(o:GeneratedSceneObservation)=>SceneFloraSource;
+ /**
+  * Issue #38 D2: the animals of the observed year and site (appearance only; derived, never saved). Painted last, over
+  * the finished frame; `layers` are the frame's own structure layer and prepared plants, reused for the depth tests.
+  */
+ readonly fauna?:(o:GeneratedSceneObservation,layers:SceneFaunaLayers)=>SceneFauna;
+ /** Issue #38 D2: what the animals of an observation depend on (the moving view rebuilds when it changes). */
+ readonly faunaKey?:(o:GeneratedSceneObservation)=>string;
 }
+/** Layers of a frame that the animals' depth tests read (never drawn again). */
+export interface SceneFaunaLayers {readonly structures:HTMLCanvasElement;readonly flora:PreparedSceneFlora}
+/** The animals of one scene: painted over a finished frame at a second (`moving` false: the still image). */
+export interface SceneFauna {readonly key:string;draw(canvas:HTMLCanvasElement,seconds:number,moving:boolean):unknown}
 export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:GeneratedSceneObservation,layer?:GeneratedSceneLayer,paint?:ScenePaintProjection,painter?:GeneratedStructurePainter):void {
  if(layer!==undefined&&layer!=='backdrop'&&layer!=='structures')throw Error('Unknown scene layer');
  if(paint&&paint.observation!==observation)throw Error('Scene paint projection mismatch');
@@ -81,7 +92,9 @@ export function drawGeneratedSceneReview(canvas:HTMLCanvasElement,observation:Ge
    const flora=prepareSceneFlora(canvas,structures,observation,painter.flora(observation),paint.presentation,sceneStructureDrawer(paint,painter));
    const c=canvas.getContext('2d')!;c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}
    drawClouds(c,paint.presentation);c.restore();c.drawImage(flora.behind,0,0);c.save();if(ground.terrain.sites[ground.site].render.mirrorX){c.translate(320,0);c.scale(-1,1);}drawPeople(c,paint.presentation);c.restore();
-   c.drawImage(structures,0,0);c.drawImage(flora.front,0,0);return;
+   c.drawImage(structures,0,0);c.drawImage(flora.front,0,0);
+   // Issue #38 D2: the animals at second 0 (the still image, crowns still)
+   painter.fauna?.(observation,{structures,flora}).draw(canvas,0,false);return;
   }
  }
  if(layer==='structures'){canvas.width=320;canvas.height=180;}else drawTerrainRecord(canvas,ground.terrain,ground.site);const c=canvas.getContext('2d');if(!c)throw Error('2d context missing');

@@ -64,7 +64,7 @@ test('D1c: a body fits only where its mirrored feet fit too',()=>{
  assert.notEqual(fits(1),fits(-1));assert.equal(fits(1),true);assert.equal(faunaBodyFits(d,'duck',6,'float',104,141,0,0),false,"the plan's default needs both facings");
 });
 
-test('D1c: the live game never loads src/fauna',()=>{
+test('D2: the live game loads src/fauna only through the world session',()=>{
  const walk=d=>readdirSync(d).flatMap(f=>{const p=join(d,f);return statSync(p).isDirectory()?walk(p):[p];});
- assert.deepEqual(walk('src').filter(f=>!f.startsWith(join('src','fauna'))&&/fauna\//.test(readFileSync(f,'utf8'))),[]);
+ assert.deepEqual(walk('src').filter(f=>!f.startsWith(join('src','fauna'))&&/fauna\//.test(readFileSync(f,'utf8'))),[join('src','story','world-session.ts')]);
 });

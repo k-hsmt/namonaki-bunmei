@@ -118,9 +118,11 @@ export function habitatFeatures(input:FaunaHabitatYear,x:number,y:number,radius:
  validate(input);
  const S=input.surface,at=(px:number,py:number)=>px>=0&&px<320&&py>=96&&py<180?S[py*320+px]!:0;
  let n=0,open=0,cover=0,bare=0;
- for(let i=0;i<440;i++){
-  const p=input.patches[i],v=input.views[i];if(!p||!v)continue;
-  const cx=(i%40)*8+4,cy=96+Math.floor(i/40)*8+4;if(Math.abs(cx-x)+Math.abs(cy-y)>radius+4)continue;
+ // only the patches whose centre can be within reach (the same test below decides; Issue #38 D2 performance)
+ const reach=radius+4,c0=Math.max(0,Math.ceil((x-reach-4)/8)),c1=Math.min(39,Math.floor((x+reach-4)/8)),r0=Math.max(0,Math.ceil((y-reach-100)/8)),r1=Math.min(10,Math.floor((y+reach-100)/8));
+ for(let row=r0;row<=r1;row++)for(let col=c0;col<=c1;col++){
+  const i=row*40+col,p=input.patches[i],v=input.views[i];if(!p||!v)continue;
+  const cx=col*8+4,cy=96+row*8+4;if(Math.abs(cx-x)+Math.abs(cy-y)>reach)continue;
   n++;if(v.stage===0)bare++;else if(p[2]!>=0&&v.stage>=3)cover++;else open++;
  }
  let samples=0,water=0,sea=0;

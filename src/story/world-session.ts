@@ -38,6 +38,7 @@ import {snapshotAt,type SiteSnapshot} from '../scene/model.js';
 import {drawScene} from '../scene/draw.js';
 import {observeGeneratedSceneReview} from '../scene/generated-scene-review.js';
 import {drawGeneratedSceneReview} from '../scene/draw-generated-review.js';
+import {prepareFaunaOverlay,faunaSceneOf} from '../fauna/fauna-overlay-v1.js';
 export type BaselineGeneratedSession={mode:'generated';review:GeneratedBridgeReview;state:CivilizationState};
 export type EconomicGeneratedSession={mode:'generated';review:EconomicProductionWorld;state:CivilizationState};
 export type TerrainGeneratedSession={mode:'generated';review:TerrainProductionWorld;state:CivilizationState};
@@ -114,7 +115,7 @@ export function worldFloraAt(session:WorldSession,year:number,siteIndex:number):
 /** Issue #37 D2: the weathering context of an architecture world (confirmed timelines, climate, cover colours). */
 export function worldRuinContext(world:ArchitectureProductionWorld){const climate=worldClimate(world);return ruinContextOf(world.terrain.review.state,climate,BIOME_SCENE[climate.dominantBiome].soil);}
 export function worldStructurePainter(session:WorldSession):GeneratedStructurePainter|undefined{return architecture(session)?painterOf(session.architecture):undefined;}
-/** Recorded birth styles plus the world's flora (Issue #47 B2d) and season (Issue #36 D2) of each observed year and site, cached per observation. */
+/** Recorded birth styles plus the world's flora (Issue #47 B2d), season (Issue #36 D2) and animals (Issue #38 D2) of each observed year and site, cached per observation. */
 function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{
  let p=painters.get(world);if(p)return p;
  const climate=worldClimate(world),flora=worldFlora(world),seen=new WeakMap<GeneratedSceneObservation,SceneFloraSource>();
@@ -127,7 +128,11 @@ function painterOf(world:ArchitectureProductionWorld):GeneratedStructurePainter{
    season:seasonalViewOf(seasonPhaseOfYear(o.snapshot.year),climate),
    // Issue #37 D3: plants take root again on abandoned ground (appearance only; derived, never saved).
    reclaim:planted=>reclaimedPlants(o,{seed,patches,views},ruins.timelines,planted)};
-  seen.set(o,f);}return f;}};
+  seen.set(o,f);}return f;},
+  // Issue #38 D2: the animals of the observed confirmed year (appearance only; derived from the year, never saved).
+  fauna:(o,layers)=>prepareFaunaOverlay(o,p,layers,faunaOf(o)),faunaKey:o=>faunaOf(o)?.key??'none'};
+ const planned=new WeakMap<GeneratedSceneObservation,ReturnType<typeof faunaSceneOf>>();
+ const faunaOf=(o:GeneratedSceneObservation)=>{if(!planned.has(o))planned.set(o,faunaSceneOf(o,p));return planned.get(o)!;};
  painters.set(world,p);return p;
 }
 function terrain(session:WorldSession):session is TerrainGeneratedSession {

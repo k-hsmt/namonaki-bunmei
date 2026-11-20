@@ -95,10 +95,10 @@ test('D1a: the depth scaling candidate stays between the smallest size and the n
  assert.throws(()=>faunaDepthSize('deer',10,1.1));
 });
 
-test('D1a: the live game never loads the fauna prototype, and the prototype reads nothing from a world',()=>{
+test('D2: the live game loads the fauna modules only through the world session; the sprites read nothing from a world',()=>{
  const walk=d=>readdirSync(d).flatMap(f=>{const p=join(d,f);return statSync(p).isDirectory()?walk(p):[p];});
  const users=walk('src').filter(f=>!f.startsWith(join('src','fauna'))&&/fauna\//.test(readFileSync(f,'utf8')));
- assert.deepEqual(users,[]);
+ assert.deepEqual(users,[join('src','story','world-session.ts')]);
  assert.doesNotMatch(readFileSync('index.html','utf8'),/fauna/);
  const source=readFileSync(join('src','fauna','fauna-sprites-v1.ts'),'utf8');
  assert.doesNotMatch(source,/^import /m,'the prototype imports nothing');

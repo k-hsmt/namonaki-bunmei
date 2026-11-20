@@ -26,7 +26,9 @@ export function prepareSceneMotion(o:GeneratedSceneObservation,painter?:Generate
  for(let y=96;y<180;y++)for(let x=0;x<320;x++){const i=y*320+x,j=(y*320+(plan.mirror?319-x:x))*4;waterMask[i]=+((raster.surface[i]===2||raster.surface[i]===3)&&pixels[j+2]!>pixels[j]!);}
  const outlets=o.ground.terrain.geography.ports.filter(p=>p.site===o.ground.site&&p.flow==='out'&&p.visible&&p.point).map(p=>p.point!);
  const view=o.ground.channelView,mask=channelMask(view),canalMask=new Uint8Array(57600);if(view?.channel?.status==='active'&&mask)for(const [x,y]of view.geometry!.cells){const i=y*320+x,j=(y*320+(plan.mirror?319-x:x))*4;canalMask[i]=+(mask[i]===1&&((pixels[j]===86&&pixels[j+1]===143&&pixels[j+2]===156)||(pixels[j]===141&&pixels[j+1]===182&&pixels[j+2]===181)));}
- return {backdrop,structures,flora,waterMask,canalMask,canalPath:view?.channel?.status==='active'?view.geometry!.path:[],waterTracks:planWaterTracks(raster,outlets,plan.ripples),plan:{...plan,ripples}};
+ // Issue #38 D2: the animals, depth-tested against this frame's own structure layer and plant roots
+ const fauna=painter?.fauna&&flora?painter.fauna(o,{structures,flora}):null;
+ return {backdrop,structures,flora,fauna,waterMask,canalMask,canalPath:view?.channel?.status==='active'?view.geometry!.path:[],waterTracks:planWaterTracks(raster,outlets,plan.ripples),plan:{...plan,ripples}};
 }
 export type PreparedSceneMotion=ReturnType<typeof prepareSceneMotion>;
 export function drawSceneMotion(canvas:HTMLCanvasElement,prepared:PreparedSceneMotion,seconds:number):void {
@@ -52,4 +54,6 @@ export function drawSceneMotion(canvas:HTMLCanvasElement,prepared:PreparedSceneM
   const age=(seconds+source.phase+n*2)%5;c.globalAlpha=(1-age/5)*.22;c.fillStyle='#807f71';c.fillRect(source.x+Math.floor(age*.5),source.y-Math.floor(age*2),2,2);
  }
  c.restore();
+ // Issue #38 D2: the animals of this second, over the finished frame (the crowns' roots were set by flora.at above)
+ prepared.fauna?.draw(canvas,seconds,true);
 }

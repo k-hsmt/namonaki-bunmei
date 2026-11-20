@@ -9,6 +9,9 @@
  * and draws with the live code (drawWorldSession, prepareSceneMotion/drawSceneMotion); src/fauna/fauna-overlay-v1
  * paints the planned animals over those frames. The live game never loads src/fauna, so its screen is unchanged.
  *
+ * D2: the live drawing (drawWorldSession, prepareSceneMotion/drawSceneMotion with the world painter) now paints the
+ * animals itself; the script draws the frame below with the same painter without them and checks, for every still and
+ * every moving frame, that the live result equals that frame plus the overlay pixel for pixel.
  * Checks (exit 1 on failure), on every moving frame: feet on that year's land (gentle grade) or water, bodies off
  * standing plots, flying birds only in the sky, no appearing or vanishing inside the screen, no jump; the still image
  * shows the scene at second 0; drawing twice gives the same pixels; the live frame below is left as it was outside
@@ -59,6 +62,8 @@ try{
    const D=await import('/scene/draw-generated-review.js'),V=await import('/season/season-presentation-v1.js');
    const O=await import('/fauna/fauna-overlay-v1.js'),H=await import('/fauna/fauna-habitat-v1.js'),F=await import('/fauna/fauna-sprites-v1.js');
    const session=S.restoreWorldSession(await decodeWorldSave(json)),painter=S.worldStructurePainter(session),fails=[];
+   // Since D2 the live painter draws the animals itself; `bare` is the same painter without them (the frame below)
+   const bare={...painter,fauna:undefined,faunaKey:undefined};
    const canvas=()=>{const c=document.createElement('canvas');c.width=320;c.height=180;return c;};
    const px=c=>c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,320,180).data;
    const count=plan=>plan?plan.groups.reduce((s,g)=>s+g.members.length,0):0;
@@ -78,25 +83,28 @@ try{
    // ---- stills: every year and site, with and without animals
    const stills=[];
    for(const y of years)for(let i=0;i<3;i++){
-    const base=canvas();let t=performance.now();S.drawWorldSession(base,session,y,i);const baseMs=performance.now()-t;
-    const o=S.observeGeneratedWorldSession(session,y,i),plain=base.toDataURL('image/png');
+    const o=S.observeGeneratedWorldSession(session,y,i),base=canvas();let t=performance.now();D.drawGeneratedSceneReview(base,o,undefined,undefined,bare);const baseMs=performance.now()-t,plain=base.toDataURL('image/png');
     t=performance.now();const ov=O.prepareFaunaOverlay(o,painter);const prepareMs=performance.now()-t;
     const c=canvas();c.getContext('2d').drawImage(base,0,0);t=performance.now();const stats=ov.draw(c,0,false);const drawMs=performance.now()-t;
-    // the same scene drawn again from scratch gives the same pixels
-    const c2=canvas();S.drawWorldSession(c2,session,y,i);O.prepareFaunaOverlay(S.observeGeneratedWorldSession(session,y,i),painter).draw(c2,0,false);
-    const same=c.toDataURL('image/png')===c2.toDataURL('image/png');
+    // D2: the live still image (drawWorldSession, animals included) equals the frame below plus the D1c overlay, and
+    // drawing it again from scratch gives the same pixels
+    const live=canvas();t=performance.now();S.drawWorldSession(live,session,y,i);const liveMs=performance.now()-t;
+    const live2=canvas();S.drawWorldSession(live2,session,y,i);
+    const same=live.toDataURL('image/png')===live2.toDataURL('image/png');
+    if(live.toDataURL('image/png')!==c.toDataURL('image/png'))fails.push(`still ${y}/${i}: the live still differs from the frame plus the overlay`);
     // only animal pixels change: compare with the frame below
     const a=px(base),b=px(c);let changed=0;for(let k=0;k<a.length;k+=4)if(a[k]!==b[k]||a[k+1]!==b[k+1]||a[k+2]!==b[k+2])changed++;
     const input=O.faunaHabitatInput(o,painter);for(const st of ov.at(0)){const ok=placed(input,st);if(ok!==true)fails.push(`still ${y}/${i}: ${ok}`);}
     if(!same)fails.push(`still ${y}/${i}: not deterministic`);if(changed>stats.drawn)fails.push(`still ${y}/${i}: ${changed} px changed for ${stats.drawn} animal px`);
     stills.push({year:y,site:i,siteId:o.ground.site,mirror:o.ground.terrain.sites[o.ground.site].render.mirrorX===true,population:o.composition.population,season:V.seasonPhaseOfYear(y),
-     animals:count(ov.plan),held:ov.loops.filter(l=>l.segments.length===1).length,kinds:ov.plan?ov.plan.groups.map(g=>`${g.kind}×${g.members.length}`):[],stats,baseMs,prepareMs,drawMs,plain,png:c.toDataURL('image/png')});
+     animals:count(ov.plan),held:ov.loops.filter(l=>l.segments.length===1).length,kinds:ov.plan?ov.plan.groups.map(g=>`${g.kind}×${g.members.length}`):[],stats,baseMs,liveMs,prepareMs,drawMs,plain,png:c.toDataURL('image/png')});
    }
    // ---- moving scenes: one 10 s loop at 12 fps, the live moving view below
    const strips=[];
    for(const [y,i] of moving){
     const o=S.observeGeneratedWorldSession(session,y,i),input=O.faunaHabitatInput(o,painter);
-    let t=performance.now();const prepared=M.prepareSceneMotion(o,painter);const livePrepareMs=performance.now()-t;
+    let t=performance.now();const prepared=M.prepareSceneMotion(o,bare);const livePrepareMs=performance.now()-t;
+    t=performance.now();const withFauna=M.prepareSceneMotion(o,painter);const faunaPrepareMs=performance.now()-t;let liveFaunaMs=0;
     t=performance.now();const ov=O.prepareFaunaOverlay(o,painter);const prepareMs=performance.now()-t;
     const frames=fps*seconds,strip=document.createElement('canvas');strip.width=320;strip.height=180*frames;const sg=strip.getContext('2d');
     let liveMs=0,overlayMs=0,prev=new Map(),hidden={structures:0,plants:0,drawn:0};
@@ -104,6 +112,9 @@ try{
      const s=k/fps,c=canvas();t=performance.now();M.drawSceneMotion(c,prepared,s);liveMs+=performance.now()-t;
      t=performance.now();const stats=ov.draw(c,s,true);overlayMs+=performance.now()-t;hidden.structures+=stats.hiddenByStructures;hidden.plants+=stats.hiddenByPlants;hidden.drawn+=stats.drawn;
      sg.drawImage(c,0,180*k);
+     // D2: the live moving view (animals included) equals the frame below plus the overlay, every frame
+     const lc=canvas();t=performance.now();M.drawSceneMotion(lc,withFauna,s);liveFaunaMs+=performance.now()-t;
+     if(lc.toDataURL('image/png')!==c.toDataURL('image/png'))fails.push(`moving ${y}/${i} ${s.toFixed(2)}s: the live frame differs from the frame plus the overlay`);
      const now=new Map(ov.at(s).map(st=>[st.id,st]));
      for(const st of now.values()){const ok=placed(input,st);if(ok!==true)fails.push(`moving ${y}/${i} ${s.toFixed(2)}s: ${ok}`);
       const was=prev.get(st.id),onScreen=visible(st);
@@ -115,12 +126,12 @@ try{
     // the still image is the scene at second 0
     if(JSON.stringify(ov.at(0))!==JSON.stringify(O.prepareFaunaOverlay(S.observeGeneratedWorldSession(session,y,i),painter).at(0)))fails.push(`moving ${y}/${i}: second 0 differs from the still`);
     strips.push({year:y,site:i,siteId:o.ground.site,mirror:o.ground.terrain.sites[o.ground.site].render.mirrorX===true,frames,animals:count(ov.plan),kinds:ov.plan?ov.plan.groups.map(g=>`${g.kind}×${g.members.length}`):[],
-     livePrepareMs,prepareMs,liveFrameMs:liveMs/frames,overlayFrameMs:overlayMs/frames,hidden,png:strip.toDataURL('image/png')});
+     livePrepareMs,faunaPrepareMs,prepareMs,liveFrameMs:liveMs/frames,liveFaunaFrameMs:liveFaunaMs/frames,overlayFrameMs:overlayMs/frames,hidden,png:strip.toDataURL('image/png')});
    }
    // ---- seasons: the same scene in the 4 phases (development input, as Issue #36 D1a)
    const phases=[];
    for(const [y,i] of seasons)for(const p of [0,1,2,3]){
-    const seasonal={...painter,flora:x=>({...painter.flora(x),season:V.seasonalViewOf(p,session.climate)})},o=S.observeGeneratedWorldSession(session,y,i),c=canvas();
+    const seasonal={...bare,flora:x=>({...painter.flora(x),season:V.seasonalViewOf(p,session.climate)})},o=S.observeGeneratedWorldSession(session,y,i),c=canvas();
     D.drawGeneratedSceneReview(c,o,undefined,undefined,seasonal);O.prepareFaunaOverlay(o,seasonal).draw(c,0,false);
     phases.push({year:y,site:i,phase:p,png:c.toDataURL('image/png')});
    }
@@ -138,7 +149,7 @@ try{
 }finally{await browser?.close();server.kill();}
 
 const med=a=>{const s=[...a].sort((x,y)=>x-y);return s.length?Math.round(s[Math.floor(s.length/2)]*10)/10:0;},max=a=>a.length?Math.round(Math.max(...a)*10)/10:0;
-const perf={stillBaseMedianMs:med(scenes.map(s=>s.baseMs)),overlayPrepareMedianMs:med(scenes.map(s=>s.prepareMs)),overlayPrepareMaxMs:max(scenes.map(s=>s.prepareMs)),overlayStillDrawMedianMs:med(scenes.map(s=>s.drawMs)),
+const perf={stillBaseMedianMs:med(scenes.map(s=>s.baseMs)),stillLiveMedianMs:med(scenes.map(s=>s.liveMs)),movingPrepareWithoutMedianMs:med(moving.map(m=>m.livePrepareMs)),movingPrepareWithMedianMs:med(moving.map(m=>m.faunaPrepareMs)),liveFaunaFrameMedianMs:med(moving.map(m=>m.liveFaunaFrameMs)),overlayPrepareMedianMs:med(scenes.map(s=>s.prepareMs)),overlayPrepareMaxMs:max(scenes.map(s=>s.prepareMs)),overlayStillDrawMedianMs:med(scenes.map(s=>s.drawMs)),
  liveFrameMedianMs:med(moving.map(m=>m.liveFrameMs)),overlayFrameMedianMs:med(moving.map(m=>m.overlayFrameMs)),overlayFrameMaxMs:max(moving.map(m=>m.overlayFrameMs)),livePrepareMedianMs:med(moving.map(m=>m.livePrepareMs))};
 const report={issue:38,stage:'D1c',status:failures.length?'FAILED':'PASSED',quick,failures,note:'PROTOTYPE. Development drawing over the live frames; nothing is saved and the live game does not load src/fauna.',
  years:YEARS,fps:FPS,seconds:SECONDS,performance:perf,worlds:worlds.map(w=>({biome:w.biome,seed:w.seed})),scenes,moving,seasons,files};
