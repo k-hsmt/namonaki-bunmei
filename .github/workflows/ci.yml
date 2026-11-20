@@ -229,6 +229,19 @@ jobs:
           name: fauna38-d1c-scenes
           path: artifacts/fauna38-d1c/*
           if-no-files-found: warn
+      # Issue 38 D3 acceptance audit, quick set (3 worlds to year 1500). The full audit (9 worlds to year 10000)
+      # runs locally: node scripts/audit-issue38-d3.mjs
+      - name: Issue 38 D3 fauna acceptance audit (quick)
+        run: node scripts/audit-issue38-d3.mjs
+        timeout-minutes: 10
+        env:
+          FAUNA_D3_QUICK: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fauna38-d3-audit
+          path: artifacts/fauna38-d3/*
+          if-no-files-found: warn
       # Issue 36 D4 season audit, quick set (3 worlds to year 1075). The full audit (9 worlds to year 10000)
       # runs locally: node scripts/audit-issue36-d4.mjs (see docs/issue36-season-design.md §15).
       - name: Audit Issue 36 D4 seasons (quick)
