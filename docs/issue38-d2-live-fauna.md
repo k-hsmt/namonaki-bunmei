@@ -37,6 +37,7 @@
 | D1cの検査（足元・区画・空・出現消失・瞬間移動・0秒の一致・決定性） | すべて合格 |
 | D1bの出力（全時点の頭数・切替など）が、適性の計算を速くする前と一致 | 一致 |
 | `npm test` | 642件すべて成功 |
+| ブラウザテスト（`node --test tests/browser/*.test.mjs`、`CHROMIUM_PATH`指定） | 93件中81件成功。失敗12件はすべてBGMの検査で、`CHROMIUM_PATH`を使わずにこの作業環境に無いブラウザ（chrome-headless-shell・WebKit）を起動しようとして失敗したもの（`Executable doesn't exist`）。情景・植物・動く景観・保存の検査は通っている。CIでの結果は未確認 |
 
 ## 4. 性能（Chromium、ローカル、63場面／8場面の中央値）
 
