@@ -217,6 +217,18 @@ jobs:
           name: fauna38-d1b-habitat
           path: artifacts/fauna38-d1b/*
           if-no-files-found: warn
+      # Issue 38 D1c: animals drawn over the live still and moving scenes (development overlay; quick set: 2 worlds).
+      - name: Render Issue 38 D1c fauna scene comparison
+        run: node scripts/preview-fauna-d1c.mjs
+        timeout-minutes: 8
+        env:
+          FAUNA_D1C_QUICK: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fauna38-d1c-scenes
+          path: artifacts/fauna38-d1c/*
+          if-no-files-found: warn
       # Issue 36 D4 season audit, quick set (3 worlds to year 1075). The full audit (9 worlds to year 10000)
       # runs locally: node scripts/audit-issue36-d4.mjs (see docs/issue36-season-design.md §15).
       - name: Audit Issue 36 D4 seasons (quick)

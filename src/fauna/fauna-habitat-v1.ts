@@ -196,16 +196,20 @@ const isWater=(input:FaunaHabitatYear,x:number,y:number)=>x>=0&&x<320&&y>=96&&y<
 /**
  * Whether a body of `kind` and `size` in `pose` fits with its origin at (x, y) in that year: every foot pixel on land
  * (gentle grade) or on water for a floating bird, the whole body clear of standing plots by the group margin, and
- * room for a short step to each side. A heron stands on land with water within 4 px. Flying birds stay in the sky.
+ * room for a short step to each side (`room` px; 0 checks the spot alone). `frame` picks the sprite frame. `facing`
+ * mirrors the sprite about its origin column; 'both' (the plan's default) requires both facings to fit, because a
+ * member turns while it moves. A heron stands on land with water within 4 px. Flying birds stay in the sky.
  */
-export function faunaBodyFits(input:FaunaHabitatYear,kind:FaunaKind,size:number,pose:FaunaPose,x:number,y:number):boolean {
+export function faunaBodyFits(input:FaunaHabitatYear,kind:FaunaKind,size:number,pose:FaunaPose,x:number,y:number,frame=0,room:number=HABITAT_PARAMETERS.stepRoom,facing:1|-1|'both'='both'):boolean {
  validate(input);
- const rects=faunaSprite(kind,size,pose,0),b=faunaBounds(rects),group=FAUNA_GROUP[kind],m=HABITAT_PARAMETERS.buildingMargin[group];
- if(group==='flying-bird')return y+b.bottom<HABITAT_PARAMETERS.skyFloor&&y+b.top>=0&&x+b.left>=0&&x+b.right<320;
- const water=pose==='float'||pose==='dabble',room=HABITAT_PARAMETERS.stepRoom;
- for(const dx of [-room,0,room]){
-  for(const r of rects){if(r.y+r.h-1!==0)continue;for(let k=0;k<r.w;k++){const px=x+dx+r.x+k;if(water?!isWater(input,px,y):!isLand(input,px,y))return false;}}
-  const L=x+dx+b.left-m,Rr=x+dx+b.right+m,T=y+b.top-m,B=y+b.bottom+m;
+ if(facing==='both')return faunaBodyFits(input,kind,size,pose,x,y,frame,room,1)&&faunaBodyFits(input,kind,size,pose,x,y,frame,room,-1);
+ const rects=faunaSprite(kind,size,pose,frame),b=faunaBounds(rects),group=FAUNA_GROUP[kind],m=HABITAT_PARAMETERS.buildingMargin[group];
+ const left=facing===1?b.left:-b.right,right=facing===1?b.right:-b.left,px=(r:{x:number;w:number},k:number)=>facing===1?r.x+k:-r.x-k;
+ if(group==='flying-bird')return y+b.bottom<HABITAT_PARAMETERS.skyFloor&&y+b.top>=0&&x+left>=0&&x+right<320;
+ const water=pose==='float'||pose==='dabble';
+ for(const dx of room?[-room,0,room]:[0]){
+  for(const r of rects){if(r.y+r.h-1!==0)continue;for(let k=0;k<r.w;k++){const fx=x+dx+px(r,k);if(water?!isWater(input,fx,y):!isLand(input,fx,y))return false;}}
+  const L=x+dx+left-m,Rr=x+dx+right+m,T=y+b.top-m,B=y+b.bottom+m;
   if(input.standing.some(p=>L<p.x+p.width&&Rr>=p.x&&T<p.y+p.depth&&B>=p.y))return false;
  }
  if(kind==='heron'){let near=false;for(let dy=-4;dy<=4&&!near;dy++)for(let dx=-4;dx<=4;dx++)if(isWater(input,x+dx,y+dy)){near=true;break;}if(!near)return false;}
