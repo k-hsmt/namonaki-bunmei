@@ -38,7 +38,7 @@ test('D1a: the painted width of each preset lies in the D0 §9 band; larger size
 
 test('D1a: invalid kinds, sizes, poses and frames are refused; no livestock kind exists',()=>{
  assert.throws(()=>faunaSprite('cow',10,'stand',0));
- assert.throws(()=>faunaSprite('deer',15,'stand',0));assert.throws(()=>faunaSprite('deer',4,'stand',0));assert.throws(()=>faunaSprite('deer',10.5,'stand',0));
+ assert.throws(()=>faunaSprite('deer',FAUNA_SIZE.deer.band[1]+1,'stand',0));assert.throws(()=>faunaSprite('deer',4,'stand',0));assert.throws(()=>faunaSprite('deer',10.5,'stand',0));
  assert.throws(()=>faunaSprite('deer',10,'fly',0));assert.throws(()=>faunaSprite('duck',6,'walk',0));
  assert.throws(()=>faunaSprite('deer',10,'walk',4));assert.throws(()=>faunaSprite('deer',10,'walk',-1));
  assert.throws(()=>drawFauna({rect(){}},'deer',10,'stand',0,1.5,10));assert.throws(()=>drawFauna({rect(){}},'deer',10,'stand',0,1,10,0));

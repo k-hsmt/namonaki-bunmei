@@ -27,14 +27,16 @@ export const FAUNA_GROUP:Readonly<Record<FaunaKind,FaunaGroup>>=Object.freeze({
  * by a pixel or two and is what the gallery reports. Small kinds have only a few distinct designs, so neighbouring
  * sizes may draw the same. `band` is the provisional D0 §9 band for a near animal (the painted width of the preset
  * lies in it); `min` is the smallest size drawn (far animals may go below the band, D0 §9 "奥行きで縮小").
+ * Human review D1c-1 (2026-11-20): animals other than birds were raised about 1.3× (large herbivores 10–11 → 13–14,
+ * small ground animals 5–7 → 7–9) and their bands widened to 8–18 and 3–10. Birds keep the D1a sizes.
  */
 export const FAUNA_SIZE:Readonly<Record<FaunaKind,{readonly band:readonly [number,number];readonly min:number;readonly preset:number}>>=Object.freeze({
- deer:{band:[8,14],min:5,preset:10},horse:{band:[8,14],min:5,preset:11},bison:{band:[8,14],min:5,preset:11},
- hare:{band:[3,7],min:3,preset:5},fox:{band:[3,7],min:4,preset:7},
+ deer:{band:[8,18],min:5,preset:13},horse:{band:[8,18],min:5,preset:14},bison:{band:[8,18],min:5,preset:14},
+ hare:{band:[3,10],min:3,preset:7},fox:{band:[3,10],min:4,preset:9},
  sparrow:{band:[2,5],min:2,preset:3},
  duck:{band:[4,8],min:4,preset:6},heron:{band:[4,8],min:5,preset:7},
  crow:{band:[4,10],min:3,preset:7},gull:{band:[4,10],min:3,preset:8},
- gazelle:{band:[8,14],min:5,preset:10},boar:{band:[8,14],min:5,preset:10},lizard:{band:[3,7],min:3,preset:5},parrot:{band:[4,10],min:3,preset:6},
+ gazelle:{band:[8,18],min:5,preset:13},boar:{band:[8,18],min:5,preset:13},lizard:{band:[3,10],min:3,preset:7},parrot:{band:[4,10],min:3,preset:6},
 });
 export type FaunaPose='stand'|'graze'|'walk'|'rest'|'sit'|'hop'|'peck'|'float'|'dabble'|'wade'|'fly'|'glide';
 /** Poses and their frame counts per kind. Only motions the kind can make are listed (D0 §12 D1a). */
@@ -282,9 +284,24 @@ const DRAW:Record<FaunaKind,(r:Pen,L:number,pose:FaunaPose,frame:number)=>void>=
 /** Rows of clearance under the airborne frame of a hop (its lowest row is y=−lift). Every other ground frame touches y=0. */
 export function faunaLift(kind:FaunaKind,size:number,pose:FaunaPose,frame:number):number {
  if(pose!=='hop')return 0;
+ const d=DESIGN_MAX[kind];if(d!==undefined&&size>d)return Math.round(faunaLift(kind,d,pose,frame)*size/d);
  if(kind==='hare')return frame===2?(size>=5?2:1):0;
  if(kind==='sparrow')return frame===1?1:0;
  return 0;
+}
+/**
+ * Human review D1c-1 (2026-11-20): animals other than birds looked too small in the live scenes. The small ground
+ * animals are hand-drawn at a few sizes; above the largest one (DESIGN_MAX) their rectangles are scaled up by
+ * size / DESIGN_MAX, edges rounded to whole pixels and the feet kept on the ground row.
+ */
+const DESIGN_MAX:Readonly<Partial<Record<FaunaKind,number>>>=Object.freeze({hare:5,fox:7,lizard:5});
+function scaleRects(rects:readonly FaunaRect[],s:number):FaunaRect[] {
+ return rects.map(r=>{
+  // heights above the ground row: rows h0..h1-1 (h0 = −(lowest y))
+  const h0=-(r.y+r.h-1),h1=-r.y+1,H0=Math.round(h0*s),H1=Math.max(H0+1,Math.round(h1*s));
+  const X0=Math.round(r.x*s),X1=Math.max(X0+1,Math.round((r.x+r.w)*s));
+  return Object.freeze({x:X0,y:-(H1-1),w:X1-X0,h:H1-H0,color:r.color});
+ });
 }
 /** Poses not standing on ground or water: their lowest row may be above y=0. */
 export const FAUNA_AIR_POSES:readonly FaunaPose[]=Object.freeze(['fly','glide']);
@@ -300,6 +317,8 @@ export function faunaSprite(kind:FaunaKind,size:number,pose:FaunaPose,frame:numb
  if(frames===undefined)throw Error(`Pose ${pose} is not made by ${kind}`);
  if(!Number.isInteger(frame)||frame<0||frame>=frames)throw Error('Invalid fauna frame');
  const key=`${kind}|${size}|${pose}|${frame}`,hit=cache.get(key);if(hit)return hit;
+ const d=DESIGN_MAX[kind];
+ if(d!==undefined&&size>d){const out=Object.freeze(scaleRects(faunaSprite(kind,d,pose,frame),size/d));cache.set(key,out);return out;}
  // an airborne hop shape has no foot row of its own (feet tucked or stretched), so it is raised one row less
  const rects:FaunaRect[]=[],lift=Math.max(0,faunaLift(kind,size,pose,frame)-1);
  DRAW[kind]((x,h,w,n,color)=>{if(w>0&&n>0)rects.push(Object.freeze({x,y:-(h+lift+n-1),w,h:n,color}));},size,pose,frame);

@@ -61,7 +61,7 @@ for(const kind of FAUNA_KINDS){
 }
 
 // ---------------------------------------------------------------- 2. scale candidates
-const CANDIDATES={deer:[8,10,12,14],horse:[8,11,14],bison:[8,11,14],hare:[3,5,7],fox:[5,7],sparrow:[2,3,4,5],duck:[4,6,8],heron:[5,7,8],crow:[4,7,10],gull:[4,8,10],gazelle:[8,10,12,14],boar:[8,10,12,14],lizard:[3,5,7],parrot:[4,6,8]};
+const CANDIDATES={deer:[8,10,13,16],horse:[8,11,14,17],bison:[8,11,14,17],hare:[3,5,7,9],fox:[5,7,9],sparrow:[2,3,4,5],duck:[4,6,8],heron:[5,7,8],crow:[4,7,10],gull:[4,8,10],gazelle:[8,10,13,16],boar:[8,10,13,16],lizard:[3,5,7,9],parrot:[4,6,8]};
 const SCW=24,SCH=40,SGY=34,REF=68;
 /** The pose a scale candidate is shown in: flying birds by their span (glide), the rest by their first pose. */
 const scalePose=kind=>FAUNA_GROUP[kind]==='flying-bird'?'glide':Object.keys(FAUNA_POSES[kind])[0];
