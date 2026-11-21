@@ -8,13 +8,14 @@ import {createCoupledReview,advanceCoupledReview} from '../dist/irrigation/coupl
 import {updateRegionalEconomy,regionalHarvestFactors} from '../dist/story/regional-economy.js';
 import {regions} from '../dist/story/population.js';
 import {reviewBaseHash} from '../dist/irrigation/wire-v1.js';
+import {withoutConfirmedMetrics} from './lib/confirmed-metrics.mjs';
 const reference=JSON.parse(await readFile('tests/fixtures/coupled-baseline-b-reference.json','utf8'));
 const report={sourceSHA:process.env.REVIEW_SOURCE_SHA??execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),scope:'C2 economic-connection milestone: exact neutral B, all-year replay of the carried combined branch, and split continuation. No trial codec, four-way visual comparison, or adoption decision.',cases:[]};
 function comparable(world){const {trialBoundary,...review}=world.review;return {...world,format:'generated-bridge-review',review};}
 for(const {seed,years,saveHash}of reference.cases){
  const save=createGeneratedWorldSave(createNewIrrigatedWorld(seed).review),baseline=advanceCoupledReview(await createCoupledReview(save,'baseline'),years),b=advanceGeneratedBridgeReview(restoreGeneratedWorld(save),years,'automatic');
  // Comparison only: never register or save a C2 adapter through a production factory.
- assert.deepEqual(comparable(baseline.world),b);assert.equal(await reviewBaseHash(createGeneratedWorldSave(b)),saveHash);
+ assert.deepEqual(comparable(baseline.world),b);assert.equal(await reviewBaseHash(withoutConfirmedMetrics(createGeneratedWorldSave(b))),saveHash);
  const start=await createCoupledReview(save,'combined'),combined=advanceCoupledReview(start,years),split=advanceCoupledReview(advanceCoupledReview(start,9900),100);
  assert.deepEqual(split,combined);assert.equal(combined.receipts.length,years);
  let economy=structuredClone(combined.initialEconomy),people,totalDiscarded=0,changedHarvestYears=0;

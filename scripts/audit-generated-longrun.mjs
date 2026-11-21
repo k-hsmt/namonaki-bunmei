@@ -1,6 +1,7 @@
 /** D5 natural worlds, lossless production saves and historical scenery.
  * Run after build, separately from the performance benchmark (includes IO).
  */
+import {withoutConfirmedMetrics} from './lib/confirmed-metrics.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
@@ -51,7 +52,7 @@ for(const seed of seeds){
    if(year>outer.review.state.year){previous=performance.now();outer={...outer,review:advanceGeneratedFacilityReview(outer.review,year-outer.review.state.year,'automatic',extension)};}
    for(let index=0;index<3;index++)early.set(`${year}:${index}`,hash(observeGeneratedSceneReview(outer,year,index)));
    const pinned=fixture.cases.find(c=>c.seed===seed&&c.year===year);
-   if(pinned)assert.equal(hash(outer.review.state),pinned.stateSha256,`seed ${seed} year ${year} differs from original complete state`);
+   if(pinned)assert.equal(hash(withoutConfirmedMetrics(outer.review.state)),pinned.stateSha256,`seed ${seed} year ${year} differs from original complete state`);
    if([0,100,1000,10000].includes(year)){
     const start=performance.now(),save=createGeneratedWorldSave(outer),encoded=await encodeWorldSave(save),decoded=await decodeWorldSave(encoded.json),restored=restoreGeneratedWorld(decoded);
     assert.deepEqual(restored.review.state,outer.review.state);assert.deepEqual(restored.review.placements,outer.review.placements);

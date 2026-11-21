@@ -1,4 +1,5 @@
 /** Independent, recorded v7/D4 branches; this script never advances either history. */
+import {withoutConfirmedMetrics,preMetricsTerrainTrialPacketHash} from './lib/confirmed-metrics.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -59,7 +60,8 @@ async function review(entry){
  const snapshotYears=[...years].sort((a,b)=>a-b),policies=[{policy:'baseline',series:b.values,summary:b.summary},{policy:'terrain',series:c.values,summary:c.summary}],data={sourceSHA,seed,years:10000,columns,first,projects,holds:entry.holds,policies,snapshotYears,globalPopulationExact:b.values.every((r,i)=>r.slice(10,14).reduce((a,b)=>a+b,0)===c.values[i].slice(10,14).reduce((a,b)=>a+b,0)),sceneChecks:[]};
  // Freeze semantic references before any production profile is introduced.
  const {terrainChangeBoundary:_,...review}=cView.review,tuples=economicTuplesInternal(cut.economicCoupling);
- const fixed={seed,packetHash:entry.packetHash,worldHash:await reviewBaseHash({...cView,review:{...review,diagnostics:{holds:{},fullSearches:0}}}),receiptsHash:await reviewBaseHash(tuples.receipts),phasesHash:await reviewBaseHash(tuples.phases),changesHash:await reviewBaseHash(cut.terrainHistory.events.map(({ruleId,revisionId,parentRevision,...e})=>e))};
+ // Issue #29 S1: frozen values are compared without the new metric history (scripts/lib/confirmed-metrics.mjs).
+ const fixed={seed,packetHash:await preMetricsTerrainTrialPacketHash(await prepareTerrainTrialSave(cut),seed),worldHash:await reviewBaseHash(withoutConfirmedMetrics({...cView,review:{...review,diagnostics:{holds:{},fullSearches:0}}})),receiptsHash:await reviewBaseHash(tuples.receipts),phasesHash:await reviewBaseHash(tuples.phases),changesHash:await reviewBaseHash(cut.terrainHistory.events.map(({ruleId,revisionId,parentRevision,...e})=>e))};
  await copyFile(out+`/seed${seed}-v7-baseline.json`,dir+'/baseline.json');await copyFile(out+`/seed${seed}-terrain-trial.json`,dir+'/terrain.json');
  const server=await coupledReviewServer();let browser;
  try{

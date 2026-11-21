@@ -2,6 +2,7 @@
  * Build both checkouts first. BASELINE_ROOT must identify an unmodified main.
  * Initialization, hashing, rendering and serialization are outside the timer.
  */
+import {withoutConfirmedMetrics} from './lib/confirmed-metrics.mjs';
 import assert from 'node:assert/strict';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -56,7 +57,7 @@ for(const seed of seeds)for(const year of years){
    assert.equal(state.year,year);assert.ok(!state.pending);
    if(expectedHash)assert.equal(stateSha256,expectedHash,'repeated run changed state');expectedHash=stateSha256;
    const pinned=fixture.cases.find(c=>c.seed===seed&&c.year===year);
-   if(pinned&&!legacy)assert.equal(stateSha256,pinned.stateSha256,'complete pre-optimization state changed');
+   if(pinned&&!legacy)assert.equal(createHash('sha256').update(JSON.stringify(withoutConfirmedMetrics(state))).digest('hex'),pinned.stateSha256,'complete pre-optimization state changed');
    if(run){values.push(elapsedMs);traces.push(trace);}
    console.log(JSON.stringify({seed,year,name,run,warmup:run===0,elapsedMs,stateSha256}));
   }

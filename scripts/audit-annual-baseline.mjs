@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {withoutConfirmedMetrics} from './lib/confirmed-metrics.mjs';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {createNewIrrigatedWorld} from '../dist/story/new-world.js';
@@ -11,7 +12,8 @@ const report={sourceSHA:process.env.REVIEW_SOURCE_SHA??execFileSync('git',['rev-
  scope:'Neutral annual land/lifecycle/ecology runner. Environment commits before the next civilization phase; complete old B v6 save hashes. No economic feedback or C2 trial codec.',cases:[]};
 for(const {seed,years,saveHash} of reference.cases){
  const origin=createNewIrrigatedWorld(seed).review,{world,diagnostics:d}=advanceAnnualBaseline(origin,years);
- const actual=await reviewBaseHash(createGeneratedWorldSave(world));assert.equal(actual,saveHash,'complete original B save, seed '+seed);
+ // Issue #29 S1: compared without the new confirmed metric history (scripts/lib/confirmed-metrics.mjs).
+ const actual=await reviewBaseHash(withoutConfirmedMetrics(createGeneratedWorldSave(world)));assert.equal(actual,saveHash,'complete original B save, seed '+seed);
  assert.equal(d.ecologySteps,years);
  for(let n=0;n<d.phases.length;n++){
   const p=d.phases[n];assert.equal(p.ecologyBefore,p.confirmedBefore);assert.equal(p.ecologyAfter,p.confirmedAfter);

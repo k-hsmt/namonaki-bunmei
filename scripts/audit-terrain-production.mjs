@@ -1,4 +1,5 @@
 /** Production terrain versus immutable preproduction model, not two rewritten trial branches. */
+import {withoutConfirmedMetrics,preMetricsOriginHash} from './lib/confirmed-metrics.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -18,11 +19,11 @@ const out='artifacts/environment34-terrain-production',sourceSHA=process.env.REV
 const normalized=(view,marker)=>{const {[marker]:_,...review}=view.review;return {...view,review:{...review,diagnostics:{holds:{},fullSearches:0}}};};
 async function check(expected){
  const seed=expected.seed,root=(await createNewEconomicWorld(seed)).review,baseline=advanceEconomicProductionWorld(root,10000,'automatic'),b=c3Reference.cases.find(c=>c.seed===seed),basePacket=await prepareEconomicProductionSave(baseline);
- assert.equal(await reviewBaseHash(normalized(economicProductionViewInternal(baseline),'economicPolicyBoundary')),b.worldHash);
+ assert.equal(await reviewBaseHash(withoutConfirmedMetrics(normalized(economicProductionViewInternal(baseline),'economicPolicyBoundary'))),b.worldHash);
  await assert.rejects(()=>introduceTerrainProduction(baseline));await writeFile(out+`/seed${seed}-v7-baseline.json`,(await encodeWorldSave(basePacket)).json);
- const initial=await introduceTerrainProduction(root),world=await advanceTerrainProductionWorld(initial,10000,'automatic'),view=terrainProductionViewInternal(world),tuples=economicTuplesInternal(world.economicCoupling),actual={worldHash:await reviewBaseHash(normalized(view,'terrainPolicyBoundary')),receiptsHash:await reviewBaseHash(tuples.receipts),phasesHash:await reviewBaseHash(tuples.phases),changesHash:await reviewBaseHash(world.terrainHistory.events.map(({ruleId,revisionId,parentRevision,...e})=>e))};
+ const initial=await introduceTerrainProduction(root),world=await advanceTerrainProductionWorld(initial,10000,'automatic'),view=terrainProductionViewInternal(world),tuples=economicTuplesInternal(world.economicCoupling),actual={worldHash:await reviewBaseHash(withoutConfirmedMetrics(normalized(view,'terrainPolicyBoundary'))),receiptsHash:await reviewBaseHash(tuples.receipts),phasesHash:await reviewBaseHash(tuples.phases),changesHash:await reviewBaseHash(world.terrainHistory.events.map(({ruleId,revisionId,parentRevision,...e})=>e))};
  for(const key of Object.keys(actual))assert.equal(actual[key],expected[key],`Frozen D4 ${seed} ${key} differs`);
- assert.equal(world.economicCoupling.originHash,b.originHash);assert.equal(slowTerrainProductionClimate(world),world);
+ assert.equal(await preMetricsOriginHash(world.economicCoupling.originHash,seed),b.originHash);assert.equal(slowTerrainProductionClimate(world),world);
  const packet=await prepareTerrainProductionSave(world),encoded=await encodeWorldSave(packet);let t=performance.now();const loaded=restoreTerrainProductionSave(await decodeWorldSave(encoded.json)),coldReadMs=performance.now()-t;assert.equal((await prepareTerrainProductionSave(loaded)).payloadHash,packet.payloadHash);
  const at9900=await advanceTerrainProductionWorld(initial,9900,'automatic'),continued=await advanceTerrainProductionWorld(restoreTerrainProductionSave(await decodeWorldSave((await encodeWorldSave(await prepareTerrainProductionSave(at9900))).json)),100,'automatic');assert.equal((await prepareTerrainProductionSave(continued)).payloadHash,packet.payloadHash);
  await writeFile(out+`/seed${seed}-v8.json`,encoded.json);
