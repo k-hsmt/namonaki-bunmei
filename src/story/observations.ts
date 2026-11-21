@@ -46,6 +46,37 @@ export function isConfirmedMetricValue(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100;
 }
 
+/** Exactly four in-range values at indices 0..3 (a sparse or decorated array is not a row). */
+function isConfirmedMetricRow(row: unknown): row is ConfirmedMetrics {
+  return Array.isArray(row) && row.length === 4 && Object.keys(row).length === 4 &&
+    [0, 1, 2, 3].every((i) => Object.hasOwn(row, i) && isConfirmedMetricValue(row[i]));
+}
+
+/**
+ * The saved metric history of a ledger whose last confirmed year is `confirmedYear`: the exact fields, one row per
+ * confirmed year from year 0, every value finite and within 0..100. When the year is fully confirmed (no choice
+ * pending), `current` is the civilization's four values and must equal the last row; a pending state passes null,
+ * because its live values are the pending year's draft. Nothing is repaired.
+ */
+export function validateConfirmedMetricLedger(raw: unknown, confirmedYear: number, current: ConfirmedMetrics | null): void {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || ![Object.prototype, null].includes(Object.getPrototypeOf(raw))) {
+    throw new Error('Invalid confirmed metric history');
+  }
+  const ledger = raw as Record<string, unknown>;
+  if (Object.keys(ledger).sort().join(',') !== 'firstYear,ruleId,values' || ledger.ruleId !== civilizationMetricRule ||
+    ledger.firstYear !== 0 || !Number.isSafeInteger(confirmedYear) || confirmedYear < 0 ||
+    !Array.isArray(ledger.values) || ledger.values.length !== confirmedYear + 1) {
+    throw new Error('Invalid confirmed metric history');
+  }
+  for (let i = 0; i < ledger.values.length; i++) {
+    if (!isConfirmedMetricRow(ledger.values[i])) throw new Error('Invalid confirmed metrics');
+  }
+  if (current) {
+    const last = ledger.values[confirmedYear] as ConfirmedMetrics;
+    if (last.some((value, i) => value !== current[i])) throw new Error('Confirmed metrics disagree with the civilization');
+  }
+}
+
 export function createMetricLedger(): ConfirmedMetricLedger {
   return { ruleId: civilizationMetricRule, firstYear: 0, values: [] };
 }
@@ -60,9 +91,7 @@ export function commitObservation(ledger: ObservationLedger, year: number, metri
   const record = ledger.metrics;
   if (record) {
     if (record.values.length !== year - record.firstYear) throw new Error('Metric history is out of sequence');
-    if (!Array.isArray(metrics) || metrics.length !== 4 || !metrics.every(isConfirmedMetricValue)) {
-      throw new Error('Invalid confirmed metrics');
-    }
+    if (!isConfirmedMetricRow(metrics)) throw new Error('Invalid confirmed metrics');
   }
 
   const block = ledger.blocks.at(-1);

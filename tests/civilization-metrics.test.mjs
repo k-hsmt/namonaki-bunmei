@@ -10,6 +10,9 @@ import {advanceGeneratedBridgeReview} from '../dist/story/generated-bridge-revie
 import {advanceWorldSessionAsync,chooseWorldSessionAsync,prepareWorldSessionSave,restoreWorldSession} from '../dist/story/world-session.js';
 import {parseWorldSaveAsync,serializeWorldSave} from '../dist/story/world-save.js';
 import {validateClimateWorldSave,OutdatedWorldSaveError} from '../dist/climate/climate-world-v1.js';
+import {createHousingCivilization} from '../dist/story/housing-persistence.js';
+import {migrateLegacySave} from '../dist/story/legacy-terrain-save.js';
+import {decodeReviewSaveDraft} from '../dist/story/compressed-save-draft-review.js';
 import {assertConfirmedMetricHistory} from './helpers/civilization-metrics.mjs';
 
 const values=s=>[s.food,s.cohesion,s.knowledge,s.culture];
@@ -67,7 +70,8 @@ test('S1: a pending year has no row; the choice confirms it once, the same for m
 
 test('S1: whole and split advancing give the same confirmed history',()=>{
  const whole=advance(createCivilization(11),600);
- const split=createCivilization(11);advance(split,250);advance(JSON.parse(JSON.stringify(split)),0);advance(split,350);
+ // The second part continues from a JSON copy, as a save and restore would.
+ const split=JSON.parse(JSON.stringify(advance(createCivilization(11),250)));advance(split,350);
  assert.deepEqual(split.observation.metrics,whole.observation.metrics);
  assert.deepEqual(split,whole);
 });
@@ -87,7 +91,7 @@ test('S1: commitObservation checks the year and the four values before writing a
  const s=createCivilization(5),ledger=s.observation;
  const snapshot=()=>JSON.stringify(ledger);
  const good=[50,50,50,50];
- for(const [year,metrics] of [[0,good],[2,good],[-1,good],[1,[50,50,50]],[1,[50,50,50,50,50]],[1,[NaN,1,1,1]],[1,[1,Infinity,1,1]],[1,[1,1,-0.1,1]],[1,[1,1,1,100.5]],[1,['1',1,1,1]],[1,undefined]]){
+ for(const [year,metrics] of [[0,good],[2,good],[-1,good],[1,[50,50,50]],[1,[50,50,50,50,50]],[1,[NaN,1,1,1]],[1,[1,Infinity,1,1]],[1,[1,1,-0.1,1]],[1,[1,1,1,100.5]],[1,['1',1,1,1]],[1,undefined],[1,[1,,1,1]],[1,Object.assign([1,1,1,1],{extra:1})]]){
   const before=snapshot();
   assert.throws(()=>commitObservation(ledger,year,metrics),String(year)+' '+JSON.stringify(metrics));
   assert.equal(snapshot(),before,'a rejected year leaves the ledger unchanged');
@@ -121,15 +125,23 @@ test('S1: the generated state reader requires the complete history and rejects e
   belowRange:s=>{s.observation.metrics.values[3][2]=-1;},
   aboveRange:s=>{s.observation.metrics.values[3][3]=100.01;},
   objectRow:s=>{s.observation.metrics.values[3]={0:1,1:1,2:1,3:1,length:4};},
-  lastRowDisagrees:s=>{s.observation.metrics.values[last][0]=s.food===0?1:0;},
-  stateDisagrees:s=>{s.culture=s.culture===100?99:s.culture+1;},
  };
+ // Values kept within 0..100, so only the agreement check can reject them.
+ const disagreements={
+  lastRowDisagrees:s=>{const row=s.observation.metrics.values[last];row[0]=row[0]>=50?row[0]-1:row[0]+1;},
+  stateDisagrees:s=>{s.culture=s.culture>=50?s.culture-1:s.culture+1;},
+ };
+ assert.equal(state.pending,null,'the agreement check applies to a confirmed state');
+ for(const [name,change] of Object.entries(disagreements)){
+  const raw=JSON.parse(JSON.stringify(state));change(raw);
+  assert.throws(()=>validateGeneratedState(raw,seed),/Confirmed metrics disagree/,name);
+ }
  for(const [name,change] of Object.entries(variants)){
   const raw=JSON.parse(JSON.stringify(state));change(raw);
   assert.throws(()=>validateGeneratedState(raw,seed),Error,name);
  }
- // This layer checks shape and the last confirmed year; an earlier row edited to another in-range value passes here
- // unchanged (never repaired) and is rejected by the production save's replay commitment (see the v10 test below).
+ // This layer checks shape and the last confirmed year only: an earlier row edited to another in-range value passes
+ // here unchanged (never repaired). No replay recomputes these values (see docs/issue29-s1-implementation.md §3.1).
  const edited=JSON.parse(JSON.stringify(state));edited.observation.metrics.values[5][0]=edited.observation.metrics.values[5][0]===0?1:0;
  assert.deepEqual(validateGeneratedState(edited,seed).observation.metrics.values[5],edited.observation.metrics.values[5]);
 });
@@ -157,9 +169,27 @@ test('S1: the v10 save carries the history through save, restore and further yea
  const visit=o=>{if(!o||typeof o!=='object')return 0;let n=0;if(o.observation?.metrics){delete o.observation.metrics;n++;}for(const v of Object.values(o))n+=visit(v);return n;};
  assert.ok(visit(stripped)>0);
  await assert.rejects(validateClimateWorldSave(stripped),'a current save without the history is refused');
- // An earlier confirmed year changed to another in-range value is caught by the replay commitment of the save.
+ // An earlier confirmed year changed to another in-range value is caught by the save's payload hash. The hash is an
+ // integrity check, not a replay: an edit with a recomputed hash is not detected (docs/issue29-s1-implementation.md §3.1).
  const tampered=JSON.parse(serializeWorldSave(packet));let edits=0;
  const tamper=o=>{if(!o||typeof o!=='object')return;const m=o.observation?.metrics;if(m&&m.values.length>6){m.values[5][0]=m.values[5][0]===0?1:0;edits++;}for(const v of Object.values(o))tamper(v);};
  tamper(tampered);assert.ok(edits>0);
  await assert.rejects(validateClimateWorldSave(tampered));
+});
+
+test('S1: the legacy-fixed reader checks a recorded metric history the same way and never invents one',async()=>{
+ const draft=migrateLegacySave(createHousingCivilization(42));
+ assertConfirmedMetricHistory(draft.state);
+ assert.deepEqual((await decodeReviewSaveDraft(JSON.stringify(draft))).state.observation.metrics,draft.state.observation.metrics);
+ const variants={
+  rule:m=>{m.ruleId='x';},
+  futureRow:m=>{m.values.push([1,1,1,1]);},
+  empty:m=>{m.values=[];},
+  aboveRange:m=>{m.values[0][0]=101;},
+  disagrees:m=>{m.values[0][3]=m.values[0][3]>=50?m.values[0][3]-1:m.values[0][3]+1;},
+ };
+ for(const [name,change] of Object.entries(variants)){
+  const raw=JSON.parse(JSON.stringify(draft));change(raw.state.observation.metrics);
+  await assert.rejects(decodeReviewSaveDraft(JSON.stringify(raw)),Error,name);
+ }
 });

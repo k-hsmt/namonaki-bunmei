@@ -11,7 +11,7 @@ function binding(p:Path):{path:Path;prefix?:true;blocks?:true}|undefined {
  const staticPaths:Record<string,Path>={'initialTerrain/record':['world','review','terrain'],'initialTerrain/hydrology':['world','review','bridgeReview','hydrology'],'initialTerrain/plans':['world','review','plans'],'vegetation/initial':['world','vegetation','initial'],'state/economy':['initialEconomy']};
  if(staticPaths[key])return {path:staticPaths[key]!};
  if(['vegetation/events','environment/targets','environment/uses','environment/checkpoints','irrigation/systems','irrigation/events','irrigation/attempts'].includes(key))return {path:['world',...p],prefix:true};
- if(/^state\/(history|decisions|samples|memory\/log|housing\/events|publicSpaces\/events|observation\/blocks)$/.test(key)||/^state\/observation\/sites\/[012]\/(changes|buildingChanges|practiceChanges)$/.test(key))return {path:['world','review',...p],prefix:true,...(key==='state/observation/blocks'?{blocks:true}:{})};
+ if(/^state\/(history|decisions|samples|memory\/log|housing\/events|publicSpaces\/events|observation\/blocks|observation\/metrics\/values)$/.test(key)||/^state\/observation\/sites\/[012]\/(changes|buildingChanges|practiceChanges)$/.test(key))return {path:['world','review',...p],prefix:true,...(key==='state/observation/blocks'?{blocks:true}:{})};
 }
 export function captureEconomicOriginInternal<D extends OriginDialect>(save:GeneratedWorldSave,dialect:D):{readonly format:D['prefix'];readonly template:unknown} {
  const walk=(v:unknown,p:Path):unknown=>{

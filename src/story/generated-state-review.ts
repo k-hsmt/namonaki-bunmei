@@ -3,7 +3,7 @@ import {checkStateHeader} from './legacy-terrain-save.js';
 import {validateHousingHistory} from './housing-save.js';
 import {lastObservedYear,type CivilizationState} from './engine.js';
 import {siteAt} from './settlement-history.js';
-import {civilizationMetricRule,isConfirmedMetricValue} from './observations.js';
+import {validateConfirmedMetricLedger} from './observations.js';
 export const wireObject=(v:unknown,required:readonly string[],optional:readonly string[]=[]):Record<string,unknown>=>{
  if(!v||typeof v!=='object'||Array.isArray(v)||![Object.prototype,null].includes(Object.getPrototypeOf(v))||required.some(k=>!Object.hasOwn(v,k))||Object.keys(v).some(k=>![...required,...optional].includes(k)))throw Error('Invalid generated object fields');return v as Record<string,unknown>;
 };
@@ -55,11 +55,8 @@ export function validateGeneratedState(raw:unknown,seed:number):CivilizationStat
  }
  if(!s.pending&&!sameWire(last,observation.people))throw Error('Population view disagrees with history');
  // Issue #29 S1: one row of four confirmed metrics per confirmed year from year 0; no row for a pending year.
- const metrics=wireObject(observation.metrics,['ruleId','firstYear','values']);
- if(metrics.ruleId!==civilizationMetricRule||metrics.firstYear!==0||!Array.isArray(metrics.values)||metrics.values.length!==year+1)throw Error('Invalid confirmed metric history');
- for(const row of metrics.values)if(!Array.isArray(row)||row.length!==4||!row.every(isConfirmedMetricValue))throw Error('Invalid confirmed metrics');
  // A pending year's state holds draft values, so only a fully confirmed state must equal its last row.
- if(!s.pending&&!sameWire(metrics.values[year],[s.food,s.cohesion,s.knowledge,s.culture]))throw Error('Confirmed metrics disagree with the civilization');
+ validateConfirmedMetricLedger(observation.metrics,year,s.pending?null:[s.food,s.cohesion,s.knowledge,s.culture]);
  for(const [index,rawSite] of observation.sites.entries()){
   const site=wireObject(rawSite,['view','changes','buildingChanges','practiceChanges','growthYears','shrinkYears','lastWork'],['reorganizeUntil','repairYears']);
   for(const key of ['growthYears','shrinkYears','lastWork','reorganizeUntil','repairYears'])if(site[key]!==undefined&&!nat(site[key]))throw Error('Invalid generated site counter');
