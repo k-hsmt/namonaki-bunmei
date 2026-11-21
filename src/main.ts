@@ -74,7 +74,7 @@ function chapter(entries:RecordEntry[]){
  return '小さな集落 · はじまりの時代';
 }
 function format(v:number){return new Intl.NumberFormat('ja-JP').format(Math.round(v));}
-function inspect(year:number,record?:RecordEntry){stop();viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
+function inspect(year:number,record?:RecordEntry){stop();graphCandidate=null;viewedYear=year;active=record??[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();document.querySelector('.paper')!.scrollIntoView({behavior:'smooth',block:'start'});}
 /**
  * Issue #36 D3 (Human decisions after D1c): a step to a later confirmed year blends a changed season over 250 ms; at the
  * fast and rapid speeds the whole observation (scene and year label together) is redrawn at most every 1400 ms, showing
@@ -98,7 +98,10 @@ let graphMetric:CivilizationMetricKey|null=null,graphRange:GraphRange=200;
 let graphEnd:number|null=null;
 /** A touch or keyboard choice not yet observed (never written to the observed year or the history). */
 let graphCandidate:number|null=null;
-const SVG='http://www.w3.org/2000/svg',PLOT={left:52,right:632,top:14,bottom:164,width:640,height:200};
+const SVG='http://www.w3.org/2000/svg',narrowGraph=matchMedia('(max-width:680px)');
+/** Plot geometry in viewBox units; the viewBox keeps the CSS aspect ratio so text and points are not stretched. */
+let PLOT={left:52,right:632,top:14,bottom:164,width:640,height:200};
+const graphGeometry=()=>narrowGraph.matches?{left:60,right:628,top:18,bottom:268,width:640,height:320}:{left:52,right:632,top:14,bottom:164,width:640,height:200};
 const svg=(name:string,attrs:Record<string,string|number>,text?:string)=>{const e=document.createElementNS(SVG,name);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));if(text!==undefined)e.textContent=text;return e;};
 function renderStatus(y:number,scenePopulation:number,viewingPast:boolean,awaitingChoice:boolean){
  const view=civilizationStatusView(state,y,scenePopulation);
@@ -117,7 +120,7 @@ function renderGraph(y:number,confirmedYear:number){
  const key=graphMetric,win=graphWindowNow(confirmedYear),points=metricSeries(state,key,win.from,win.to),scale=metricScale(key,points);
  for(const b of document.querySelectorAll<HTMLButtonElement>('.civ-graph-ranges button'))b.setAttribute('aria-pressed',String(b.dataset.range===String(graphRange)));
  el('civ-graph-title').textContent=`${metricLabels[key]}の推移（文明全体・${scale.unit}）`;
- const plot=el('civ-graph-plot');plot.replaceChildren();
+ const plot=el('civ-graph-plot');plot.replaceChildren();PLOT=graphGeometry();plot.setAttribute('viewBox',`0 0 ${PLOT.width} ${PLOT.height}`);
  const span=Math.max(1,win.to-win.from),x=(year:number)=>PLOT.left+(year-win.from)/span*(PLOT.right-PLOT.left),yv=(v:number)=>PLOT.bottom-(v-scale.min)/(scale.max-scale.min)*(PLOT.bottom-PLOT.top);
  for(const t of scale.ticks){plot.append(svg('line',{x1:PLOT.left,x2:PLOT.right,y1:yv(t),y2:yv(t),class:'grid'}),svg('text',{x:PLOT.left-6,y:yv(t)+4,class:'tick','text-anchor':'end'},key==='population'?new Intl.NumberFormat('ja-JP',{notation:'compact'}).format(t):String(t)));}
  plot.append(svg('text',{x:PLOT.left,y:PLOT.height-8,class:'tick'},`${format(win.from)}年`),svg('text',{x:PLOT.right,y:PLOT.height-8,class:'tick','text-anchor':'end'},`${format(win.to)}年`));
@@ -143,7 +146,12 @@ function renderGraph(y:number,confirmedYear:number){
 /** The common entry of graph observation: a confirmed year only; stops automatic progress; does not scroll. */
 function observeYear(year:number){
  const confirmed=lastObservedYear(state);if(!Number.isSafeInteger(year)||year<0||year>confirmed)return;
- stop();graphEnd??=graphWindowNow(confirmed).to;graphCandidate=null;viewedYear=year;
+ stop();const win=graphWindowNow(confirmed);
+ // Hold the window where it is; move it only as far as needed when the year lies outside it.
+ graphEnd=year<win.from?Math.min(confirmed,year+(win.to-win.from)):year>win.to?year:win.to;
+ graphCandidate=null;
+ // The last confirmed year is the live view (as on the slider): a pending choice stays visible.
+ viewedYear=year===confirmed?null:year;if(viewedYear===null)graphEnd=null;
  active=[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();
 }
 function returnLive(){viewedYear=null;graphEnd=null;graphCandidate=null;render();}
@@ -152,19 +160,24 @@ for(const b of document.querySelectorAll<HTMLButtonElement>('.civ-metric'))b.add
 for(const b of document.querySelectorAll<HTMLButtonElement>('.civ-graph-ranges button'))b.addEventListener('click',()=>{const r=b.dataset.range;graphRange=r==='all'?'all':Number(r) as GraphRange;render();});
 el('civ-graph-close').addEventListener('click',()=>{graphMetric=null;graphCandidate=null;render();});
 const graphPlot=el('civ-graph-plot');
+let plotPress:number|null=null;
+graphPlot.addEventListener('pointerdown',event=>{plotPress=event.isPrimary&&event.button===0?event.pointerId:null;});
+graphPlot.addEventListener('pointercancel',()=>{plotPress=null;});
 graphPlot.addEventListener('pointerup',event=>{
- if(busy||!event.isPrimary)return;const rect=graphPlot.getBoundingClientRect();if(!rect.width)return;
+ const pressed=plotPress===event.pointerId;plotPress=null;
+ if(busy||!event.isPrimary||event.button!==0||!pressed)return;const rect=graphPlot.getBoundingClientRect();if(!rect.width)return;
  const vx=(event.clientX-rect.left)/rect.width*PLOT.width,year=yearAtFraction(graphWindowNow(lastObservedYear(state)),(vx-PLOT.left)/(PLOT.right-PLOT.left));
  // Human decision C: a mouse (or pen) observes the year at once; a touch only proposes it until confirmed.
  if(event.pointerType==='touch')setCandidate(year);else observeYear(year);
 });
-el('civ-graph-year').addEventListener('change',()=>setCandidate(Number((el('civ-graph-year') as HTMLInputElement).value)));
+const typedYear=()=>{const v=(el('civ-graph-year') as HTMLInputElement).value.trim();return v===''?NaN:Number(v);};
+el('civ-graph-year').addEventListener('change',()=>{const y=typedYear();if(Number.isFinite(y))setCandidate(y);});
 el('civ-graph-minus').addEventListener('click',()=>setCandidate((graphCandidate??viewedYear??lastObservedYear(state))-1));
 el('civ-graph-plus').addEventListener('click',()=>setCandidate((graphCandidate??viewedYear??lastObservedYear(state))+1));
 const recordYears=()=>recordMarkers(state,0,lastObservedYear(state)).map(m=>m.year);
 el('civ-graph-prev-record').addEventListener('click',()=>{const from=graphCandidate??viewedYear??lastObservedYear(state),year=recordYears().filter(y=>y<from).at(-1);if(year!==undefined)setCandidate(year);});
 el('civ-graph-next-record').addEventListener('click',()=>{const from=graphCandidate??viewedYear??lastObservedYear(state),year=recordYears().find(y=>y>from);if(year!==undefined)setCandidate(year);});
-el('civ-graph-observe').addEventListener('click',()=>{if(busy)return;const input=el('civ-graph-year') as HTMLInputElement,year=graphCandidate??Number(input.value);if(Number.isFinite(year))observeYear(Math.round(year));});
+el('civ-graph-observe').addEventListener('click',()=>{if(busy)return;const year=graphCandidate??typedYear();if(Number.isFinite(year))observeYear(Math.max(0,Math.min(lastObservedYear(state),Math.round(year))));});
 function render(){
  if(throttledRender!==null){clearTimeout(throttledRender);throttledRender=null;}
  const seasonTransition=stepTransition;stepTransition=0;lastStepRender=Date.now();
@@ -217,10 +230,10 @@ function render(){
  el('scene-phase').textContent=scene.phase;
  el('scene-atmosphere').textContent=scene.atmosphere;
  el('past-notice').hidden=!viewingPast;
- el('past-note').textContent=`世界暦 ${format(y)}年の風景を観測中 · 現在は${format(state.year)}年`;
+ el('past-note').textContent=`世界暦 ${format(y)}年の風景を観測中 · 現在は${format(confirmedYear)}年`;
  document.querySelector('.paper')!.classList.toggle('past-view',viewingPast);
  scrubber.max=String(confirmedYear);scrubber.value=String(y);
- el('rewind-label').textContent=`${format(y)}年 / 現在 ${format(state.year)}年`;
+ el('rewind-label').textContent=`${format(y)}年 / 現在 ${format(confirmedYear)}年`;
  el('chapter').textContent=chapter(observedRecords);el('year').textContent=`世界暦 ${format(viewingPast?y:state.year)}年${!viewingPast&&state.pending?'（未確定）':''}`;
  el('kind').textContent=!viewingPast&&state.pending?'分かれ道':active.tag;
  el('headline').textContent=!viewingPast&&state.pending?'歴史に、ひとつの選択が訪れる。':active.title;
@@ -279,7 +292,7 @@ autoChoiceInput.addEventListener('change',()=>{if(autoChoiceInput.checked)schedu
 autoDelayInput.addEventListener('change',()=>{clearChoiceTimer();scheduleChoice();});
 el('play').addEventListener('click',()=>{if(busy)return;if(viewedYear!==null){returnLive();return;}if(timer!==null){stop();return;}start();});
 el('return-now').addEventListener('click',returnLive);
-scrubber.addEventListener('input',()=>{stop();const y=Number(scrubber.value);viewedYear=y===lastObservedYear(state)?null:y;graphEnd=viewedYear===null?null:graphEnd;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
+scrubber.addEventListener('input',()=>{stop();graphCandidate=null;const y=Number(scrubber.value);viewedYear=y===lastObservedYear(state)?null:y;graphEnd=viewedYear===null?null:graphEnd;active=[...state.history].reverse().find(e=>e.year<=y)??state.history[0]!;render();});
 el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
 function setBusy(value:boolean){busy=value;document.querySelectorAll<HTMLButtonElement>('#options button').forEach(b=>b.disabled=value);for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic','enable-terrain'])(el(id) as HTMLButtonElement).disabled=value;}
 function adopt(candidate:WorldSession,keepObservation=false,keepArchive=false,deferRender=false){

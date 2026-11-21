@@ -42,7 +42,7 @@ async function clickPlotAtYear(page,win,year,pointerType){
  const box=await page.locator('#civ-graph-plot').boundingBox(),vx=PLOT.left+(year-win.from)/(win.to-win.from)*(PLOT.right-PLOT.left);
  const x=box.x+vx/PLOT.width*box.width,y=box.y+box.height/2;
  if(pointerType==='mouse'){await page.mouse.click(x,y);return;}
- await page.locator('#civ-graph-plot').dispatchEvent('pointerup',{pointerType,isPrimary:true,clientX:x,clientY:y,bubbles:true});
+ for(const type of ['pointerdown','pointerup'])await page.locator('#civ-graph-plot').dispatchEvent(type,{pointerType,pointerId:7,isPrimary:true,button:0,clientX:x,clientY:y,bubbles:true});
 }
 
 test('S2: the status bar shows the five confirmed civilization-wide values under the scene, the same for every site',async t=>{
@@ -77,9 +77,16 @@ test('S3: one metric graph opens and closes; mouse observes a year at once and k
  assert.equal(await page.inputValue('#rewind-year'),String(observed));
  assert.deepEqual(await barTexts(page),expectedBar(state,observed));
  assert.deepEqual(await page.locator('#civ-graph-plot .tick').allTextContents(),ticks,'the window did not re-center on the observed year');
+ // A right click does not observe anything.
+ const box=await page.locator('#civ-graph-plot').boundingBox();
+ await page.mouse.click(box.x+box.width*.2,box.y+box.height/2,{button:'right'});
+ assert.equal(await page.locator('#scene-year').textContent(),`世界暦 ${format.format(observed)}年`);
  await page.click('#return-now');
  assert.equal(await page.locator('#past-notice').isVisible(),false);
  assert.deepEqual(await barTexts(page),expectedBar(state,last));
+ // Observing the last confirmed year is the live view, as on the slider.
+ await clickPlotAtYear(page,graphWindow(last,50,last),last,'mouse');
+ assert.equal(await page.locator('#past-notice').isVisible(),false);
  await page.click('#civ-graph-close');assert.equal(await page.locator('#civ-graph').isVisible(),false);
 });
 
@@ -100,6 +107,14 @@ test('S3: touch only proposes a year until "この年を観測"; the year input 
  await page.click('#civ-graph-observe');
  assert.equal(await page.locator('#scene-year').textContent(),'世界暦 13年');
  assert.deepEqual(await barTexts(page),expectedBar(state,13));
+ // An empty year field is ignored (not year 0).
+ await page.fill('#civ-graph-year','');await page.locator('#civ-graph-year').dispatchEvent('change');
+ assert.match(await page.locator('#civ-graph-candidate').textContent(),/^マウスでは/);
+ // Observing a year outside the current window moves the window just enough to show it.
+ await page.click('.civ-graph-ranges [data-range="50"]');
+ await page.fill('#civ-graph-year','3');await page.locator('#civ-graph-year').dispatchEvent('change');await page.click('#civ-graph-observe');
+ assert.equal(await page.locator('#scene-year').textContent(),'世界暦 3年');
+ assert.equal(await page.locator('#civ-graph-plot line.observed').count(),1,'the observed year is drawn');
  // A year beyond the last confirmed one is clamped, never observed as unconfirmed.
  await page.fill('#civ-graph-year',String(last+500));await page.locator('#civ-graph-year').dispatchEvent('change');
  assert.match(await page.locator('#civ-graph-candidate').textContent(),new RegExp(`^候補：世界暦 ${format.format(last)}年`));

@@ -105,6 +105,25 @@ export function commitObservation(ledger: ObservationLedger, year: number, metri
   ledger.lastYear = year;
 }
 
+/**
+ * Confirmed total population of every year from..to (inclusive, within the confirmed range), in one pass over the
+ * blocks: the same values as observationAt(year).population, without replaying a checkpoint for each year.
+ */
+export function populationTotalsBetween(ledger: ObservationLedger, from: number, to: number): {year: number; population: number}[] {
+  const first = ledger.blocks[0];
+  if (!first || ledger.lastYear === null) return [];
+  const start = Math.max(first.year, from), end = Math.min(ledger.lastYear, to), out: {year: number; population: number}[] = [];
+  for (const block of ledger.blocks) {
+    if (block.year > end) break;
+    let people = [...block.population];
+    for (let i = 0; i <= block.changes.length && block.year + i <= end; i++) {
+      if (i > 0) { const change = block.changes[i - 1]!; people = people.map((n, j) => n + change[j]!); }
+      if (block.year + i >= start) out.push({year: block.year + i, population: populationTotal(people)});
+    }
+  }
+  return out;
+}
+
 /** The four confirmed metrics of `year`, or null when the year is unconfirmed or was never recorded. */
 export function metricsAt(ledger: ObservationLedger, year: number): ConfirmedMetrics | null {
   const record = ledger.metrics;

@@ -6,7 +6,7 @@
  * applied to the text only; changes are computed from the unrounded values.
  */
 import {lastObservedYear,type CivilizationState,type RecordEntry} from './engine.js';
-import {observeCivilizationMetrics,civilizationMetricKeys,type CivilizationMetricKey,type CivilizationMetricObservation} from './civilization-metrics.js';
+import {observeCivilizationMetrics,confirmedMetricRange,civilizationMetricKeys,type CivilizationMetricKey,type CivilizationMetricObservation} from './civilization-metrics.js';
 
 export const CHANGE_SPAN_YEARS=20;
 export const metricLabels:Readonly<Record<CivilizationMetricKey,string>>={population:'人口',food:'食料',cohesion:'結束',knowledge:'知識',culture:'文化'};
@@ -60,9 +60,7 @@ export interface SeriesPoint {readonly year:number;readonly value:number}
  * ledger never recorded are left out, so a gap is never drawn as a line.
  */
 export function metricSeries(state:Readonly<CivilizationState>,key:CivilizationMetricKey,from:number,to:number):SeriesPoint[] {
- const last=lastObservedYear(state as CivilizationState),start=Math.max(0,Math.ceil(from)),end=Math.min(last,Math.floor(to)),points:SeriesPoint[]=[];
- for(let year=start;year<=end;year++){const o=observeCivilizationMetrics(state,year);if(o)points.push({year,value:o[key]});}
- return points;
+ return confirmedMetricRange(state,key,from,to);
 }
 /** Splits a series into runs of consecutive years (a missing year starts a new run). */
 export function seriesRuns(points:readonly SeriesPoint[]):SeriesPoint[][] {

@@ -49,6 +49,9 @@ test('S3: a series is the confirmed record, a missing year breaks the line, and 
  const series=metricSeries(s,'knowledge',250,last+50);
  assert.equal(series.at(-1).year,last);assert.equal(series[0].year,250);
  for(const p of series)assert.equal(p.value,observeCivilizationMetrics(s,p.year).knowledge);
+ // The one-pass population range equals the per-year read contract across checkpoint blocks.
+ const people=metricSeries(s,'population',0,last);assert.equal(people.length,last+1);
+ for(const p of people)assert.equal(p.value,observeCivilizationMetrics(s,p.year).population,'year '+p.year);
  assert.deepEqual(seriesRuns([{year:1,value:1},{year:2,value:1},{year:4,value:1}]).map(r=>r.map(p=>p.year)),[[1,2],[4]]);
  const old=clone(s);delete old.observation.metrics;assert.deepEqual(metricSeries(old,'food',0,last),[]);
  assert.deepEqual(graphWindow(last,200,last),{from:last-200,to:last});
