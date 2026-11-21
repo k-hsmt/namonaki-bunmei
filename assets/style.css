@@ -34,3 +34,44 @@
 .music-control input[type=range]{box-sizing:border-box;flex:none;width:64px;min-width:64px;max-width:64px;height:44px;min-height:0;margin:0;padding:0;accent-color:#597c68}
 .music-control :focus-visible{outline:2px solid #597c68;outline-offset:3px}.music-status{color:#777c75;font-size:11px;margin:0 0 10px}.music-status:empty{display:none}
 @media(max-width:600px){.scene-topline{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px}.scene-controls{grid-row:2;grid-column:1/-1;justify-content:flex-start}.scene-topline>span:last-child{grid-row:1;grid-column:2}}
+/* Issue #29 S2/S3: civilization-wide status bar and one-metric history graph (outside the 320×180 scene) */
+.civ-status{border-top:1px solid #e3e5dc;padding:14px 0 18px}
+.civ-status-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.civ-status-head h3{margin:0;font-size:13px;font-weight:600;letter-spacing:.08em;color:#4f5a52}
+#civ-status-year{font-size:11px;color:#7b8177;letter-spacing:.05em}
+.civ-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:10px}
+.civ-metric{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-height:64px;padding:8px 9px;background:#f8f7f1;border:1px solid #e1e3da;border-radius:3px;color:#2e332f;text-align:left;cursor:pointer;font:inherit}
+.civ-metric:hover{border-color:#b9c3b6}
+.civ-metric:focus-visible{outline:2px solid #52695d;outline-offset:2px}
+.civ-metric[aria-pressed="true"]{border-color:#52695d;background:#f0f1ea}
+.civ-label{font-size:11px;letter-spacing:.1em;color:#777c75}
+.civ-metric strong{font-family:Georgia,serif;font-weight:500;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.civ-change{font-size:11px;color:#5f665f;font-variant-numeric:tabular-nums}
+.civ-status-note{margin:8px 0 0;font-size:11px;color:#858a83;line-height:1.6}
+.civ-graph{margin-top:12px;padding-top:10px;border-top:1px dashed #dcdfd5}
+.civ-graph[hidden]{display:none}
+.civ-graph-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.civ-graph-head h4{margin:0;font-size:12px;font-weight:600;color:#4f5a52}
+.civ-graph-ranges{display:flex;gap:2px}
+.civ-graph-ranges button[aria-pressed="true"]{color:#2f3f36;font-weight:600;text-decoration:underline}
+#civ-graph-plot{display:block;width:100%;height:auto;aspect-ratio:16 / 5;margin-top:6px;background:#fbfaf6;border:1px solid #e6e7df;touch-action:pan-y;cursor:crosshair}
+#civ-graph-plot .grid{stroke:#e4e5dd;stroke-width:1;vector-effect:non-scaling-stroke}
+#civ-graph-plot .tick{font-size:10px;fill:#858a83}
+#civ-graph-plot .line{fill:none;stroke:#52695d;stroke-width:1.5;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+#civ-graph-plot .line-point{fill:#52695d}
+#civ-graph-plot .marker{stroke:#a08c62;stroke-width:2;vector-effect:non-scaling-stroke}
+#civ-graph-plot .observed{stroke:#2e332f;stroke-width:1;vector-effect:non-scaling-stroke}
+#civ-graph-plot .observed-point{fill:#2e332f}
+#civ-graph-plot .candidate{stroke:#52695d;stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+#civ-graph-plot .candidate-point{fill:#fffefb;stroke:#52695d;stroke-width:1.5}
+.civ-graph-summary,.civ-graph-candidate{margin:6px 0 0;font-size:11px;color:#5f665f;line-height:1.6}
+.civ-graph-pick{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:#5f665f}
+.civ-graph-pick input{width:6.5em;padding:6px;font:inherit;border:1px solid #d8ddd4;background:#fffefb}
+.civ-graph-pick .textbutton,.civ-graph-pick .subbutton{min-height:40px}
+@media(max-width:680px){
+ .civ-metrics{grid-template-columns:repeat(6,minmax(0,1fr))}
+ .civ-metric{grid-column:span 2;min-height:58px}
+ .civ-metric:nth-child(n+4){grid-column:span 3}
+ .civ-metric strong{font-size:15px}
+}
+@media(max-width:680px){#civ-graph-plot{aspect-ratio:16 / 8}#civ-graph-plot .tick{font-size:15px}}

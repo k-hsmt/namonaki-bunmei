@@ -45,17 +45,18 @@ async function openSave(t, key, state) {
   return page;
 }
 
-async function assertObservation(page, year, population, pendingYear) {
+const decimal = new Intl.NumberFormat('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** Issue #29 S2: the status bar shows the confirmed values of the observed year (never a pending draft). */
+const confirmedText = state => ['food', 'cohesion', 'knowledge', 'culture'].map(id => `${decimal.format(state[id])} / 100`);
+async function assertObservation(page, year, population, pendingYear, metrics) {
   assert.match(await page.locator('#scene-year').textContent(), new RegExp(`^世界暦 ${format.format(year)}年`));
   assert.match(await page.locator('#population').textContent(), new RegExp(`^約 ${format.format(population)} 人`));
   const expectedYear = pendingYear ?? year;
   const pending = pendingYear !== undefined;
   assert.equal(await page.locator('#year').textContent(), `世界暦 ${format.format(expectedYear)}年${pending ? '（未確定）' : ''}`);
   assert.equal(await page.locator('#choice').isVisible(), pending);
-  if (pending) {
-    for (const id of ['food', 'cohesion', 'knowledge']) {
-      assert.equal(await page.locator(`#${id}`).textContent(), '観測年の記録なし');
-    }
+  if (metrics) {
+    assert.deepEqual(await Promise.all(['food', 'cohesion', 'knowledge', 'culture'].map(id => page.locator(`#${id}`).textContent())), metrics);
   }
 }
 
@@ -80,12 +81,14 @@ test('pending choice shows confirmed population through save, reload and resolut
   const confirmedYear = state.year;
   const pendingYear = expected.year;
   const page = await openSave(t, saveKey, state);
-  await assertObservation(page, confirmedYear, state.population);
+  const confirmed = confirmedText(state);
+  await assertObservation(page, confirmedYear, state.population, undefined, confirmed);
   const canvas = page.locator('#scene');
   const image = await canvas.evaluate(element => element.toDataURL());
 
   await page.locator('#step').click();
-  await assertObservation(page, confirmedYear, state.population, pendingYear);
+  // The pending year's draft values (expected.food etc.) are not shown: the bar keeps the last confirmed year.
+  await assertObservation(page, confirmedYear, state.population, pendingYear, confirmed);
   assert.equal(await canvas.evaluate(element => element.toDataURL()), image);
 
   await page.locator('#save').click();
@@ -93,21 +96,19 @@ test('pending choice shows confirmed population through save, reload and resolut
   await page.reload();
   await page.locator('#load').click();
   await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('保存された歴史を開きました'));
-  await assertObservation(page, confirmedYear, state.population, pendingYear);
+  await assertObservation(page, confirmedYear, state.population, pendingYear, confirmed);
   assert.equal(await canvas.evaluate(element => element.toDataURL()), image);
 
   choose(expected, option);
   await page.locator('#options button').nth(option).click();
-  await assertObservation(page, pendingYear, expected.population);
-  for (const id of ['food', 'cohesion', 'knowledge']) {
-    assert.notEqual(await page.locator(`#${id}`).textContent(), '観測年の記録なし');
-  }
+  await assertObservation(page, pendingYear, expected.population, undefined, confirmedText(expected));
 });
 
 test('migrated pending choice preserves the estimated scene at the migration boundary', async t => {
   const state = JSON.parse(await readFile(new URL('../fixtures/v05-seed82-pending.json', import.meta.url), 'utf8'));
   const page = await openSave(t, legacyKey, state);
-  await assertObservation(page, state.year, state.population, state.year);
+  const unrecorded = ['記録なし', '記録なし', '記録なし', '記録なし'];
+  await assertObservation(page, state.year, state.population, state.year, unrecorded);
   const canvas = page.locator('#scene');
   const image = await canvas.evaluate(element => element.toDataURL());
   await page.locator('#save').click();
