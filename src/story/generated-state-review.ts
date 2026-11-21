@@ -3,6 +3,7 @@ import {checkStateHeader} from './legacy-terrain-save.js';
 import {validateHousingHistory} from './housing-save.js';
 import {lastObservedYear,type CivilizationState} from './engine.js';
 import {siteAt} from './settlement-history.js';
+import {civilizationMetricRule,isConfirmedMetricValue} from './observations.js';
 export const wireObject=(v:unknown,required:readonly string[],optional:readonly string[]=[]):Record<string,unknown>=>{
  if(!v||typeof v!=='object'||Array.isArray(v)||![Object.prototype,null].includes(Object.getPrototypeOf(v))||required.some(k=>!Object.hasOwn(v,k))||Object.keys(v).some(k=>![...required,...optional].includes(k)))throw Error('Invalid generated object fields');return v as Record<string,unknown>;
 };
@@ -43,7 +44,7 @@ export function validateGeneratedState(raw:unknown,seed:number):CivilizationStat
   if(!Array.isArray(v)||v.length>3)throw Error('Invalid generated practices');const seen=new Set();
   for(const p of v){const o=wireObject(p,['kind','originId','recordId','active']);if(!practiceKinds.includes(o.kind as string)||seen.has(o.kind)||typeof o.active!=='boolean'||!known(o.originId,at)||!known(o.recordId,at))throw Error('Invalid practice source');seen.add(o.kind);}
  };
- const observation=wireObject(s.observation,['people','sites','blocks','lastYear','legacy']);
+ const observation=wireObject(s.observation,['people','sites','blocks','lastYear','legacy','metrics']);
  if(observation.lastYear!==year)throw Error('Missing generated confirmed year');
  if(observation.legacy!==null||!Array.isArray(observation.people)||observation.people.length!==4||!observation.people.every(nat)||observation.people[3]!==0||observation.people.reduce((a,b)=>a+b,0)!==s.population||!Array.isArray(observation.blocks)||observation.blocks.length!==Math.floor(year/100)+1||!Array.isArray(observation.sites)||observation.sites.length!==3)throw Error('Invalid generated observation boundary');
  let last:number[]=[];
@@ -53,6 +54,12 @@ export function validateGeneratedState(raw:unknown,seed:number):CivilizationStat
   for(const row of b.changes){if(!Array.isArray(row)||row.length!==4||!row.every(Number.isSafeInteger))throw Error('Invalid population delta');last=last.map((n,j)=>n+row[j]);if(last.some(n=>!nat(n))||last[3]!==0)throw Error('Invalid reconstructed population');}
  }
  if(!s.pending&&!sameWire(last,observation.people))throw Error('Population view disagrees with history');
+ // Issue #29 S1: one row of four confirmed metrics per confirmed year from year 0; no row for a pending year.
+ const metrics=wireObject(observation.metrics,['ruleId','firstYear','values']);
+ if(metrics.ruleId!==civilizationMetricRule||metrics.firstYear!==0||!Array.isArray(metrics.values)||metrics.values.length!==year+1)throw Error('Invalid confirmed metric history');
+ for(const row of metrics.values)if(!Array.isArray(row)||row.length!==4||!row.every(isConfirmedMetricValue))throw Error('Invalid confirmed metrics');
+ // A pending year's state holds draft values, so only a fully confirmed state must equal its last row.
+ if(!s.pending&&!sameWire(metrics.values[year],[s.food,s.cohesion,s.knowledge,s.culture]))throw Error('Confirmed metrics disagree with the civilization');
  for(const [index,rawSite] of observation.sites.entries()){
   const site=wireObject(rawSite,['view','changes','buildingChanges','practiceChanges','growthYears','shrinkYears','lastWork'],['reorganizeUntil','repairYears']);
   for(const key of ['growthYears','shrinkYears','lastWork','reorganizeUntil','repairYears'])if(site[key]!==undefined&&!nat(site[key]))throw Error('Invalid generated site counter');

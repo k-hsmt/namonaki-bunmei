@@ -1,10 +1,12 @@
 import {createHash} from 'node:crypto';import test from 'node:test';import assert from 'node:assert/strict';
+import {withoutConfirmedMetrics,assertConfirmedMetricHistory} from './helpers/civilization-metrics.mjs';
 import {createNewWorld} from '../dist/story/new-world.js';import {advanceGeneratedBridgeReview} from '../dist/story/generated-bridge-review.js';import {createGeneratedWorldSave,restoreGeneratedWorld} from '../dist/story/world-save.js';import {generatedSession,improveWorldGrowth} from '../dist/story/world-session.js';import {housingAt} from '../dist/story/housing-history.js';import {observeGeneratedSceneReview} from '../dist/scene/generated-scene-review.js';
 import {generatedPublicSpaceExtension} from '../dist/story/generated-public-space-review.js';import {withGeneratedBridgeAccess} from '../dist/story/generated-bridge-history-review.js';import {findPlacementReview} from '../dist/terrain/placement-search-review.js';import {reviewNeighborEntrances} from '../dist/terrain/facility-plan-review.js';
 const old=advanceGeneratedBridgeReview(createNewWorld(42,'terrain-placement-v2').review,1000,'automatic');
 const blocks=(r,year)=>housingAt(r.review.state.housing,year,'river-bank').blocks;
 test('v2 seed 42 still matches its pre-fix complete state',()=>{
- assert.equal(createHash('sha256').update(JSON.stringify(old.review.state)).digest('hex'),'8fdf5cdba41651bed5811dfc0bdeb7b5dbbfd17c2320c8d8c3a1863926b7ff25');
+ assertConfirmedMetricHistory(old.review.state);
+ assert.equal(createHash('sha256').update(JSON.stringify(withoutConfirmedMetrics(old.review.state))).digest('hex'),'8fdf5cdba41651bed5811dfc0bdeb7b5dbbfd17c2320c8d8c3a1863926b7ff25');
 });
 test('seed 42 natural growth reaches the empty opposite bank after a walkable bridge',()=>{
  const improved=advanceGeneratedBridgeReview(createNewWorld(42).review,1000,'automatic'),bridge=improved.review.bridgeReview.bridges[0];assert.ok(bridge);

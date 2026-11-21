@@ -67,7 +67,7 @@ test('B2b: in a transition world some patches take the neighbouring biome, about
 
 test('B2b: the saved flora must match its sources; a changed patch is rejected',async()=>{
  const packet=JSON.parse(serializeWorldSave(await prepareWorldSessionSave(worlds.forest)));
- assert.equal(packet.schemaVersion,2);assert.equal(packet.flora.ruleId,'local-flora-v1');
+ assert.equal(packet.schemaVersion,3);assert.equal(packet.flora.ruleId,'local-flora-v1');
  assert.ok(await validateClimateWorldSave(JSON.parse(JSON.stringify(packet))));
  const i=packet.flora.sites['hill-side'].findIndex(Boolean);
  const changes=[p=>{p.flora.sites['hill-side'][i][2]=(p.flora.sites['hill-side'][i][2]+1)%PLANT_ARCHETYPES.length;},

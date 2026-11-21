@@ -13,7 +13,7 @@ import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import {checkCoupledModifier} from './coupled-economy-policy-internal.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
-import { commitObservation, type ObservationLedger } from './observations.js';
+import { commitObservation, createMetricLedger, type ConfirmedMetrics, type ObservationLedger } from './observations.js';
 import { createRegionalEconomy, regionalHarvestFactors, tradeYearsFor, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
 import { createSociety, practiceNames, updateSociety, type Society } from './society.js';
 import { createSettlementHistory, updateSettlements, siteAt } from './settlement-history.js';
@@ -54,9 +54,9 @@ export function createCivilization(seed:number):CivilizationState {
  const s:CivilizationState={version:2,seed:n,rngState:r.state,year:0,name:names[r.int(0,names.length-1)]!+'の民',homeland,trait,population:r.int(1800,7000),food:r.int(50,76),cohesion:r.int(52,74),knowledge:r.int(5,16),exchange:r.int(9,29),culture:r.int(25,52),drought:0,epidemic:0,lastKind:{},history:[],pending:null,decisions:[],samples:[],lastDecisionId:-1,memory:{legacies:{},log:[]}};
  s.rngState=r.state; entry(s,'誕生',`${s.name}が生まれる`,`${homeland}に、いくつかの集落が形成された。人々は${trait}を暮らしの中心とし、まだ自分たちの行く末を知らない。`,['地形と生活様式が抽選された'],true); s.samples.push({year:0,population:s.population});
  s.version=3;
- s.observation={people:initialPopulation(s.population,false),blocks:[],lastYear:null,legacy:null};
+ s.observation={people:initialPopulation(s.population,false),blocks:[],lastYear:null,legacy:null,metrics:createMetricLedger()};
  s.observation.sites=createSettlementHistory(s.observation.people,0);
- commitObservation(s.observation,0);
+ commitObservation(s.observation,0,confirmedMetrics(s));
  return s;
 }
 export function migrateCivilization(s:CivilizationState):CivilizationState {
@@ -70,6 +70,8 @@ export function migrateCivilization(s:CivilizationState):CivilizationState {
  s.version=3;
  return s;
 }
+/** Issue #29 S1: the four civilization-wide values at the moment a year is confirmed (never a pending year's draft). */
+const confirmedMetrics=(s:CivilizationState):ConfirmedMetrics=>[s.food,s.cohesion,s.knowledge,s.culture];
 function setPopulation(s:CivilizationState,next:number):void {
  const ledger=s.observation!;
  changePopulation(ledger.people,next);
@@ -256,7 +258,7 @@ function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
    }
   }
  }
- commitObservation(ledger,s.year);
+ commitObservation(ledger,s.year,confirmedMetrics(s));
  if(s.year%10===0)s.samples.push({year:s.year,population:s.population});
 }
 export function lastObservedYear(s:CivilizationState):number {

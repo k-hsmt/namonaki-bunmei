@@ -1,4 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {readFileSync} from 'node:fs';
+import {withoutConfirmedMetrics,assertConfirmedMetricHistory} from './helpers/civilization-metrics.mjs';
 import {createNewWorld} from '../dist/story/new-world.js';import {advanceGeneratedBridgeReview} from '../dist/story/generated-bridge-review.js';import {createGeneratedWorldSave,restoreGeneratedWorld,validateWorldSave} from '../dist/story/world-save.js';import {observeGeneratedSceneReview} from '../dist/scene/generated-scene-review.js';import {housingAt} from '../dist/story/housing-history.js';
 const span=outer=>{
  const o=observeGeneratedSceneReview(outer,100,0),plots=[...o.ground.facilities.filter(f=>f.purpose!=='field').map(f=>f.plot),...housingAt(outer.review.state.housing,100,'river-bank').blocks.map(b=>b.footprint)];
@@ -22,6 +23,7 @@ test('saved compact worlds keep their original full state and future placement p
  assert.deepEqual(restored.review.state,compact.review.state);assert.deepEqual(restored.review.plans,compact.review.plans);
  const future=advanceGeneratedBridgeReview(restored,2000,'automatic');
  const expected=JSON.parse(readFileSync('tests/fixtures/generated-progression-reference-v1.json')).cases.find(c=>c.seed===1&&c.year===2000).stateSha256;
- assert.equal(createHash('sha256').update(JSON.stringify(future.review.state)).digest('hex'),expected);
+ assertConfirmedMetricHistory(future.review.state);
+ assert.equal(createHash('sha256').update(JSON.stringify(withoutConfirmedMetrics(future.review.state))).digest('hex'),expected);
  assert.equal(createGeneratedWorldSave(future).progressionPolicy.id,'terrain-placement-v1');
 });

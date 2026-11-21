@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {withoutConfirmedMetrics,assertConfirmedMetricHistory} from './helpers/civilization-metrics.mjs';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
@@ -48,7 +49,8 @@ test('cached replay and repeated land HOLD retain the pinned uncached complete s
  const saved=parseTerrainRecord(gunzipSync(readFileSync(new URL('./fixtures/terrain-record-v1-seed1.json.gz',import.meta.url))).toString());
  const initial=createGeneratedHousingReview(saved,'field-only');assert.equal(initial.status,'review-only');
  const result=advanceGeneratedHousingReview(initial,2000,'automatic');
- assert.equal(createHash('sha256').update(JSON.stringify(result.review.state)).digest('hex'),'c48ee9dae9481a7a315636245b1d8954f2c4e3432f92891f71ca426254c11764');
+ assertConfirmedMetricHistory(result.review.state);
+ assert.equal(createHash('sha256').update(JSON.stringify(withoutConfirmedMetrics(result.review.state))).digest('hex'),'c48ee9dae9481a7a315636245b1d8954f2c4e3432f92891f71ca426254c11764');
  assert.equal(result.review.diagnostics.holds['river-bank:housing:no-safe-plot'],3);
  const split=advanceGeneratedHousingReview(advanceGeneratedHousingReview(initial,1900,'automatic'),100,'automatic');
  assert.deepEqual(split,result);
