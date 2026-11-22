@@ -6,6 +6,7 @@ import {migrateCivilization,type CivilizationState} from './engine.js';
 import {housingAt,type HousingHistory,type ResidentialBlockEvent} from './housing-history.js';
 import {validateCivicLedger} from './civic-architecture.js';
 import {validatePublicSpaceLedger} from './public-space-history.js';
+import {validateConfirmedMetricLedger} from './observations.js';
 
 export interface PersistedHousingHistory extends HousingHistory {
  readonly schemaVersion:1;
@@ -84,6 +85,13 @@ export function prepareHousingSave(raw:unknown):HousingSaveState{
   validatePublicSpaceLedger(current.publicSpaces,{confirmedYear:confirmed,
    records:current.history,sites:current.observation?.sites,housing:current.housing});
   if(!current.housing.legacyUntracked&&current.housing.introducedYear!==0)fail('新規完全記録の導入年が0以外');
+  // Issue #29 S1: a recorded metric history is checked like the generated one. A ledger from before #29 has none
+  // (its years stay unrecorded; nothing is back-filled), and a ledger with a legacy boundary never records one.
+  const ledger=current.observation!;
+  if(ledger.metrics!==undefined){
+   if(ledger.legacy!==null)fail('旧境界の台帳に指標履歴');
+   validateConfirmedMetricLedger(ledger.metrics,confirmed,current.pending?null:[current.food,current.cohesion,current.knowledge,current.culture]);
+  }
   return current;
  }
  const existing=copy as CivilizationState;

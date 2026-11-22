@@ -64,12 +64,15 @@ test('B2a: a changed, missing or unknown climate record is rejected',async()=>{
   p=>{delete p.climate;},
   p=>{p.climate=null;},
   p=>{p.extra=1;},
-  p=>{p.schemaVersion=3;},
+  p=>{p.schemaVersion=4;},
  ];
  for(const change of variants){const p=JSON.parse(JSON.stringify(packet));change(p);await assert.rejects(validateClimateWorldSave(p),/Invalid v10 world|Invalid/,change.toString());}
  // v10 from B2a (schemaVersion 1, no flora) is an earlier version: reported, not opened.
  const b2a=JSON.parse(JSON.stringify(packet));b2a.schemaVersion=1;delete b2a.flora;
  await assert.rejects(validateClimateWorldSave(b2a),OutdatedWorldSaveError);
+ // v10 from B2b (schemaVersion 2, no confirmed metric history, Issue #29 S1) is likewise reported, not opened.
+ const b2b=JSON.parse(JSON.stringify(packet));b2b.schemaVersion=2;
+ await assert.rejects(validateClimateWorldSave(b2b),OutdatedWorldSaveError);
  // A climate copied from another seed does not fit this world.
  const other=JSON.parse(JSON.stringify(packet));other.climate=JSON.parse(JSON.stringify(generateClimateBaseline(43)));
  await assert.rejects(validateClimateWorldSave(other),/does not match the world seed/);

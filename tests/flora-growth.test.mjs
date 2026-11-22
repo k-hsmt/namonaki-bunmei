@@ -73,7 +73,7 @@ test('B2c: same world and year give the same flora, however the years were advan
  for(const y of [0,120,year(split)])for(let i=0;i<3;i++)assert.deepEqual(worldFloraAt(split,y,i),worldFloraAt(worlds.forest,y,i),'year '+y+' site '+i);
  const packet=await prepareWorldSessionSave(worlds.forest);
  assert.deepEqual(Object.keys(packet).sort(),['climate','flora','format','schemaVersion','version','world'],'B2c adds no save field');
- assert.equal(packet.schemaVersion,2);
+ assert.equal(packet.schemaVersion,3,'schemaVersion 3 is Issue #29 S1 (confirmed metric history), not B2c');
 });
 
 test('B2c: the growth module uses no random source and is not read by civilisation code',()=>{

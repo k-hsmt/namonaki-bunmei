@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {withoutConfirmedMetrics} from './lib/confirmed-metrics.mjs';
 import {readFile,mkdir,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {createNewIrrigatedWorld} from '../dist/story/new-world.js';
@@ -11,7 +12,8 @@ const report={sourceSHA:process.env.REVIEW_SOURCE_SHA??execFileSync('git',['rev-
  scope:'Clone-once neutral land driver and phase diagnostics. Full B v6 save hashes from unmodified main; ecology still finalized at batch end. No economic feedback, incremental ecology, trial codec or coupled performance claim.',cases:[]};
 for(const {seed,years,saveHash} of reference.cases){
  const origin=createNewIrrigatedWorld(seed).review,{world,diagnostics:d}=auditBaselineAdvance(origin,years);
- const actual=await reviewBaseHash(createGeneratedWorldSave(world));
+ // Issue #29 S1: compared without the new confirmed metric history (scripts/lib/confirmed-metrics.mjs).
+ const actual=await reviewBaseHash(withoutConfirmedMetrics(createGeneratedWorldSave(world)));
  assert.equal(actual,saveHash,'complete pre-refactor B save, seed '+seed);
  const commits=d.phases.filter(p=>p.confirmedAfter>p.confirmedBefore);
  assert.equal(commits.length,years);

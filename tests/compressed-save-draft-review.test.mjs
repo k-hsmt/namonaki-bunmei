@@ -7,7 +7,11 @@ const legacy=migrateLegacySave(createHousingCivilization(42));
 test('frozen generated v5 fixture loads by saved results with the pinned complete domain value',async()=>{
  const draft=await decodeReviewSaveDraft(readFileSync(new URL('./fixtures/generated-save-draft-v1-seed42-year0.json',import.meta.url),'utf8'));
  assert.equal(draft.initialTerrain.mode,'generated');assert.equal(draft.state.seed,42);assert.equal(draft.state.year,0);
- assert.equal(createHash('sha256').update(JSON.stringify(draft)).digest('hex'),'42e89ae91880e86413cb79f85f7356c9c9578bd90657ce195e5bfcc323ff22eb');
+ // Issue #29 S1 re-encoded the fixture with its one confirmed year-0 metric row; the pre-#29 domain value is unchanged.
+ assert.deepEqual(draft.state.observation.metrics,{ruleId:'civilization-metrics-v1',firstYear:0,values:[[draft.state.food,draft.state.cohesion,draft.state.knowledge,draft.state.culture]]});
+ const before=structuredClone(draft);delete before.state.observation.metrics;
+ assert.equal(createHash('sha256').update(JSON.stringify(before)).digest('hex'),'42e89ae91880e86413cb79f85f7356c9c9578bd90657ce195e5bfcc323ff22eb');
+ assert.equal(createHash('sha256').update(JSON.stringify(draft)).digest('hex'),'7c2b58aa9b5d152f4ea06b6e3e1d0236b536f8f97d02f41d2d212a85e10d08d7');
 });
 test('standard gzip storage restores the complete legacy envelope without changing modes or inputs',async()=>{
  const before=JSON.stringify(legacy),encoded=await encodeReviewSaveDraft(legacy),container=JSON.parse(encoded);assert.equal(container.encoding,'gzip-base64-v1');

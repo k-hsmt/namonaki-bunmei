@@ -1,4 +1,5 @@
 import {timeline,firstTimeline} from './coupled-comparison-timeline.mjs';
+import {withoutConfirmedMetrics} from './lib/confirmed-metrics.mjs';
 import assert from 'node:assert/strict';import {mkdir,readFile,writeFile} from 'node:fs/promises';import {execFileSync} from 'node:child_process';import {chromium} from 'playwright';
 import {createNewIrrigatedWorld} from '../dist/story/new-world.js';import {createGeneratedWorldSave,restoreGeneratedWorld} from '../dist/story/world-save.js';import {advanceGeneratedBridgeReview} from '../dist/story/generated-bridge-review.js';
 import {createCoupledReview,advanceCoupledReview} from '../dist/irrigation/coupled-progression-v1.js';import {encodeCoupledReview,decodeCoupledReview,serializeCoupledReview} from '../dist/irrigation/coupled-storage-v1.js';import {coupledRows} from '../dist/irrigation/coupled-history-v1.js';import {economyPolicies} from '../dist/irrigation/economy-types-v1.js';
@@ -21,7 +22,7 @@ function c1Series(t){let before=structuredClone(t.initialEconomy);const result=[
 try{
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH});const page=await browser.newPage();await page.goto(server.url+'/capture');
  for(const seed of seeds){
-  console.log(JSON.stringify({seed,phase:'four-complete-histories'}));const dir=out+'/seed'+seed;await mkdir(dir,{recursive:true});const save=createGeneratedWorldSave(createNewIrrigatedWorld(seed).review);let b=advanceGeneratedBridgeReview(restoreGeneratedWorld(save),10000,'automatic');assert.equal(await reviewBaseHash(createGeneratedWorldSave(b)),reference.cases.find(c=>c.seed===seed).saveHash);
+  console.log(JSON.stringify({seed,phase:'four-complete-histories'}));const dir=out+'/seed'+seed;await mkdir(dir,{recursive:true});const save=createGeneratedWorldSave(createNewIrrigatedWorld(seed).review);let b=advanceGeneratedBridgeReview(restoreGeneratedWorld(save),10000,'automatic');assert.equal(await reviewBaseHash(withoutConfirmedMetrics(createGeneratedWorldSave(b))),reference.cases.find(c=>c.seed===seed).saveHash);
   let baseReceipts,baseTargets,baseTimelines;const data={sourceSHA,seed,years:10000,originHash:null,policies:[],c1:null,first:[],snapshotYears:[]};
   for(const policy of economyPolicies){
    const initializationStart=performance.now(),init=await createCoupledReview(save,policy),initializationMs=performance.now()-initializationStart,annualStart=performance.now(),t=advanceCoupledReview(init,10000),annualMs=performance.now()-annualStart,stored=await encodeCoupledReview(t),plain=await serializeCoupledReview(t);let start=performance.now();const loaded=await decodeCoupledReview(stored),coldReadMs=performance.now()-start;assert.equal(await serializeCoupledReview(loaded),plain);

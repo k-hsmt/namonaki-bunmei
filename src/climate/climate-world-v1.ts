@@ -9,6 +9,10 @@
  * B2b (schemaVersion 2): adds the world's local flora (local-flora-v1), likewise a pure function of the seed,
  * the climate and the initial terrain record, saved and regenerated on load. v10 schemaVersion 1 saves (B2a)
  * are reported as an earlier version and not opened.
+ *
+ * Issue #29 S1 (schemaVersion 3): every civilization state carries the confirmed food / cohesion / knowledge /
+ * culture of each year from year 0 (observation.metrics), checked by the nested state reader. A schemaVersion 2
+ * save has no such history; it is reported as an earlier version and not opened, never back-filled.
  */
 import {prepareArchitectureSave,validateArchitectureSave,restoreArchitectureSave,type ArchitectureProductionSave,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
 import {sameWire} from '../story/generated-state-review.js';
@@ -17,7 +21,7 @@ import {createLocalFlora,type LocalFlora} from '../flora/local-flora-v1.js';
 
 export const CLIMATE_WORLD_SAVE_KEY='namonaki-story-v10';
 export interface ClimateWorldSave {
- readonly format:'namonaki-world-save';readonly version:10;readonly schemaVersion:2;
+ readonly format:'namonaki-world-save';readonly version:10;readonly schemaVersion:3;
  readonly world:ArchitectureProductionSave;readonly climate:WorldClimateBaseline;readonly flora:LocalFlora;
 }
 /** A save from before the climate record. Thrown so the UI can say why it cannot be opened. */
@@ -46,7 +50,7 @@ export function worldFlora(world:ArchitectureProductionWorld):LocalFlora {
 }
 
 export async function prepareClimateWorldSave(world:ArchitectureProductionWorld):Promise<ClimateWorldSave>{
- const packet=freeze({format:'namonaki-world-save',version:10,schemaVersion:2,world:await prepareArchitectureSave(world),climate:worldClimate(world),flora:worldFlora(world)} as ClimateWorldSave);
+ const packet=freeze({format:'namonaki-world-save',version:10,schemaVersion:3,world:await prepareArchitectureSave(world),climate:worldClimate(world),flora:worldFlora(world)} as ClimateWorldSave);
  packets.set(packet,world);return packet;
 }
 /** Native reader: the nested v9 packet through its own reader, then the climate and flora against their sources. */
@@ -55,13 +59,14 @@ export async function validateClimateWorldSave(raw:unknown):Promise<ClimateWorld
  if(!raw||typeof raw!=='object'||Array.isArray(raw))fail('save must be an object');
  const d=raw as Record<string,unknown>;
  if(d.format==='namonaki-world-save'&&d.version===10&&d.schemaVersion===1)throw new OutdatedWorldSaveError('v10 without the flora record');
- if(Object.keys(d).sort().join(',')!=='climate,flora,format,schemaVersion,version,world'||d.format!=='namonaki-world-save'||d.version!==10||d.schemaVersion!==2)fail('unknown contract');
+ if(d.format==='namonaki-world-save'&&d.version===10&&d.schemaVersion===2)throw new OutdatedWorldSaveError('v10 without the civilization metric history');
+ if(Object.keys(d).sort().join(',')!=='climate,flora,format,schemaVersion,version,world'||d.format!=='namonaki-world-save'||d.version!==10||d.schemaVersion!==3)fail('unknown contract');
  const v9=await validateArchitectureSave(d.world),world=restoreArchitectureSave(v9),expected=worldClimate(world);
  const wire=(v:unknown)=>JSON.parse(JSON.stringify(v??null));
  if(!sameWire(wire(d.climate),wire(expected)))fail('climate does not match the world seed');
  const flora=worldFlora(world);
  if(!sameWire(wire(d.flora),wire(flora)))fail('flora does not match the world seed, climate and initial terrain');
- const packet=freeze({format:'namonaki-world-save',version:10,schemaVersion:2,world:v9,climate:expected,flora} as ClimateWorldSave);
+ const packet=freeze({format:'namonaki-world-save',version:10,schemaVersion:3,world:v9,climate:expected,flora} as ClimateWorldSave);
  packets.set(packet,world);return packet;
 }
 export function restoreClimateWorldSave(packet:ClimateWorldSave):ArchitectureProductionWorld {return packets.get(packet)??fail('use a validated v10 packet');}
