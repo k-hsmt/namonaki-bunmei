@@ -122,6 +122,9 @@ test('D1: a waterway reads its own events; only a same-year chronicle cause is a
 test('D1: unknown, not yet built and the future are kept apart; years must be confirmed',()=>{
  const src=source();
  assert.equal(at(src,{kind:'facility',id:'r-0'},4).presence,'not-yet-built');
+ assert.equal(at(src,{kind:'facility',id:'r-0'},4).name,'川辺の集会所','the name carries no construction year (safe before it)');
+ assert.equal(at(src,{kind:'bridge',id:'r-7'},400).name,'川辺の橋');assert.equal(at(src,{kind:'waterway',systemId:'ch1'},0).name,'川辺の水路');
+ assert.equal(at(src,{kind:'housing-block',blockId:'b1'},0).name,'川辺の住宅街区');
  assert.deepEqual(at(src,{kind:'facility',id:'r-0'},4).history,[]);
  assert.equal(at(src,{kind:'housing-block',blockId:'b1'},59).presence,'not-yet-built');
  const none=at(src,{kind:'facility',id:'nowhere'},100);

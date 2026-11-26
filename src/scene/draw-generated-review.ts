@@ -46,8 +46,9 @@ export type ScenePaintProjection=ReturnType<typeof projectScenePaint>;
 export function withoutLandscapePlants(paint:ScenePaintProjection):ScenePaintProjection {
  return {...paint,presentation:{...paint.presentation,trees:[]},vegetation:paint.vegetation?{...paint.vegetation,grass:[],shrubs:[],trees:[]}:null};
 }
-function drawClouds(c:CanvasRenderingContext2D,presentation:ScenePaintProjection['presentation']){for(const {x,y} of presentation.clouds){c.fillStyle=presentation.drought?'#c4c3aa':'#e9e1cb';c.fillRect(x+4,y,19,3);c.fillRect(x,y+3,31,5);c.fillRect(x+8,y-3,10,4);}}
-function drawPeople(c:CanvasRenderingContext2D,presentation:ScenePaintProjection['presentation']){for(const [i,[x,y]] of presentation.people.entries()){
+/** Exported for the Issue #39 pick mask (occluders of the backdrop); drawing unchanged. */
+export function drawClouds(c:CanvasRenderingContext2D,presentation:ScenePaintProjection['presentation']){for(const {x,y} of presentation.clouds){c.fillStyle=presentation.drought?'#c4c3aa':'#e9e1cb';c.fillRect(x+4,y,19,3);c.fillRect(x,y+3,31,5);c.fillRect(x+8,y-3,10,4);}}
+export function drawPeople(c:CanvasRenderingContext2D,presentation:ScenePaintProjection['presentation']){for(const [i,[x,y]] of presentation.people.entries()){
  c.fillStyle='#d2b894';c.fillRect(x,y-6,2,2);c.fillStyle=['#66594f','#b29b74','#667a70'][i%3]!;c.fillRect(x,y-4,2,3);c.fillStyle='#454e48';c.fillRect(x,y-1,2,2);
 }}
 /** Draws a structure-only layer of a filtered observation with one scene's presentation (for the plant/structure Y order). */

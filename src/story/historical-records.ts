@@ -58,6 +58,8 @@ export interface HistoricalGeneration {
 }
 export interface HistoricalSubject {
  readonly ref:HistoricalTargetRef;
+ /** Site and kind only (e.g. 「川辺の橋」): safe to show in any year, unlike `title`, which names the construction year. */
+ readonly name:string;
  /** Undefined only for an id no record knows. */
  readonly siteId:HistoricalSiteId|undefined;
  readonly observedYear:number;
@@ -125,7 +127,7 @@ function housingCondition(b:ResidentialBlock):string {
 
 // ---- index (all years; queries filter by year) ----
 interface Entry {
- readonly ref:HistoricalTargetRef;readonly siteId:HistoricalSiteId;readonly title:string;
+ readonly ref:HistoricalTargetRef;readonly siteId:HistoricalSiteId;readonly name:string;readonly title:string;
  /** First confirmed year; null when the records cannot be tied to this target. */
  readonly firstYear:number|null;readonly unsupported:boolean;
  /** Records began after this year (e.g. irrigation introduction): earlier years are unknown, not "not built". */
@@ -179,7 +181,7 @@ function buildIndex(source:HistoricalSource):Index {
      ...(linked?{linkedChronicleId:linked}:{}),...(generation?{generation}:{})});
    });
    const name=bridge?'橋':first.building.civic?civicNames[first.building.civic.architectureStyle]??'共同施設':facilityNames[first.building.kind]??fail('unknown facility kind '+first.building.kind);
-   add(Object.freeze({ref:Object.freeze(ref),siteId,title:`${siteNames[siteId]}の${name}（${first.building.builtYear}年建設）`,
+   add(Object.freeze({ref:Object.freeze(ref),siteId,name:`${siteNames[siteId]}の${name}`,title:`${siteNames[siteId]}の${name}（${first.building.builtYear}年建設）`,
     firstYear:unsupported?null:first.year,unsupported,recordsFrom:0,changes:Object.freeze(changes),generations}));
   }
  });
@@ -199,7 +201,7 @@ function buildIndex(source:HistoricalSource):Index {
      label:housingLabels[e.kind]+(generation?`（建て直し・第${generation}世代）`:''),condition:housingCondition(e.after),
      ...(linked?{linkedChronicleId:linked}:{}),...(generation?{generation}:{})});
    });
-   add(Object.freeze({ref:Object.freeze({kind:'housing-block',blockId}),siteId,title:`${siteNames[siteId]}の住宅街区（${first.after.builtYear}年建設）`,
+   add(Object.freeze({ref:Object.freeze({kind:'housing-block',blockId}),siteId,name:`${siteNames[siteId]}の住宅街区`,title:`${siteNames[siteId]}の住宅街区（${first.after.builtYear}年建設）`,
     firstYear:first.year,unsupported:false,recordsFrom:source.housing.legacyUntracked?source.housing.introducedYear:0,changes:Object.freeze(changes),generations}));
   }
  }
@@ -214,7 +216,7 @@ function buildIndex(source:HistoricalSource):Index {
      condition:waterwayConditions[e.after.status],...(linked?{linkedChronicleId:linked}:{})});
    });
    const first=list[0]!;
-   add(Object.freeze({ref:Object.freeze({kind:'waterway',systemId}),siteId:'river-bank',title:`${siteNames['river-bank']}の水路（${first.year}年築造）`,
+   add(Object.freeze({ref:Object.freeze({kind:'waterway',systemId}),siteId:'river-bank',name:`${siteNames['river-bank']}の水路`,title:`${siteNames['river-bank']}の水路（${first.year}年築造）`,
     firstYear:first.kind==='built'?first.year:null,unsupported:first.kind!=='built',recordsFrom:i.introducedYear+1,changes:Object.freeze(changes),generations:Object.freeze([])}));
   }
  }
@@ -231,7 +233,7 @@ function checkYear(source:HistoricalSource,year:number):void {
  if(!Number.isSafeInteger(year)||year<0||year>source.confirmedThrough)throw RangeError('historical records: unconfirmed year '+year);
 }
 function subjectOf(entry:Entry,year:number):HistoricalSubject {
- const base={ref:entry.ref,siteId:entry.siteId,observedYear:year,title:entry.title,firstYear:entry.firstYear};
+ const base={ref:entry.ref,siteId:entry.siteId,observedYear:year,name:entry.name,title:entry.title,firstYear:entry.firstYear};
  if(entry.unsupported)return Object.freeze({...base,presence:'unsupported',currentCondition:null,history:Object.freeze([]),generations:Object.freeze([])});
  if(year<entry.recordsFrom)return Object.freeze({...base,presence:'unknown',currentCondition:null,history:Object.freeze([]),generations:Object.freeze([])});
  if(entry.firstYear===null||entry.firstYear>year)return Object.freeze({...base,presence:'not-yet-built',currentCondition:null,history:Object.freeze([]),generations:Object.freeze([])});
@@ -248,7 +250,7 @@ export function historicalSubjectAt(source:HistoricalSource,ref:HistoricalTarget
  checkYear(source,year);
  const entry=indexOf(source).entries.get(keyOf(ref));
  if(entry)return subjectOf(entry,year);
- return Object.freeze({ref:Object.freeze({...ref}),siteId:undefined,observedYear:year,presence:'unknown',title:'記録のない対象',firstYear:null,
+ return Object.freeze({ref:Object.freeze({...ref}),siteId:undefined,observedYear:year,presence:'unknown',name:'記録のない対象',title:'記録のない対象',firstYear:null,
   currentCondition:null,history:Object.freeze([]),generations:Object.freeze([])});
 }
 
