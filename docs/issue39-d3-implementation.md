@@ -1,7 +1,7 @@
 # Issue #39 D3｜記録された変化から、その年の風景へ
 
 - Issue: [#39 歴史を発見する観察体験](https://github.com/k-hsmt/namonaki-bunmei/issues/39)
-- 設計: D0詳細設計 `docs/issue39-historical-discovery-d0.md`（PR #161）の §7・§8.2・§10 D3。前工程は[D1](issue39-d1-implementation.md)と[D2](issue39-d2-implementation.md)（D2はHumanレビューで全項目了承済み）
+- 設計: [D0詳細設計](issue39-historical-discovery-d0.md)の §7・§8.2・§10 D3。前工程は[D1](issue39-d1-implementation.md)と[D2](issue39-d2-implementation.md)（D2はHumanレビューで全項目了承済み）
 - 範囲：調査パネルの各変化から、その確定年を観測する操作。2画面比較（D4）は含めない。
 
 ## 1. 体験

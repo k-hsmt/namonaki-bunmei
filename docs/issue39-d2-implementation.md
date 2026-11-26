@@ -1,7 +1,7 @@
 # Issue #39 D2｜調べるモード：実画素の選択マスク・調査パネル・土地の記録
 
 - Issue: [#39 歴史を発見する観察体験](https://github.com/k-hsmt/namonaki-bunmei/issues/39)
-- 設計: D0詳細設計 `docs/issue39-historical-discovery-d0.md`（PR #161）の §5・§6・§7・§10 D2。D1は[issue39-d1-implementation.md](issue39-d1-implementation.md)（§2の4点はHuman了承済み）
+- 設計: [D0詳細設計](issue39-historical-discovery-d0.md)の §5・§6・§7・§10 D2。D1は[issue39-d1-implementation.md](issue39-d1-implementation.md)（§2の4点はHuman了承済み）
 - 範囲：**調べるモードのON/OFF、320×180の選択マスク、調査パネル、記録一覧**。年移動（D3）、2画面比較（D4）は含めない。
 - **D0 §10の停止線：本工程は原寸Humanレビューが必要**。
 

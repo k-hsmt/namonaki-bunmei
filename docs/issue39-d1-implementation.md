@@ -1,7 +1,7 @@
 # Issue #39 D1｜調べる対象の確定履歴API（読み取り専用）
 
 - Issue: [#39 歴史を発見する観察体験](https://github.com/k-hsmt/namonaki-bunmei/issues/39)
-- 設計: D0詳細設計 `docs/issue39-historical-discovery-d0.md`（PR #161、本PR作成時点で未マージ）の §3・§4・§10 D1
+- 設計: [D0詳細設計](issue39-historical-discovery-d0.md)の §3・§4・§10 D1
 - 範囲：**履歴の読み取りAPIとテストのみ**。UI（D2調べるモード／D3年移動／D4比較）は含めない。
 - 優先規約：[AGENTS.md](../AGENTS.md)。対象は現行のv10世界（`ArchitectureGeneratedSession`）だけで、旧形式向けの分岐は追加していない。
 

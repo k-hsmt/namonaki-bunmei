@@ -1,7 +1,7 @@
 # Issue #39 D5｜風景から歴史を調べる体験の総合監査（Human最終受入用）
 
-- 設計：D0詳細設計 `docs/issue39-historical-discovery-d0.md`（PR #161）§9・§10 D5。前工程：[D1](issue39-d1-implementation.md)・[D2](issue39-d2-implementation.md)・[D3](issue39-d3-implementation.md)・[D4](issue39-d4-implementation.md)（D2・D4はHumanレビュー了承済み）
-- 状態：**監査は合格（失敗0）。Human最終受入待ち**（§7）。
+- 設計：[D0詳細設計](issue39-historical-discovery-d0.md)§9・§10 D5。前工程：[D1](issue39-d1-implementation.md)・[D2](issue39-d2-implementation.md)・[D3](issue39-d3-implementation.md)・[D4](issue39-d4-implementation.md)（D2・D4はHumanレビュー了承済み）
+- 状態：**監査は合格（失敗0）。Human最終受入（2026-11-26）：#39はこの形で完了**（§7）。
 - 生成：`npm run build && node scripts/audit-issue39-d5.mjs` → `artifacts/history39-d5/`（report.json・gallery.html・画像90枚。9世界で約20分）。
   - CIでは短い版（`HISTORY_D5_QUICK=1`：3世界・1500年まで）を `history39-d5-audit` として保存する（`visual-browser`ジョブ、#38 D3の監査の直後）。
 - 本編のコードは変更していない（監査スクリプト・CIの手順・D1テストの追加だけ）。
@@ -88,3 +88,9 @@
 1. **性能**：マスク1枚が中央値約0.22秒、最大約0.45秒（ヘッドレスChromium）。対象を選ぶ・年を変えるたびに、この時間だけ待つ。この水準で受け入れるか。
 2. **スマホ実機**：この環境では端末エミュレーションまで（390px幅・タッチ）。実機での操作確認が必要か。
 3. **Issue #39の完了**：上記で問題なければ、D0の受け入れ条件（確定履歴と年代記の整合、現行シミュレーションを変えない、記録のないものは「不明」、静けさとスマホ）を満たしたとして完了とするか。
+
+### 7.1 Human最終受入（2026-11-26）
+
+1. 性能：**了承**（マスク1枚 中央値約0.22秒・最大約0.45秒の水準で受け入れ）。
+2. スマホ実機での確認：**不要**（端末エミュレーションでの確認で足りる）。
+3. Issue #39：PRを作成したうえで、**この形で完了**とする。

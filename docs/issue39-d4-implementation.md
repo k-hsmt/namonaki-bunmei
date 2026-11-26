@@ -1,7 +1,7 @@
 # Issue #39 D4｜2つの確定年の風景を並べて比べる
 
 - Issue: [#39 歴史を発見する観察体験](https://github.com/k-hsmt/namonaki-bunmei/issues/39)
-- 設計: D0詳細設計 `docs/issue39-historical-discovery-d0.md`（PR #161）の §8・§10 D4。前工程は[D1](issue39-d1-implementation.md)、[D2](issue39-d2-implementation.md)、[D3](issue39-d3-implementation.md)
+- 設計: [D0詳細設計](issue39-historical-discovery-d0.md)の §8・§10 D4。前工程は[D1](issue39-d1-implementation.md)、[D2](issue39-d2-implementation.md)、[D3](issue39-d3-implementation.md)
 - 範囲：調べるモード内の2画面比較。**D0 §10の停止線：本工程はHumanのレイアウトレビューが必要**。
 
 ## 1. 体験
