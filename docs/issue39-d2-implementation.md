@@ -91,4 +91,5 @@
 
 ## 8. 全体回帰
 
-（記入予定）
+- `npm test`：**664件成功・失敗0**。
+- ブラウザ（`CHROMIUM_PATH=/opt/pw-browsers/chromium`）：**101件中89件成功**（本工程の5件を含む）。失敗12件はすべて`tests/browser/music.test.mjs`。原因はこの実行環境でブラウザが起動しないこと（`CHROMIUM_PATH`を使わずに起動し、WebKitも未導入）。#29 S1の記録と同じ事象で、BGMは本変更の対象外。この12件は本環境では未検証。
