@@ -147,7 +147,8 @@ function renderGraph(y:number,confirmedYear:number){
  else {const o=observeCivilizationMetrics(state,c),records=state.history.filter(r=>r.year===c&&r.important);candidateLine.textContent=`候補：世界暦 ${format(c)}年 · ${o?formatMetricValue(key,o[key]):'記録なし'}${records.length?` · この年の記録 ${records.length}件：${records.slice(0,2).map(r=>r.title).join('、')}`:''}`;}
 }
 /** The common entry of graph observation: a confirmed year only; stops automatic progress; does not scroll. */
-function observeYear(year:number){
+/** `record` (Issue #39 D3): the chronicle entry to show for that year, when the caller knows the exact one. */
+function observeYear(year:number,record?:RecordEntry){
  const confirmed=lastObservedYear(state);if(!Number.isSafeInteger(year)||year<0||year>confirmed)return;
  stop();const win=graphWindowNow(confirmed);
  // Hold the window where it is; move it only as far as needed when the year lies outside it.
@@ -155,7 +156,7 @@ function observeYear(year:number){
  graphCandidate=null;
  // The last confirmed year is the live view (as on the slider): a pending choice stays visible.
  viewedYear=year===confirmed?null:year;if(viewedYear===null)graphEnd=null;
- active=[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();
+ active=record&&record.year===year?record:[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();
 }
 function returnLive(){viewedYear=null;graphEnd=null;graphCandidate=null;render();}
 function setCandidate(year:number){const confirmed=lastObservedYear(state);if(!Number.isFinite(year))return;graphCandidate=Math.max(0,Math.min(confirmed,Math.round(year)));render();}
@@ -244,12 +245,22 @@ function renderInspector(y:number,siteIndex:number){
   el('inspector-state').textContent=presenceText(s,visible(s.ref));
   const g=s.generations.at(-1),generation=el('inspector-generation');generation.hidden=!g;
   generation.textContent=!g?'':g.generation===1?'建てられたときの建物（第1世代）':`第${g.generation}世代（世界暦 ${format(g.year)}年に建て直し）`;
-  const titles=new Map(state.history.map(r=>[r.id,r.title])),ol=el('inspector-history');ol.replaceChildren();
-  for(const c of s.history){const li=document.createElement('li'),time=document.createElement('time');time.textContent=`世界暦 ${format(c.year)}年`;
-   li.append(time,document.createTextNode(`${c.label} · ${c.condition}`));
-   const title=c.linkedChronicleId?titles.get(c.linkedChronicleId):undefined;
-   if(title){const note=document.createElement('span');note.className='chronicle';note.textContent=`年代記：${title}`;li.append(note);}
-   ol.append(li);}
+  const ol=el('inspector-history');ol.replaceChildren();
+  // D3: each confirmed change opens its own year through the common observation entry (#29), with its chronicle entry
+  const records=new Map(state.history.map(r=>[r.id,r]));
+  for(const c of s.history){const li=document.createElement('li'),text=document.createElement('div'),time=document.createElement('time');time.textContent=`世界暦 ${format(c.year)}年`;
+   text.append(time,document.createTextNode(`${c.label} · ${c.condition}`));li.append(text);
+   const record=c.linkedChronicleId?records.get(c.linkedChronicleId):undefined;
+   if(record){const note=document.createElement('span');note.className='chronicle';note.textContent=`年代記：${record.title}`;text.append(note);}
+   const here=c.year===y,go=document.createElement('button');go.type='button';go.className='textbutton inspector-go';go.dataset.source=c.sourceId;
+   go.textContent=here?'この年を観測中':'この年の風景を見る';
+   // aria-disabled, not disabled: the row just moved to keeps the keyboard focus
+   go.setAttribute('aria-disabled',String(here||busy));
+   go.setAttribute('aria-label',here?`世界暦${c.year}年を観測中`:`世界暦${c.year}年の風景を見る（${c.label}）`);
+   go.onclick=()=>{if(busy||c.year===y)return;observeYear(c.year,record);
+    // keep the keyboard where it was: the same change's row, rebuilt for the new year
+    (document.querySelector(`#inspector-history button[data-source="${CSS.escape(c.sourceId)}"]`) as HTMLButtonElement|null)?.focus();};
+   li.append(go);ol.append(li);}
  }
  const records=historicalTargetsAt(source,siteId,y),shownList=el('inspector-visible'),hiddenList=el('inspector-hidden');shownList.replaceChildren();hiddenList.replaceChildren();
  for(const s of records){const b=textButton(s.title+(s.presence==='unsupported'?'（結び付け不可）':''),Boolean(selected&&sameHistoricalTarget(s.ref,selected)),()=>selectTarget(s.ref));(visible(s.ref)?shownList:hiddenList).append(b);}

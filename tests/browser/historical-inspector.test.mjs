@@ -25,6 +25,10 @@ test.before(async()=>{
   const world=await P.advanceArchitectureWorld((await createNewArchitectureWorld(seed)).architecture,END,'automatic');
   saves[seed]=path.join(dir,`world-${seed}.json`);await writeFile(saves[seed],serializeWorldSave(await prepareWorldSessionSave(architectureProductionSession(world))));
  }
+ // D3: seed 42 stopped at its first choice (the pending year is not confirmed)
+ const pending=await P.advanceArchitectureWorld((await createNewArchitectureWorld(42)).architecture,END,'stop');
+ assert.ok(pending.terrain.review.state.pending,'seed 42 reaches a choice before '+END);
+ saves.pending=path.join(dir,'world-42-pending.json');await writeFile(saves.pending,serializeWorldSave(await prepareWorldSessionSave(architectureProductionSession(pending))));
 });
 test.after(async()=>{try{await browser?.close();}finally{server?.kill();}});
 
@@ -193,4 +197,73 @@ test('D2: a choice is checked again for each year and site; a new world clears i
  await page.setInputFiles('#import-file',saves[1]);
  await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('記録ファイルを開きました'),null,{timeout:120000});
  assert.equal(await page.locator('#inspector-subject').isVisible(),false,'another world clears the choice');
+});
+
+// ---- D3: from a recorded change to its year ----
+const rows=page=>page.evaluate(()=>[...document.querySelectorAll('#inspector-history li')].map(li=>({text:li.textContent,chronicle:li.querySelector('.chronicle')?.textContent.replace(/^年代記：/,'')??null,source:li.querySelector('button').dataset.source,disabled:li.querySelector('button').getAttribute('aria-disabled')==='true'})));
+const stillAt=async(page,seed,year,si)=>page.evaluate(async([json,year,si])=>{
+ const S=await import('/story/world-session.js'),WS=await import('/story/world-save.js');
+ const session=window.__issue39??=S.restoreWorldSession(await WS.parseWorldSaveAsync(json)),c=document.createElement('canvas');S.drawWorldSession(c,session,year,si);
+ const a=c.getContext('2d').getImageData(0,0,320,180).data,b=document.getElementById('scene').getContext('2d').getImageData(0,0,320,180).data;let d=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])d++;return d;
+},[await readFile(saves[seed],'utf8'),year,si]);
+
+test('D3: a recorded change opens its own year in the scene, chronicle, status, graph and panel together',async t=>{
+ const page=await open(t,42);
+ await page.click('.civ-metric[data-metric="population"]');
+ await page.click('#inspect-toggle');await openRecords(page);
+ await page.locator('#inspector-records button',{hasText:'橋'}).first().click();
+ for(const [year,state] of [[1135,'損傷して渡れない'],[777,'渡ることができる']]){
+  const row=(await rows(page)).find(r=>r.source.startsWith(`river-bank-7@${year}#`));assert.ok(row&&row.chronicle,`the ${year} change has its chronicle entry`);
+  await page.locator(`#inspector-history button[data-source="${row.source}"]`).click();
+  const label=new Intl.NumberFormat('ja-JP').format(year);
+  assert.match(await page.locator('#past-note').textContent(),new RegExp(`世界暦 ${label}年の風景を観測中`));
+  assert.equal(await page.locator('#rewind-year').inputValue(),String(year));
+  assert.equal(await page.locator('#headline').textContent(),row.chronicle,'the chronicle shows the entry of that change');
+  assert.match(await page.locator('#civ-status-year').textContent(),new RegExp(`^世界暦 ${label}年の確定値（当時）`));
+  assert.match(await page.locator('#civ-graph-summary').textContent(),new RegExp(`観測中の${label}年`));
+  assert.equal(await stillAt(page,42,year,0),0,'the scene is the still frame of that confirmed year');
+  assert.equal(await page.locator('#inspector-state').textContent(),`世界暦 ${label}年の状態：${state}`);
+  const after=await rows(page);
+  assert.ok(after.every(r=>Number(r.source.split('@')[1].split('#')[0])<=year),'the panel lists nothing after the observed year');
+  assert.deepEqual([after.at(-1).source,after.at(-1).chronicle,after.at(-1).disabled],[row.source,row.chronicle,true],'the observed change is the last row, its button disabled');
+  assert.equal(await page.locator('#inspector-history button[aria-disabled=true]').textContent(),'この年を観測中');
+ }
+ // keyboard: Enter on a row moves there and keeps focus on that row
+ const first=(await rows(page))[0];
+ await page.evaluate(()=>document.getElementById('return-now').click());
+ await page.focus(`#inspector-history button[data-source="${first.source}"]`);await page.keyboard.press('Enter');
+ assert.equal(await page.evaluate(()=>document.activeElement?.dataset?.source),first.source);
+ assert.equal(await page.locator('#rewind-year').inputValue(),first.source.split('@')[1].split('#')[0]);
+});
+
+test('D3: moving to a year stops automatic progress and keeps the choice and the investigation',async t=>{
+ const page=await open(t,42);
+ await page.click('#inspect-toggle');await openRecords(page);
+ await page.locator('#inspector-records button',{hasText:'共同会堂'}).first().click();
+ await page.click('#play');assert.match(await page.locator('#play').textContent(),/停止/);
+ const row=(await rows(page))[0];
+ await page.locator(`#inspector-history button[data-source="${row.source}"]`).click();
+ assert.match(await page.locator('#play').textContent(),/自動で見守る/,'automatic progress stopped');
+ assert.equal(await page.locator('#inspector').isVisible(),true);
+ assert.match(await page.locator('#inspector-name').textContent(),/共同会堂/,'the same target stays chosen');
+ const year=await page.locator('#rewind-year').inputValue();
+ await page.waitForTimeout(1200);assert.equal(await page.locator('#rewind-year').inputValue(),year,'nothing moved it afterwards');
+});
+
+test('D3: with a choice pending, the records end at the last confirmed year and the choice is kept',async t=>{
+ const page=await open(t,'pending');
+ assert.equal(await page.locator('#choice').isVisible(),true);
+ const confirmed=Number(await page.locator('#rewind-year').getAttribute('max'));
+ await page.click('#inspect-toggle');await openRecords(page);
+ const buttons=page.locator('#inspector-records button');const n=await buttons.count();assert.ok(n>0);
+ let moved=false;
+ for(let i=0;i<n;i++){
+  await openRecords(page);await buttons.nth(i).click();
+  for(const r of await rows(page))assert.ok(Number(r.source.split('@')[1].split('#')[0])<=confirmed,'no unconfirmed year');
+  const target=(await rows(page)).find(r=>!r.disabled);
+  if(!moved&&target){await page.locator(`#inspector-history button[data-source="${target.source}"]`).click();moved=true;
+   assert.equal(await page.locator('#choice').isVisible(),false,'the past view hides the choice');
+   await page.click('#return-now');assert.equal(await page.locator('#choice').isVisible(),true,'and the choice is still waiting');}
+ }
+ assert.ok(moved);
 });
