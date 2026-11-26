@@ -267,3 +267,86 @@ test('D3: with a choice pending, the records end at the last confirmed year and 
  }
  assert.ok(moved);
 });
+
+// ---- D4: two confirmed years side by side ----
+const canvasDiff=async(page,seed,id,year,si)=>page.evaluate(async([json,id,year,si])=>{
+ const S=await import('/story/world-session.js'),WS=await import('/story/world-save.js');
+ const session=window.__issue39??=S.restoreWorldSession(await WS.parseWorldSaveAsync(json)),c=document.createElement('canvas');S.drawWorldSession(c,session,year,si);
+ const a=c.getContext('2d').getImageData(0,0,320,180).data,b=document.getElementById(id).getContext('2d').getImageData(0,0,320,180).data;let d=0;for(let i=0;i<a.length;i++)if(a[i]!==b[i])d++;return d;
+},[await readFile(saves[seed],'utf8'),id,year,si]);
+const painted=(page,id)=>page.evaluate(id=>document.getElementById(id).getContext('2d').getImageData(0,0,320,180).data.some(v=>v!==0),id);
+async function openHallComparison(page){
+ await page.click('#inspect-toggle');await openRecords(page);
+ await page.locator('#inspector-records button',{hasText:'共同会堂'}).first().click();
+ await page.evaluate(()=>{document.getElementById('inspector-records').open=false;});
+ await page.click('#compare-open');
+}
+
+test('D4: both images are the real still frames of their own years; changing the comparison year moves nothing else',async t=>{
+ const page=await open(t,42);await observe(page,1000);
+ await page.click('.civ-metric[data-metric="food"]');
+ const before={scene:await sceneRGBA(page),past:await page.locator('#past-note').textContent(),graph:await page.locator('#civ-graph-summary').textContent(),headline:await page.locator('#headline').textContent()};
+ await openHallComparison(page);
+ assert.equal(await page.locator('#compare-ref-year').textContent(),'比較元 · 世界暦 1,000年','the reference is the observed year');
+ assert.equal(await page.locator('#compare-cmp-year').textContent(),'比較先 · 世界暦 800年','the default is the target\'s first record, not a guessed peak');
+ const set=async how=>{await how();return Number(await page.locator('#compare-year').inputValue());};
+ const years=[];
+ years.push(await set(()=>page.selectOption('#compare-event',{label:'世界暦 799年 · 建設の前年'})));
+ years.push(await set(async()=>{await page.fill('#compare-year','450');await page.locator('#compare-year').dispatchEvent('change');}));
+ years.push(await set(()=>page.click('#compare-plus')));
+ years.push(await set(()=>page.click('#compare-minus')));
+ years.push(await set(async()=>{await page.evaluate(()=>{const r=document.getElementById('compare-range');r.value='1150';r.dispatchEvent(new Event('change'));});}));
+ years.push(await set(async()=>{await page.fill('#compare-year','99999');await page.locator('#compare-year').dispatchEvent('change');}));
+ years.push(await set(async()=>{await page.fill('#compare-year','-5');await page.locator('#compare-year').dispatchEvent('change');}));
+ assert.deepEqual(years,[799,450,451,450,1150,END,0],'event year, typed, ±1, slider, and clamped to the confirmed range');
+ for(const year of [799,0,END,1135]){
+  await page.fill('#compare-year',String(year));await page.locator('#compare-year').dispatchEvent('change');
+  assert.equal(await canvasDiff(page,42,'compare-cmp',year,0),0,`comparison ${year} is the normal still frame`);
+  assert.equal(await canvasDiff(page,42,'compare-ref',1000,0),0,'the reference stays the normal still frame of 1000');
+ }
+ assert.deepEqual({scene:await sceneRGBA(page),past:await page.locator('#past-note').textContent(),graph:await page.locator('#civ-graph-summary').textContent(),headline:await page.locator('#headline').textContent()},before,
+  'the main scene, observed year, graph and chronicle do not move');
+ // each side is described from its own year; the mark is off by default and never drawn where the target is absent
+ await page.selectOption('#compare-event',{label:'世界暦 799年 · 建設の前年'});
+ assert.match(await page.locator('#compare-cmp-state').textContent(),/^川辺の大きな共同会堂：この年にはまだ建てられていません。$/);
+ assert.match(await page.locator('#compare-ref-state').textContent(),/世界暦 1,000年の状態：建っている/);
+ assert.equal(await painted(page,'compare-ref-mark'),false);
+ await page.check('#compare-mark');
+ assert.equal(await painted(page,'compare-ref-mark'),true);assert.equal(await painted(page,'compare-cmp-mark'),false);
+ assert.equal(await canvasDiff(page,42,'compare-ref',1000,0),0,'the mark is a separate layer');
+ // only the explicit action moves the observed year; the reference stays
+ await page.click('#compare-observe');
+ assert.match(await page.locator('#past-note').textContent(),/世界暦 799年の風景を観測中/);
+ assert.equal(await page.locator('#compare-ref-year').textContent(),'比較元 · 世界暦 1,000年');
+ assert.equal(await page.locator('#compare-observe').textContent(),'この年を観測中');
+});
+
+test('D4: progress never moves the fixed years; layouts are side by side on a PC and stacked on a phone; leaving closes it',async t=>{
+ const page=await open(t,42);
+ await openHallComparison(page);
+ assert.match(await page.locator('#play').textContent(),/自動で見守る/,'opening the comparison holds automatic progress');
+ const pc=[await page.locator('#compare-ref').boundingBox(),await page.locator('#compare-cmp').boundingBox()];
+ assert.ok(Math.abs(pc[0].y-pc[1].y)<1&&pc[1].x>pc[0].x+pc[0].width-1,'side by side');
+ for(const b of pc)assert.ok(Math.abs(b.width/b.height-16/9)<.02,'each keeps 16:9');
+ // the viewer advances the world by hand: both years stay where they were
+ const year=await page.locator('#year').textContent();await page.click('#step');
+ await page.waitForFunction(y=>document.getElementById('year').textContent!==y&&!document.getElementById('play').disabled,year,{timeout:60000});
+ assert.equal(await page.locator('#compare-ref-year').textContent(),'比較元 · 世界暦 1,200年');
+ assert.equal(await page.locator('#compare-cmp-year').textContent(),'比較先 · 世界暦 800年');
+ assert.equal(await canvasDiff(page,42,'compare-ref',END,0),0,'the confirmed year draws the same after progress');
+ // leaving the site, the investigation or the world closes it
+ await page.selectOption('#site-select','1');assert.equal(await page.locator('#compare').isVisible(),false);
+ await page.selectOption('#site-select','0');await page.click('#compare-open');assert.equal(await page.locator('#compare').isVisible(),true);
+ await page.click('#inspector-close');await page.click('#inspect-toggle');assert.equal(await page.locator('#compare').isVisible(),false);
+ await page.click('#compare-open');
+ await page.setInputFiles('#import-file',saves[1]);
+ await page.waitForFunction(()=>document.getElementById('feedback').textContent.includes('記録ファイルを開きました'),null,{timeout:120000});
+ assert.equal(await page.locator('#compare').isVisible(),false,'another world discards the comparison');
+ // a phone stacks the two images, each at full width and 16:9
+ const phone=await open(t,42,{viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true,isMobile:true});
+ await openHallComparison(phone);
+ const sp=[await phone.locator('#compare-ref').boundingBox(),await phone.locator('#compare-cmp').boundingBox()];
+ assert.ok(sp[1].y>=sp[0].y+sp[0].height&&Math.abs(sp[0].x-sp[1].x)<1,'stacked');
+ for(const b of sp)assert.ok(Math.abs(b.width/b.height-16/9)<.02);
+ assert.equal(await phone.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true,'no sideways scroll');
+});
