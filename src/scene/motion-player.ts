@@ -14,19 +14,23 @@ export class SceneMotionPlayer {
  private world:WorldSession|null=null;private year=-1;private site=-1;private snapshot:SiteSnapshot|null=null;private observation:GeneratedSceneObservation|null=null;private prepared:PreparedSceneMotion|null=null;private visualKey:string|null=null;private terrain:object|null=null;private painter:GeneratedStructurePainter|undefined;
  private transition:SeasonTransition|null=null;private pendingTransition:{from:PreparedSceneMotion;ms:number}|null=null;private season:SeasonalView|null=null;private raf:number|null=null;private lastTimestamp:number|null=null;private seconds=0;private lastPaint=-Infinity;private preferred=true;private disposed=false;private frames=0;private builds=0;
  private readonly media=matchMedia('(prefers-reduced-motion: reduce)');
+ /** Issue #39 D2: held still while the scene is being investigated (the pick mask is of the still frame). */
+ private still=false;
  constructor(private readonly canvas:HTMLCanvasElement,private readonly control:HTMLInputElement){
   try{this.preferred=localStorage.getItem(sceneMotionPreferenceKey)!=='off';}catch{}
   control.addEventListener('change',this.change);this.media.addEventListener('change',this.configure);document.addEventListener('visibilitychange',this.visibility);this.configure();
  }
  get environment(){return this.observation?.ground.environment;}
+ /** Issue #39 D2: hold the still frame (true) or return to the viewer's motion preference (false). Preference unchanged. */
+ setStill(still:boolean){if(this.still===still)return;this.still=still;this.configure();}
  /** Issue #36 D3: a season blend is running or waiting for the moving view to start. */
  get isTransitioning(){return this.transition!==null||this.pendingTransition!==null;}
  get paintedFrames(){return this.frames;}get preparations(){return this.builds;}get isRunning(){return this.raf!==null;}
  private change=()=>{this.preferred=this.control.checked;try{localStorage.setItem(sceneMotionPreferenceKey,this.preferred?'on':'off');}catch{}this.configure();};
  private visibility=()=>{this.stopClock();if(!document.hidden)this.configure();};
  private configure=()=>{
-  if(this.disposed)return;const supported=this.world?.mode==='generated';this.control.disabled=!supported||this.media.matches;this.control.checked=Boolean(supported&&this.preferred&&!this.media.matches);
-  this.control.title=this.media.matches?'端末のモーション軽減設定に従い静止画で表示しています':!supported?'この情景は静止画で表示します':'';
+  if(this.disposed)return;const supported=this.world?.mode==='generated';this.control.disabled=!supported||this.media.matches||this.still;this.control.checked=Boolean(supported&&this.preferred&&!this.media.matches&&!this.still);
+  this.control.title=this.media.matches?'端末のモーション軽減設定に従い静止画で表示しています':!supported?'この情景は静止画で表示します':this.still?'調べている間は静止画で表示します':'';
   if(this.control.checked&&!document.hidden&&this.observation){
    if(!this.prepared){this.prepared=prepareSceneMotion(this.observation,this.painter);this.builds++;}
    if(this.pendingTransition){this.transition={...this.pendingTransition,start:performance.now()};this.pendingTransition=null;}

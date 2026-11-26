@@ -14,6 +14,9 @@ import {siteAt} from './story/settlement-history.js';
 import {practiceNames} from './story/society.js';
 import {civilizationStatusView,metricSeries,seriesRuns,reduceSeries,metricScale,recordMarkers,graphWindow,yearAtFraction,formatMetricValue,metricLabels,type GraphRange} from './story/civilization-status-view.js';
 import {observeCivilizationMetrics,type CivilizationMetricKey} from './story/civilization-metrics.js';
+import {historicalSourceOf,historicalSubjectAt,historicalTargetsAt,historicalSiteIds,sameHistoricalTarget,type HistoricalTargetRef,type HistoricalSubject} from './story/historical-records.js';
+import {buildPickMask,pickAt,targetPixels,type PickMask} from './scene/historical-pick-mask.js';
+import type {ArchitectureGeneratedSession} from './story/world-session.js';
 const el=(id:string)=>document.getElementById(id)!;
 const randomSeed=()=>Math.floor(Math.random()*4294967295)+1;
 /** Paint feedback before native JSON/terrain validation; hidden tabs use a bounded timer. */
@@ -144,7 +147,8 @@ function renderGraph(y:number,confirmedYear:number){
  else {const o=observeCivilizationMetrics(state,c),records=state.history.filter(r=>r.year===c&&r.important);candidateLine.textContent=`候補：世界暦 ${format(c)}年 · ${o?formatMetricValue(key,o[key]):'記録なし'}${records.length?` · この年の記録 ${records.length}件：${records.slice(0,2).map(r=>r.title).join('、')}`:''}`;}
 }
 /** The common entry of graph observation: a confirmed year only; stops automatic progress; does not scroll. */
-function observeYear(year:number){
+/** `record` (Issue #39 D3): the chronicle entry to show for that year, when the caller knows the exact one. */
+function observeYear(year:number,record?:RecordEntry){
  const confirmed=lastObservedYear(state);if(!Number.isSafeInteger(year)||year<0||year>confirmed)return;
  stop();const win=graphWindowNow(confirmed);
  // Hold the window where it is; move it only as far as needed when the year lies outside it.
@@ -152,7 +156,7 @@ function observeYear(year:number){
  graphCandidate=null;
  // The last confirmed year is the live view (as on the slider): a pending choice stays visible.
  viewedYear=year===confirmed?null:year;if(viewedYear===null)graphEnd=null;
- active=[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();
+ active=record&&record.year===year?record:[...state.history].reverse().find(e=>e.year<=year)??state.history[0]!;render();
 }
 function returnLive(){viewedYear=null;graphEnd=null;graphCandidate=null;render();}
 function setCandidate(year:number){const confirmed=lastObservedYear(state);if(!Number.isFinite(year))return;graphCandidate=Math.max(0,Math.min(confirmed,Math.round(year)));render();}
@@ -178,6 +182,198 @@ const recordYears=()=>recordMarkers(state,0,lastObservedYear(state)).map(m=>m.ye
 el('civ-graph-prev-record').addEventListener('click',()=>{const from=graphCandidate??viewedYear??lastObservedYear(state),year=recordYears().filter(y=>y<from).at(-1);if(year!==undefined)setCandidate(year);});
 el('civ-graph-next-record').addEventListener('click',()=>{const from=graphCandidate??viewedYear??lastObservedYear(state),year=recordYears().find(y=>y>from);if(year!==undefined)setCandidate(year);});
 el('civ-graph-observe').addEventListener('click',()=>{if(busy)return;const year=graphCandidate??typedYear();if(Number.isFinite(year))observeYear(Math.max(0,Math.min(lastObservedYear(state),Math.round(year))));});
+/**
+ * Issue #39 D2: "調べる" — read-only investigation of the observed still scene. The scene canvas is never drawn on; the
+ * outline goes to a separate annotation canvas and the records to the panel outside the scene. Investigating does not
+ * stop or change progress; an explicit year move (D3) will.
+ */
+const inspectToggle=el('inspect-toggle') as HTMLButtonElement,pickLayer=el('scene-pick') as HTMLCanvasElement,sceneBox=el('scene-canvas');
+let inspecting=false,selected:HistoricalTargetRef|null=null,hovered:number|null=null,candidates:readonly HistoricalTargetRef[]=[],pickNote='';
+let pickCache:{world:WorldSession;year:number;site:number;mask:PickMask}|null=null;
+/**
+ * Issue #39 D4: two confirmed years of the same world and site (UI state only, never saved). The reference year is the
+ * observed year when the comparison opened and never follows later moves or progress; only an explicit
+ * "この年を観測する" changes the observed year. `drawn` keeps what each canvas shows (a confirmed year draws the same
+ * pixels in every later world of the same history, so progress does not redraw them).
+ */
+let compare:{site:number;reference:number;comparison:number;drawn:{ref:string;cmp:string}}|null=null,compareMark=false;
+const compareMasks=new Map<string,PickMask>();
+const isArchitecture=(w:WorldSession):w is ArchitectureGeneratedSession=>'architecture' in w&&Boolean(w.architecture);
+const observedNow=()=>({year:viewedYear??lastObservedYear(state),site:Number(siteSelect.value)});
+function pickMaskAt(year:number,site:number):PickMask|null{
+ if(!inspecting||!isArchitecture(world))return null;
+ if(pickCache&&pickCache.world===world&&pickCache.year===year&&pickCache.site===site)return pickCache.mask;
+ const mask=buildPickMask(world,year,site);pickCache={world,year,site,mask};return mask;
+}
+const pickMaskNow=()=>{const o=observedNow();return pickMaskAt(o.year,o.site);};
+function outlineTarget(c:CanvasRenderingContext2D,mask:PickMask,index:number,color:string){
+ const own=new Uint8Array(320*180),ring=new Set<number>();for(const i of targetPixels(mask,index))own[i]=1;
+ for(let i=0;i<own.length;i++){if(!own[i])continue;const x=i%320,y=(i-x)/320;
+  for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]] as const){const nx=x+dx,ny=y+dy;if(nx>=0&&nx<320&&ny>=0&&ny<180&&!own[ny*320+nx])ring.add(ny*320+nx);}}
+ c.fillStyle=color;for(const i of ring)c.fillRect(i%320,Math.floor(i/320),1,1);
+}
+function drawPickLayer(){
+ const c=pickLayer.getContext('2d')!;c.clearRect(0,0,320,180);
+ const mask=inspecting?pickMaskNow():null;if(!mask)return;
+ const chosen=selected?mask.targets.findIndex(t=>sameHistoricalTarget(t,selected!)):-1;
+ if(hovered!==null&&hovered!==chosen)outlineTarget(c,mask,hovered,'rgba(255,248,214,.55)');
+ if(chosen>=0)outlineTarget(c,mask,chosen,'rgba(255,248,214,.95)');
+}
+function setInspecting(on:boolean){
+ inspecting=on;selected=null;candidates=[];hovered=null;pickNote='';if(!on){pickCache=null;closeCompare();}
+ sceneBox.classList.remove('over-target');motion.setStill(on);render();
+}
+function selectTarget(ref:HistoricalTargetRef,near:readonly HistoricalTargetRef[]=[]){selected=ref;candidates=near;pickNote='';render();}
+const textButton=(label:string,pressed:boolean,onclick:()=>void)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('aria-pressed',String(pressed));b.onclick=onclick;return b;};
+const presenceText=(s:HistoricalSubject,visible:boolean)=>
+ s.presence==='recorded'?(visible?`世界暦 ${format(s.observedYear)}年の状態：${s.currentCondition}`:`記録はありますが、世界暦 ${format(s.observedYear)}年の風景では見えていません。状態：${s.currentCondition}`)
+ :s.presence==='not-yet-built'?'この年にはまだ建てられていません。'
+ :s.presence==='unsupported'?'記録はありますが、この対象と確実に結び付けられないため、履歴を表示できません。'
+ :'この年についての記録はありません（不明）。';
+function renderInspector(y:number,siteIndex:number){
+ const supported=isArchitecture(world);inspectToggle.hidden=!supported;
+ if(!supported&&inspecting){inspecting=false;selected=null;candidates=[];pickCache=null;motion.setStill(false);}
+ inspectToggle.setAttribute('aria-pressed',String(inspecting));inspectToggle.textContent=inspecting?'調べる ✓':'調べる';
+ el('inspector').hidden=!inspecting;sceneBox.classList.toggle('inspecting',inspecting);
+ if(!inspecting||!supported){drawPickLayer();return;}
+ const mask=pickMaskAt(y,siteIndex)!,source=historicalSourceOf(world as ArchitectureGeneratedSession),siteId=historicalSiteIds[siteIndex]!;
+ const visible=(ref:HistoricalTargetRef)=>{const i=mask.targets.findIndex(t=>sameHistoricalTarget(t,ref));return i>=0&&mask.visiblePixels[i]!>0;};
+ // a choice belongs to its site; it is checked again in every observed year
+ if(selected&&historicalSubjectAt(source,selected,y).siteId!==siteId){selected=null;candidates=[];}
+ candidates=candidates.filter(r=>historicalSubjectAt(source,r,y).siteId===siteId);
+ if(hovered!==null&&hovered>=mask.targets.length)hovered=null;
+ el('inspector-hint').textContent=pickNote||`世界暦 ${format(y)}年の${['川辺','丘陵','入り江'][siteIndex]}。風景の建物・住宅街区・橋・水路を選ぶと、確定した記録を読めます。見えないものは「この土地の記録」から選べます。`;
+ const near=el('inspector-candidates');near.replaceChildren();near.hidden=candidates.length<2;
+ if(candidates.length>1){const label=document.createElement('span');label.textContent='近くの候補：';near.append(label);
+  for(const r of candidates)near.append(textButton(historicalSubjectAt(source,r,y).name,Boolean(selected&&sameHistoricalTarget(r,selected)),()=>selectTarget(r,candidates)));}
+ const article=el('inspector-subject');article.hidden=!selected;
+ if(selected){
+  const s=historicalSubjectAt(source,selected,y),shown=s.presence==='recorded'||s.presence==='unsupported';
+  el('inspector-name').textContent=shown?s.title:s.name;
+  el('inspector-state').textContent=presenceText(s,visible(s.ref));
+  const g=s.generations.at(-1),generation=el('inspector-generation');generation.hidden=!g;
+  generation.textContent=!g?'':g.generation===1?'建てられたときの建物（第1世代）':`第${g.generation}世代（世界暦 ${format(g.year)}年に建て直し）`;
+  const ol=el('inspector-history');ol.replaceChildren();
+  // D3: each confirmed change opens its own year through the common observation entry (#29), with its chronicle entry
+  const records=new Map(state.history.map(r=>[r.id,r]));
+  for(const c of s.history){const li=document.createElement('li'),text=document.createElement('div'),time=document.createElement('time');time.textContent=`世界暦 ${format(c.year)}年`;
+   text.append(time,document.createTextNode(`${c.label} · ${c.condition}`));li.append(text);
+   const record=c.linkedChronicleId?records.get(c.linkedChronicleId):undefined;
+   if(record){const note=document.createElement('span');note.className='chronicle';note.textContent=`年代記：${record.title}`;text.append(note);}
+   const here=c.year===y,go=document.createElement('button');go.type='button';go.className='textbutton inspector-go';go.dataset.source=c.sourceId;
+   go.textContent=here?'この年を観測中':'この年の風景を見る';
+   // aria-disabled, not disabled: the row just moved to keeps the keyboard focus
+   go.setAttribute('aria-disabled',String(here||busy));
+   go.setAttribute('aria-label',here?`世界暦${c.year}年を観測中`:`世界暦${c.year}年の風景を見る（${c.label}）`);
+   go.onclick=()=>{if(busy||c.year===y)return;observeYear(c.year,record);
+    // keep the keyboard where it was: the same change's row, rebuilt for the new year
+    (document.querySelector(`#inspector-history button[data-source="${CSS.escape(c.sourceId)}"]`) as HTMLButtonElement|null)?.focus();};
+   li.append(go);ol.append(li);}
+ }
+ const records=historicalTargetsAt(source,siteId,y),shownList=el('inspector-visible'),hiddenList=el('inspector-hidden');shownList.replaceChildren();hiddenList.replaceChildren();
+ for(const s of records){const b=textButton(s.title+(s.presence==='unsupported'?'（結び付け不可）':''),Boolean(selected&&sameHistoricalTarget(s.ref,selected)),()=>selectTarget(s.ref));(visible(s.ref)?shownList:hiddenList).append(b);}
+ for(const list of [shownList,hiddenList])if(!list.childElementCount){const p=document.createElement('p');p.textContent='ありません。';list.append(p);}
+ el('inspector-records-summary').textContent=`この土地の記録から調べる（${records.length}件）`;
+ if(compare&&compare.site!==siteIndex)closeCompare();
+ renderCompare(y);
+ drawPickLayer();
+}
+function closeCompare(){compare=null;compareMasks.clear();}
+function compareMaskAt(year:number,site:number):PickMask|null{
+ if(!isArchitecture(world))return null;const key=site+':'+year;let m=compareMasks.get(key);
+ if(!m){m=buildPickMask(world,year,site);compareMasks.set(key,m);}return m;
+}
+/** The default year to compare with: the chosen target's first record when it differs, else a century earlier (no "peak" is guessed). */
+function defaultComparison(reference:number):number{
+ if(selected&&isArchitecture(world)){const first=historicalSubjectAt(historicalSourceOf(world),selected,lastObservedYear(state)).firstYear;if(first!==null&&first!==reference)return first;}
+ return Math.max(0,reference-100);
+}
+function setComparison(year:number){
+ if(!compare||!Number.isFinite(year))return;const confirmed=lastObservedYear(state);
+ compare.comparison=Math.max(0,Math.min(confirmed,Math.round(year)));render();
+}
+function renderCompare(y:number){
+ const open=Boolean(compare&&inspecting&&isArchitecture(world));
+ el('compare').hidden=!open;(el('compare-open') as HTMLButtonElement).hidden=open;
+ if(!open||!compare||!isArchitecture(world))return;
+ const c=compare,confirmed=lastObservedYear(state),site=c.site,source=historicalSourceOf(world),siteName=['川辺','丘陵','入り江'][site]!;
+ // the chosen target's recorded years (and the year before each) lead the choice of years
+ const events=el('compare-event-row'),select=el('compare-event') as HTMLSelectElement;
+ const full=selected?historicalSubjectAt(source,selected,confirmed):null;events.hidden=!full||full.presence!=='recorded';
+ if(full&&full.presence==='recorded'){
+  const options:[number,string][]=[];const years=new Set(full.history.map(h=>h.year));
+  for(const h of full.history){if(h.year-1>=0&&!years.has(h.year-1))options.push([h.year-1,`世界暦 ${format(h.year-1)}年 · ${h.label}の前年`]);options.push([h.year,`世界暦 ${format(h.year)}年 · ${h.label}`]);}
+  const key=JSON.stringify(options);
+  if(select.dataset.key!==key){select.dataset.key=key;select.replaceChildren(new Option(`（${full.name}の記録から選ぶ）`,''),...options.map(([v,t])=>new Option(t,String(v))));}
+  select.value=options.some(([v])=>v===c.comparison)?String(c.comparison):'';
+ }
+ const input=el('compare-year') as HTMLInputElement,range=el('compare-range') as HTMLInputElement;
+ // renders follow committed changes only (typing commits on change), so the field always shows the year in use, clamped
+ input.max=range.max=String(confirmed);input.value=String(c.comparison);range.value=String(c.comparison);
+ (el('compare-mark') as HTMLInputElement).checked=compareMark;
+ const side=(which:'ref'|'cmp',year:number,role:string)=>{
+  const canvas=el('compare-'+which) as HTMLCanvasElement,key=site+':'+year;
+  if(c.drawn[which]!==key){drawWorldSession(canvas,world,year,site);c.drawn[which]=key;}
+  canvas.setAttribute('aria-label',`${role}：世界暦${year}年の${siteName}の風景`);
+  el(`compare-${which}-year`).textContent=`${role} · 世界暦 ${format(year)}年`;
+  // each image is described from its own year only
+  let text='対象を選ぶと、その年の状態をここに示します。',index=-1,mask:PickMask|null=null;
+  if(selected){const s=historicalSubjectAt(source,selected,year);mask=compareMaskAt(year,site);
+   index=mask?mask.targets.findIndex(t=>sameHistoricalTarget(t,selected!)):-1;
+   text=`${s.presence==='recorded'||s.presence==='unsupported'?s.title:s.name}：${presenceText(s,index>=0&&mask!.visiblePixels[index]!>0)}`;}
+  el(`compare-${which}-state`).textContent=text;
+  const mark=(el(`compare-${which}-mark`) as HTMLCanvasElement).getContext('2d')!;mark.clearRect(0,0,320,180);
+  if(compareMark&&mask&&index>=0)outlineTarget(mark,mask,index,'rgba(255,248,214,.95)');
+ };
+ side('ref',c.reference,'比較元');side('cmp',c.comparison,'比較先');
+ const observe=el('compare-observe') as HTMLButtonElement,here=c.comparison===y;
+ observe.setAttribute('aria-disabled',String(here||busy));observe.textContent=here?'この年を観測中':'この年を観測する';
+ el('compare-note').textContent=`比較元は比較を始めたときの観測年に固定しています。比較先を変えても、上の風景・年代記・グラフの年は変わりません。季節や植生は、それぞれの年の記録のまま描いています。`;
+}
+el('compare-open').addEventListener('click',()=>{
+ if(busy||!inspecting)return;const o=observedNow();
+ // an explicit comparison holds the history still (D0 §8.2): automatic progress stops, as for a year move
+ stop();compare={site:o.site,reference:o.year,comparison:defaultComparison(o.year),drawn:{ref:'',cmp:''}};compareMasks.clear();render();
+ (el('compare-year') as HTMLInputElement).focus();
+});
+el('compare-close').addEventListener('click',()=>{closeCompare();render();(el('compare-open') as HTMLButtonElement).focus();});
+el('compare-event').addEventListener('change',()=>{const v=(el('compare-event') as HTMLSelectElement).value;if(v!=='')setComparison(Number(v));});
+el('compare-year').addEventListener('change',()=>{const v=(el('compare-year') as HTMLInputElement).value.trim();if(v!=='')setComparison(Number(v));});
+el('compare-minus').addEventListener('click',()=>{if(compare)setComparison(compare.comparison-1);});
+el('compare-plus').addEventListener('click',()=>{if(compare)setComparison(compare.comparison+1);});
+let rangeTimer:ReturnType<typeof setTimeout>|null=null;
+el('compare-range').addEventListener('input',()=>{const v=Number((el('compare-range') as HTMLInputElement).value);(el('compare-year') as HTMLInputElement).value=String(v);
+ if(rangeTimer!==null)clearTimeout(rangeTimer);rangeTimer=setTimeout(()=>{rangeTimer=null;setComparison(v);},150);});
+el('compare-range').addEventListener('change',()=>{if(rangeTimer!==null){clearTimeout(rangeTimer);rangeTimer=null;}setComparison(Number((el('compare-range') as HTMLInputElement).value));});
+el('compare-mark').addEventListener('change',()=>{compareMark=(el('compare-mark') as HTMLInputElement).checked;render();});
+el('compare-observe').addEventListener('click',()=>{if(busy||!compare||compare.comparison===observedNow().year)return;observeYear(compare.comparison);});
+inspectToggle.addEventListener('click',()=>setInspecting(!inspecting));
+el('inspector-close').addEventListener('click',()=>{setInspecting(false);inspectToggle.focus();});
+el('inspector').addEventListener('keydown',event=>{if(event.key==='Escape'&&selected){selected=null;candidates=[];render();}});
+/** The scene pixel under a pointer (the canvas is scaled by CSS; its border is outside the 320×180 image). */
+function scenePoint(event:PointerEvent){
+ const r=canvas.getBoundingClientRect(),w=canvas.clientWidth,h=canvas.clientHeight;if(!w||!h)return null;
+ const x=Math.floor((event.clientX-r.left-canvas.clientLeft)/w*320),y=Math.floor((event.clientY-r.top-canvas.clientTop)/h*180);
+ return x>=0&&x<320&&y>=0&&y<180?{x,y,scale:w/320}:null;
+}
+canvas.addEventListener('pointermove',event=>{
+ if(!inspecting||event.pointerType==='touch')return;const p=scenePoint(event),mask=p?pickMaskNow():null;
+ const next=p&&mask?pickAt(mask,p.x,p.y)[0]??null:null;
+ if(next!==hovered){hovered=next;sceneBox.classList.toggle('over-target',next!==null);drawPickLayer();}
+});
+canvas.addEventListener('pointerleave',()=>{if(hovered!==null){hovered=null;sceneBox.classList.remove('over-target');drawPickLayer();}});
+let pickPress:number|null=null;
+canvas.addEventListener('pointerdown',event=>{pickPress=inspecting&&event.isPrimary&&event.button===0?event.pointerId:null;});
+canvas.addEventListener('pointercancel',()=>{pickPress=null;});
+canvas.addEventListener('pointerup',event=>{
+ const pressed=pickPress===event.pointerId;pickPress=null;if(!inspecting||!pressed)return;
+ const p=scenePoint(event),mask=pickMaskNow();if(!p||!mask)return;
+ // a touch reaches a few pixels around the finger (about 12 CSS px); a mouse or pen picks the exact pixel
+ const radius=event.pointerType==='touch'?Math.max(1,Math.min(8,Math.round(12/p.scale))):0;
+ const found=pickAt(mask,p.x,p.y,radius).map(i=>mask.targets[i]!);
+ if(!found.length){selected=null;candidates=[];pickNote='ここには調べられる記録がありません。見えないものは「この土地の記録」から選べます。';render();return;}
+ selectTarget(found[0]!,found.length>1?found:[]);
+});
 function render(){
  if(throttledRender!==null){clearTimeout(throttledRender);throttledRender=null;}
  const seasonTransition=stepTransition;stepTransition=0;lastStepRender=Date.now();
@@ -276,6 +472,7 @@ function render(){
   for(const title of rebuilds.get(e.id)??[]){const li=document.createElement('li');li.tabIndex=0;li.className='architecture-note';const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  建築`;li.append(time,document.createTextNode(title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
   const li=document.createElement('li');li.tabIndex=0;li.classList.toggle('active',viewingPast&&active.id===e.id);const time=document.createElement('time');time.textContent=`世界暦 ${format(e.year)}年  ·  ${e.tag}`;li.append(time,document.createTextNode(e.title));li.title='この年代の情景を見る';li.onclick=()=>inspect(e.year,e);li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();inspect(e.year,e);}};ol.append(li);}
  el('toggle-all').textContent=expanded?'最近の5件だけ見る −':`過去の記録をすべて見る ＋（${confirmedRecords.length}件）`;
+ renderInspector(y,siteIndex);
 }
 async function forward(){
  if(busy)return;if(viewedYear!==null){returnLive();return;}if(state.pending){render();scheduleChoice();return;}
@@ -297,6 +494,7 @@ el('toggle-all').addEventListener('click',()=>{expanded=!expanded;render();});
 function setBusy(value:boolean){busy=value;document.querySelectorAll<HTMLButtonElement>('#options button').forEach(b=>b.disabled=value);for(const id of ['save','load','export','import','restart','random','step','play','improve-growth','improve-environment','slow-climate','enable-irrigation','enable-economic','enable-terrain'])(el(id) as HTMLButtonElement).disabled=value;}
 function adopt(candidate:WorldSession,keepObservation=false,keepArchive=false,deferRender=false){
  verifyWorldCandidate(candidate);graphCandidate=null;if(!keepObservation)graphEnd=null;const previous={world,state,viewedYear,expanded,active,input:input.value};
+ if(!keepObservation){selected=null;candidates=[];hovered=null;pickNote='';pickCache=null;closeCompare();}
  try{world=candidate;state=world.state;viewedYear=keepObservation?previous.viewedYear:null;expanded=keepArchive?previous.expanded:false;active=keepObservation?(state.history.find(r=>r.id===previous.active.id)??state.history[0]!):state.history[0]!;input.value=String(state.seed);if(!deferRender)render();}
  catch(error){world=previous.world;state=previous.state;viewedYear=previous.viewedYear;expanded=previous.expanded;active=previous.active;input.value=previous.input;try{render();}catch{}throw error;}
 }
