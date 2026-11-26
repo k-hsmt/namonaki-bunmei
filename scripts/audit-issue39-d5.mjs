@@ -67,7 +67,14 @@ function audit(session,year,i,label){
    if(b?.condition==='ruined')n.ruins++;if(s.ref.kind==='bridge'&&b?.condition!=='intact')n.damagedBridges++;
   }
   if(s.ref.kind==='housing-block'){const b=homes.find(b=>b.blockId===s.ref.blockId);check(b,`${label}: ${s.ref.blockId} missing from housing`);if(b?.condition==='ruined')n.ruins++;}
-  if(s.ref.kind==='waterway'){const v=productionChannelAt(session.review,year).channel;check(v&&s.currentCondition===waterText[v.status],`${label}: waterway condition`);if(v?.status==='retired')n.backfilled++;}
+  if(s.ref.kind==='waterway'){
+   // the channel view shows only the latest system; an earlier one is read from its own last event of the year
+   const v=productionChannelAt(session.review,year).channel,own=session.review.irrigation.events.filter(e=>e.systemId===s.ref.systemId&&e.year<=year).at(-1)?.after;
+   const status=v?.id===s.ref.systemId?v.status:own?.status;
+   check(status&&s.currentCondition===waterText[status],`${label}: waterway ${s.ref.systemId} condition`);
+   if(v?.id!==s.ref.systemId)check(status==='retired',`${label}: an earlier waterway ${s.ref.systemId} is not backfilled before the next one`);
+   if(status==='retired')n.backfilled++;
+  }
  }
  for(const b of site.buildings)if(b.kind!=='field')check(list.some(s=>s.ref.id===b.id),`${label}: ${b.id} stands but is not listed`);
  for(const b of homes)check(list.some(s=>s.ref.blockId===b.blockId),`${label}: ${b.blockId} recorded but not listed`);

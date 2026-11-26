@@ -202,3 +202,14 @@ test('D1 real world: reading changes nothing and survives save and restore uncha
  const restored=restoreWorldSession(await parseWorldSaveAsync(before));
  assert.deepEqual([0,400,800,END].map(y=>historicalSiteIds.flatMap(site=>historicalTargetsAt(historicalSourceOf(restored),site,y))),answers);
 });
+
+test('D1: several waterways in turn each keep their own history and state',()=>{
+ const W=(seq,year,id,kind,status)=>({seq,id:'w-'+seq,year,systemId:id,kind,cause:{kind:'policy-clock',parentEventId:'x',elapsed:0},before:null,after:{id,status,lastMaintainedYear:year,lastMaintainedEventId:'w-'+seq,abandonedYear:null,abandonedEventId:null}});
+ const src=source({irrigation:{introducedYear:0,confirmedThrough:400,events:[
+  W(1,80,'ch1','built','active'),W(2,120,'ch1','abandoned','abandoned'),W(3,140,'ch1','backfilled','retired'),
+  W(4,200,'ch2','built','active'),W(5,260,'ch2','paused','idle')]}});
+ const water=y=>historicalTargetsAt(src,'river-bank',y).filter(s=>s.ref.kind==='waterway').map(s=>[s.ref.systemId,s.currentCondition,s.history.length]);
+ assert.deepEqual(water(150),[['ch1','埋め戻されている',3]],'the second is not listed before it is built');
+ assert.deepEqual(water(400),[['ch1','埋め戻されている',3],['ch2','休止している',2]],'each reads its own events');
+ assert.equal(historicalSubjectAt(src,{kind:'waterway',systemId:'ch2'},199).presence,'not-yet-built');
+});
