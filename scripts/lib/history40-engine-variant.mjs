@@ -14,18 +14,25 @@ import path from 'node:path';
 
 const DIST=fileURLToPath(new URL('../../dist/story/',import.meta.url));
 export const PRODUCTION_DRAW='rng.next() < (s.year < 30 ? .12 : .19)';
+export const DRAW_PATCH=Object.freeze({find:PRODUCTION_DRAW,replace:'rng.next() < __history40.drawRate(s)'});
 
-/** The copy's source: production with the draw probability replaced and relative imports resolved against `dir`. */
-export function patchEngineSource(source,dir=DIST){
- const at=source.split(PRODUCTION_DRAW).length-1;
- if(at!==1)throw Error(`the production draw expression was found ${at} times in dist/story/engine.js (expected 1)`);
- const rewritten=source.replace(/from '(\.{1,2}\/[^']+)'/g,(_,rel)=>`from '${pathToFileURL(path.resolve(dir,rel)).href}'`)
-  .replace(PRODUCTION_DRAW,'rng.next() < __history40DrawRate(s)');
- return `let __history40DrawRate=null;\nexport function setHistory40DrawRate(f){__history40DrawRate=f;}\n${rewritten}`;
+/**
+ * The copy's source: production with each patch's `find` replaced by its `replace` (each must occur exactly once) and
+ * relative imports resolved against `dir`. Patched code calls hooks on `__history40` (set with setHistory40Hooks).
+ */
+export function patchEngineSource(source,dir=DIST,patches=[DRAW_PATCH]){
+ let rewritten=source.replace(/from '(\.{1,2}\/[^']+)'/g,(_,rel)=>`from '${pathToFileURL(path.resolve(dir,rel)).href}'`);
+ for(const {find,replace} of patches){
+  const at=rewritten.split(find).length-1;
+  if(at!==1)throw Error(`the production expression "${find}" was found ${at} times in dist/story/engine.js (expected 1)`);
+  rewritten=rewritten.replace(find,replace);
+ }
+ return `let __history40={};\nexport function setHistory40Hooks(h){__history40={...h};}\nexport function setHistory40DrawRate(f){__history40={...__history40,drawRate:f};}\n${rewritten}`;
 }
-export async function loadEngineVariant(outDir){
- const module=patchEngineSource(await readFile(path.join(DIST,'engine.js'),'utf8'));
- await mkdir(outDir,{recursive:true});const file=path.join(outDir,'engine-variant.mjs');await writeFile(file,module);
+/** Generates and imports one copy. `name` keeps copies with different patches apart. */
+export async function loadEngineVariant(outDir,patches=[DRAW_PATCH],name='engine-variant'){
+ const module=patchEngineSource(await readFile(path.join(DIST,'engine.js'),'utf8'),DIST,patches);
+ await mkdir(outDir,{recursive:true});const file=path.join(outDir,`${name}.mjs`);await writeFile(file,module);
  return import(pathToFileURL(file).href);
 }
 
