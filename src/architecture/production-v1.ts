@@ -287,10 +287,16 @@ function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorl
  const interaction=interactionNow;verifyInteraction(interaction,terrain,0);
  return own({format:ARCHITECTURE_WORLD_FORMAT,status:'production',terrain,architecture:{...old,births:mergeBirths(old.births,recomputed),interaction,traditionChanges,capabilityEvents}});
 }
-export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={}):Promise<ArchitectureProductionWorld>{
- knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
+/**
+ * `observe` (Issue #40 D1b) is an optional read-only tap for audits: it receives each confirmed year's frozen
+ * capture after the architecture layer has taken it. The world advanced is identical with or without it.
+ */
+export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={},observe?:(capture:InteractionCaptureInternal)=>void):Promise<ArchitectureProductionWorld>{
+ knownArchitectureWorld(world);if(observe!==undefined&&typeof observe!=='function')fail('invalid observer');const captures:InteractionCaptureInternal[]=[];
  const {advanceTerrainProductionWorld}=await progression();
- return next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options,c=>{captures.push(c);}),captures);
+ const result=next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options,c=>{captures.push(c);}),captures);
+ if(observe)for(const c of captures)observe(c);
+ return result;
 }
 export async function chooseArchitectureWorld(world:ArchitectureProductionWorld,index:number|'random'):Promise<ArchitectureProductionWorld>{
  knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];

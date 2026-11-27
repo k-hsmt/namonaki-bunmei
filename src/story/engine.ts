@@ -102,7 +102,7 @@ function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
   granaries:s.society?.sites.map(site=>site.practices.some(p=>p.kind==='granary'&&p.active)),
  };
  const totals=updateRegionalEconomy(s.economy,ledger.people,s.year,conditions,event=>{const id=entry(s,'地域',event.title,event.body,event.causes,true,event.relatedIds);if(observer||receiptObserver||interactionObserver)records.push({id,event});return id;},ledger.legacy?.year);
- if(interactionObserver)interactionObserver(frozenInteractionCaptureInternal(s.year,totals,s.economy.routes,records.map(r=>r.id)));
+ if(interactionObserver)interactionObserver(frozenInteractionCaptureInternal(s.year,totals,s.economy.routes,records.map(r=>r.id),s.economy.districts));
  if(observer)observer(frozenEconomyCapture({year:s.year,drought:s.drought,before:before!,conditions:{...conditions,blockedRegions:[...conditions.blockedRegions]},after:{economy:s.economy,people:ledger.people},records,totals}));
  if(receiptObserver)receiptObserver(frozenCoupledReceiptCaptureInternal({year:s.year,drought:s.drought,before:{people:beforePeople!},conditions:{disruptionId:conditions.disruptionId,granaries:conditions.granaries,blockedRegions:[...conditions.blockedRegions]},records,totals}));
  const yearRecords:RecordEntry[]=[];

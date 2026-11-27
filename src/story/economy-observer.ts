@@ -44,13 +44,24 @@ export interface InteractionCaptureInternal {
  readonly traded:readonly number[];
  readonly routes:readonly {readonly blocked:boolean;readonly originRecord:string|null;readonly agreementRecord:string|null;readonly closureRecord:string|null}[];
  readonly recordIds:readonly string[];
+ /**
+  * Issue #40 D1b: the year's confirmed economic result, read-only (per district, in v8's order). Copied after the
+  * regional economy ran; nothing here is written back or persisted. The architecture ledger does not read it.
+  */
+ readonly economy:{
+  readonly harvest:readonly number[];readonly imports:readonly number[];readonly discarded:readonly number[];
+  readonly districts:readonly {readonly coverage:number|null;readonly shortageYears:number;readonly reserve:number;readonly importShare:number}[];
+ };
 }
 export type InteractionObserverInternal=(capture:InteractionCaptureInternal)=>void;
-export function frozenInteractionCaptureInternal(year:number,totals:{readonly moves:readonly {from:number;to:number;amount:number}[];readonly traded:readonly number[]},
- routes:readonly {readonly blocked:boolean;readonly originRecord:string|null;readonly agreementRecord:string|null;readonly closureRecord:string|null}[],recordIds:readonly string[]):InteractionCaptureInternal {
+export function frozenInteractionCaptureInternal(year:number,totals:{readonly moves:readonly {from:number;to:number;amount:number}[];readonly traded:readonly number[];readonly harvest:readonly number[];readonly imports:readonly number[];readonly discarded:readonly number[]},
+ routes:readonly {readonly blocked:boolean;readonly originRecord:string|null;readonly agreementRecord:string|null;readonly closureRecord:string|null}[],recordIds:readonly string[],
+ districts:readonly {readonly coverage:readonly number[];readonly shortageYears:number;readonly reserve:number;readonly importShare:number}[]):InteractionCaptureInternal {
  return Object.freeze({year,moves:Object.freeze(totals.moves.map(m=>Object.freeze({from:m.from,to:m.to,amount:m.amount}))),traded:Object.freeze([...totals.traded]),
   routes:Object.freeze(routes.map(r=>Object.freeze({blocked:r.blocked,originRecord:r.originRecord,agreementRecord:r.agreementRecord,closureRecord:r.closureRecord}))),
-  recordIds:Object.freeze([...recordIds])});
+  recordIds:Object.freeze([...recordIds]),
+  economy:Object.freeze({harvest:Object.freeze([...totals.harvest]),imports:Object.freeze([...totals.imports]),discarded:Object.freeze([...totals.discarded]),
+   districts:Object.freeze(districts.map(d=>Object.freeze({coverage:d.coverage.at(-1)??null,shortageYears:d.shortageYears,reserve:d.reserve,importShare:d.importShare})))})});
 }
 export function frozenCoupledReceiptCaptureInternal(value:CoupledReceiptCaptureInternal):CoupledReceiptCaptureInternal {
  return Object.freeze({year:value.year,drought:value.drought,before:Object.freeze({people:Object.freeze([...value.before.people])}),
