@@ -28,7 +28,7 @@ import {architectureProductionSession,prepareWorldSessionSave,restoreWorldSessio
 import {encodeWorldSave,decodeWorldSave} from '../dist/story/world-storage.js';
 import {createCivilization,step,chooseAutomatically,lastObservedYear} from '../dist/story/engine.js';
 import {MEASURE_ID,ANALYSIS,distribution,allocateSeeds} from './lib/history40-measures.mjs';
-import {measureCivilization,civilizationWideAgreement,TRAJECTORY_EVERY,POPULATION_FLOOR} from './lib/history40-civilization.mjs';
+import {measureCivilization,civilizationWideAgreement,acrossWorlds,D1A_SCALARS,TRAJECTORY_EVERY,POPULATION_FLOOR} from './lib/history40-civilization.mjs';
 
 const out='artifacts/history40-d1a',quick=process.env.HISTORY40_D1A_QUICK==='1';
 const HORIZON=quick?300:1000,PER_BIOME=quick?1:3,EXCHANGE_EVERY=25;
@@ -91,24 +91,7 @@ for(const c of cases){
 }
 
 // ---- across worlds (no composite score: one distribution per measure, overall and per biome) ----
-const scalars={
- 'population.end':m=>m.population.end,'population.max':m=>m.population.max,'population.min':m=>m.population.min,
- 'population.deepestDecline':m=>m.population.declines.deepest.fraction,'population.declines':m=>m.population.declines.count,
- 'population.declinesCensored':m=>m.population.declines.censored,'population.floorYears':m=>m.population.floorYears,
- ...Object.fromEntries(['food','cohesion','knowledge','culture','exchange'].flatMap(k=>[[`${k}.mean`,m=>m.metrics[k].mean],[`${k}.sd`,m=>m.metrics[k].sd],
-  [`${k}.nearHighShare`,m=>m.metrics[k].nearHighShare],[`${k}.firstNearHighYear`,m=>m.metrics[k].firstNearHighYear],[`${k}.nearLowShare`,m=>m.metrics[k].nearLowShare],[`${k}.lastQuarterMean`,m=>m.metrics[k].quarterMeans[3]]])),
- 'sites.maxScale':m=>Math.max(...m.sites.map(s=>s.maxScale)),'sites.uninhabitedYears':m=>m.sites.reduce((a,s)=>a+s.uninhabitedYears,0),
- 'sites.resettled':m=>m.sites.reduce((a,s)=>a+s.resettled,0),'sites.scaleDowns':m=>m.sites.reduce((a,s)=>a+s.scaleDowns,0),
- 'center.changes':m=>m.center.changes,
- 'chronicle.total':m=>m.chronicle.total,'chronicle.civilizationPerWindowMedian':m=>m.chronicle.perWindow.civilization.median,
- 'chronicle.emptyWindows':m=>m.chronicle.emptyWindows,'chronicle.distinctCivilizationKinds':m=>m.chronicle.distinctCivilizationKinds,
- 'chronicle.unclassified':m=>m.chronicle.unclassified,
- ...Object.fromEntries(['shortage','trade','damage','society'].map(g=>[`groups.${g}`,m=>m.chronicle.groups[g]])),
- 'memory.formed':m=>m.memory.formed,'memory.lost':m=>m.memory.lost,'memory.activeAtHorizon':m=>m.memory.activeAtHorizon.length,
- 'decisions.count':m=>m.decisions.count,
-};
-const across=model=>{const ok=worlds.filter(w=>w[model].status==='ok'),pick=(rows,f)=>distribution(rows.map(w=>f(w[model])));
- return Object.fromEntries(Object.entries(scalars).map(([k,f])=>[k,{all:pick(ok,f),byBiome:Object.fromEntries((quick?QUICK_BIOMES:BIOME_KINDS).map(b=>[b,pick(ok.filter(w=>w.biome===b),f)]))}]));};
+const across=model=>acrossWorlds(worlds,model,D1A_SCALARS,quick?QUICK_BIOMES:BIOME_KINDS);
 
 let commit=process.env.REVIEW_SOURCE_SHA??null,dirty=null;
 try{commit??=execSync('git rev-parse HEAD',{encoding:'utf8'}).trim();dirty=execSync('git status --porcelain',{encoding:'utf8'}).trim().length>0;}catch{}

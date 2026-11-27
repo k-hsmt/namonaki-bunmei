@@ -43,3 +43,27 @@ export function civilizationWideAgreement(a,b){
  return {metrics:['population','food','cohesion','knowledge','culture'].every(k=>JSON.stringify(a.trajectory[k])===JSON.stringify(b.trajectory[k])),
   exchangeAtSharedYears:a.trajectory.exchange.every(([y,v])=>!ex.has(y)||ex.get(y)===v),decisionYears:JSON.stringify(a.decisions.years)===JSON.stringify(b.decisions.years)};
 }
+
+/** The scalar per world summarized across worlds in the D1 reports (no composite score: one distribution per measure). */
+export const D1A_SCALARS={
+ 'population.end':m=>m.population.end,'population.max':m=>m.population.max,'population.min':m=>m.population.min,
+ 'population.deepestDecline':m=>m.population.declines.deepest.fraction,'population.declines':m=>m.population.declines.count,
+ 'population.declinesCensored':m=>m.population.declines.censored,'population.floorYears':m=>m.population.floorYears,
+ ...Object.fromEntries(['food','cohesion','knowledge','culture','exchange'].flatMap(k=>[[`${k}.mean`,m=>m.metrics[k].mean],[`${k}.sd`,m=>m.metrics[k].sd],
+  [`${k}.nearHighShare`,m=>m.metrics[k].nearHighShare],[`${k}.firstNearHighYear`,m=>m.metrics[k].firstNearHighYear],[`${k}.nearLowShare`,m=>m.metrics[k].nearLowShare],[`${k}.lastQuarterMean`,m=>m.metrics[k].quarterMeans[3]]])),
+ 'sites.maxScale':m=>Math.max(...m.sites.map(s=>s.maxScale)),'sites.uninhabitedYears':m=>m.sites.reduce((a,s)=>a+s.uninhabitedYears,0),
+ 'sites.resettled':m=>m.sites.reduce((a,s)=>a+s.resettled,0),'sites.scaleDowns':m=>m.sites.reduce((a,s)=>a+s.scaleDowns,0),
+ 'center.changes':m=>m.center.changes,
+ 'chronicle.total':m=>m.chronicle.total,'chronicle.civilizationPerWindowMedian':m=>m.chronicle.perWindow.civilization.median,
+ 'chronicle.emptyWindows':m=>m.chronicle.emptyWindows,'chronicle.distinctCivilizationKinds':m=>m.chronicle.distinctCivilizationKinds,
+ 'chronicle.unclassified':m=>m.chronicle.unclassified,
+ ...Object.fromEntries(['shortage','trade','damage','society'].map(g=>[`groups.${g}`,m=>m.chronicle.groups[g]])),
+ 'memory.formed':m=>m.memory.formed,'memory.lost':m=>m.memory.lost,'memory.activeAtHorizon':m=>m.memory.activeAtHorizon.length,
+ 'decisions.count':m=>m.decisions.count,
+};
+
+/** One distribution per scalar over the worlds whose `model` succeeded, overall and per biome. */
+export function acrossWorlds(worlds,model,scalars,biomes){
+ const ok=worlds.filter(w=>w[model]?.status==='ok'),pick=(rows,f)=>distribution(rows.map(w=>f(w[model])));
+ return Object.fromEntries(Object.entries(scalars).map(([k,f])=>[k,{all:pick(ok,f),byBiome:Object.fromEntries(biomes.map(b=>[b,pick(ok.filter(w=>w.biome===b),f)]))}]));
+}
