@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {BIOME_KINDS,generateClimateBaseline} from '../dist/climate/initial-climate-v1.js';
-import {distribution,firstYearAtLeast,declines,boundedSeries,siteResidency,centerMoves,recordClass,chronicleMeasures,memoryMeasures,decisionMeasures,allocateSeeds} from '../scripts/lib/history40-measures.mjs';
+import {distribution,dispersion,firstYearAtLeast,declines,boundedSeries,siteResidency,centerMoves,recordClass,chronicleMeasures,memoryMeasures,decisionMeasures,allocateSeeds} from '../scripts/lib/history40-measures.mjs';
 
 const yearly=values=>values.map((value,year)=>({year,value}));
 
@@ -100,4 +100,29 @@ test('allocateSeeds: stable seeds alternate tuning/acceptance in ascending order
   assert.deepEqual(tuning,[stable[0],stable[2],stable[4]]);assert.deepEqual(acceptance,[stable[1],stable[3],stable[5]]);
  }
  assert.deepEqual(allocateSeeds({tuning:3,acceptance:3}),a);
+});
+
+test('dispersion: variance / mean of counts; constant counts give 0; null without a mean', () => {
+ assert.equal(dispersion([2,2,2]),0);assert.equal(dispersion([0,4]),2);assert.equal(dispersion([0,0]),null);assert.equal(dispersion([3]),null);
+});
+
+test('chronicleMeasures: gaps between civilization events and the years that have one', () => {
+ const h=[5,6,20,20].map((year,i)=>({id:year+'-'+i,year,tag:'自然',kind:'flood',title:'f'}));
+ const r=chronicleMeasures(h,99,50);
+ assert.deepEqual([r.civilizationGaps.min,r.civilizationGaps.max,r.civilizationYearsWithEvent],[0,14,3]);
+ assert.equal(r.civilizationWindowDispersion,2);// counts [4,0]: mean 2, variance 4
+});
+
+test('economyMeasures: shortage years and runs from the economy counter, trade runs, moves; nothing inferred', async () => {
+ const {economyMeasures}=await import('../scripts/lib/history40-measures.mjs');
+ const cap=(year,short,traded,moves=[])=>({year,traded,moves,routes:traded.map(()=>({blocked:false})),
+  economy:{harvest:[10,5],imports:[0,1],discarded:[1,0],districts:short.map((s,i)=>({coverage:s?0.8:1,shortageYears:s,reserve:i,importShare:0}))}});
+ const c=[cap(1,[0,1],[0]),cap(2,[1,2],[3]),cap(3,[2,3],[2],[{from:0,to:1,amount:5},{from:2,to:0,amount:7}]),cap(4,[0,0],[0]),cap(5,[1,0],[1])];
+ const r=economyMeasures(c);
+ assert.deepEqual([r.years,r.firstYear,r.lastYear],[5,1,5]);
+ assert.deepEqual([r.districts[0].shortageYears,r.districts[0].longestShortageRun,r.districts[0].runsOfThreeOrMore],[3,2,0]);
+ assert.deepEqual([r.districts[1].shortageYears,r.districts[1].longestShortageRun,r.districts[1].runsOfThreeOrMore],[3,3,1]);
+ assert.deepEqual([r.routes[0].yearsWithTrade,r.routes[0].tradedTotal,r.routes[0].longestTradeRun,r.routes[0].tradeRuns],[3,6,2,2]);
+ assert.deepEqual(r.moves,{betweenDistricts:1,settledFromOutside:1,peopleMoved:5});
+ assert.equal(r.districts[1].importsTotal,5);
 });

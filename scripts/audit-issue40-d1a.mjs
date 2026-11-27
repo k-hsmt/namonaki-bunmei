@@ -27,12 +27,11 @@ import {advanceArchitectureWorld} from '../dist/architecture/production-v1.js';
 import {architectureProductionSession,prepareWorldSessionSave,restoreWorldSession} from '../dist/story/world-session.js';
 import {encodeWorldSave,decodeWorldSave} from '../dist/story/world-storage.js';
 import {createCivilization,step,chooseAutomatically,lastObservedYear} from '../dist/story/engine.js';
-import {observationAt} from '../dist/story/observations.js';
-import {confirmedMetricRange} from '../dist/story/civilization-metrics.js';
-import {MEASURE_ID,ANALYSIS,distribution,firstYearAtLeast,declines,boundedSeries,siteResidency,centerMoves,chronicleMeasures,memoryMeasures,decisionMeasures,allocateSeeds} from './lib/history40-measures.mjs';
+import {MEASURE_ID,ANALYSIS,distribution,allocateSeeds} from './lib/history40-measures.mjs';
+import {measureCivilization,civilizationWideAgreement,TRAJECTORY_EVERY,POPULATION_FLOOR} from './lib/history40-civilization.mjs';
 
 const out='artifacts/history40-d1a',quick=process.env.HISTORY40_D1A_QUICK==='1';
-const HORIZON=quick?300:1000,PER_BIOME=quick?1:3,EXCHANGE_EVERY=25,TRAJECTORY_EVERY=10,POPULATION_FLOOR=60;
+const HORIZON=quick?300:1000,PER_BIOME=quick?1:3,EXCHANGE_EVERY=25;
 const QUICK_BIOMES=['desert','temperate_forest','tundra'];
 const failures=[],check=(ok,m)=>{if(!ok){failures.push(m);console.error('FAIL',m);}return ok;};
 const sha=s=>createHash('sha256').update(s).digest('hex');
@@ -43,29 +42,8 @@ const started=performance.now(),startedAt=new Date().toISOString();
 const allocation=allocateSeeds({tuning:10,acceptance:20});
 const cases=(quick?QUICK_BIOMES:BIOME_KINDS).flatMap(b=>allocation.biomes[b].tuning.slice(0,PER_BIOME).map((seed,rank)=>({id:`${b}-${rank+1}`,biome:b,seed,rank})));
 
-/** Every measure of one confirmed civilization up to `horizon`. `exchange` is [{year,value}] as observed. */
-function measure(state,horizon,exchange,exchangeSampling){
- check(lastObservedYear(state)===horizon&&!state.pending,`seed ${state.seed}: not confirmed up to ${horizon}`);
- const series=Object.fromEntries(['population','food','cohesion','knowledge','culture'].map(k=>[k,confirmedMetricRange(state,k,0,horizon)]));
- for(const [k,s] of Object.entries(series))check(s.length===horizon+1,`seed ${state.seed}: ${k} has ${s.length} confirmed years`);
- const ledger=state.observation,people=[];
- for(let y=0;y<=horizon;y++){const o=observationAt(ledger,y);people.push({year:y,people:o.residents.slice(0,3).map(r=>r.population)});
-  if(y%97===0)check(o.population===series.population[y].value,`seed ${state.seed}: population ${y} disagrees between readers`);}
- const pop=series.population.map(p=>p.value),sites=ledger.sites.map(site=>siteResidency(site.changes,horizon));
- const traj=Object.fromEntries(Object.entries(series).map(([k,s])=>[k,s.filter(p=>p.year%TRAJECTORY_EVERY===0).map(p=>+p.value.toFixed(2))]));
- return {
-  population:{...distribution(pop),start:pop[0],end:pop.at(-1),floorYears:pop.filter(v=>v<=POPULATION_FLOOR).length,declines:declines(series.population)},
-  metrics:{...Object.fromEntries(['food','cohesion','knowledge','culture'].map(k=>[k,{...boundedSeries(series[k].map(p=>p.value)),firstNearHighYear:firstYearAtLeast(series[k],ANALYSIS.capHigh)}])),
-   exchange:{...boundedSeries(exchange.map(p=>p.value)),firstNearHighYear:firstYearAtLeast(exchange,ANALYSIS.capHigh),sampling:exchangeSampling,observedYears:exchange.length,missingYears:horizon+1-exchange.length}},
-  populationMinYear:series.population.reduce((b,p)=>p.value<b.value?p:b).year,
-  sites,center:centerMoves(people),
-  chronicle:chronicleMeasures(state.history,horizon),
-  memory:memoryMeasures(state.memory.log,state.memory.legacies,horizon),
-  decisions:decisionMeasures(state.decisions,horizon),
-  trajectory:{every:TRAJECTORY_EVERY,...traj,exchange:exchange.filter(p=>p.year%(exchangeSampling==='every year'?TRAJECTORY_EVERY:EXCHANGE_EVERY)===0).map(p=>[p.year,+p.value.toFixed(2)])},
-  identity:{name:state.name,homeland:state.homeland,trait:state.trait},
- };
-}
+const measure=(state,horizon,exchange,sampling)=>measureCivilization(state,horizon,exchange,
+ {exchangeSampling:sampling,exchangeTrajectoryEvery:sampling==='every year'?TRAJECTORY_EVERY:EXCHANGE_EVERY,check});
 
 async function fullWorld(c){
  const timing={};let t=performance.now();
@@ -108,9 +86,7 @@ for(const c of cases){
   catch(e){check(false,`${c.id} ${model}: ${e.message}`);row[model]={status:'failed',error:String(e.message)};row[model+'Timing']={totalMs:ms(t)};}
  }
  // a finding, not a check: do the civilization-wide values of the two models agree (every 10 years; exchange at shared samples)?
- if(row.full.status==='ok'&&row.engine.status==='ok'){const f=row.full.trajectory,e=row.engine.trajectory,ex=new Map(e.exchange);
-  row.civilizationWideAgreement={metrics:['population','food','cohesion','knowledge','culture'].every(k=>JSON.stringify(f[k])===JSON.stringify(e[k])),
-   exchangeAtSharedYears:f.exchange.every(([y,v])=>y%TRAJECTORY_EVERY!==0||ex.get(y)===v),decisionYears:JSON.stringify(row.full.decisions.years)===JSON.stringify(row.engine.decisions.years)};}
+ if(row.full.status==='ok'&&row.engine.status==='ok')row.civilizationWideAgreement=civilizationWideAgreement(row.full,row.engine);
  worlds.push(row);console.log(c.id,'seed',c.seed,JSON.stringify({full:row.fullTiming,engine:row.engineTiming}));
 }
 

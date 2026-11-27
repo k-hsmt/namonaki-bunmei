@@ -123,6 +123,12 @@ export const RECORD_GROUPS={
  society:['society-practice-formed','society-practice-inherited','society-practice-lost','society-split','society-rejoined','split','dispute','reconciliation','first_fragment','first_confederation'],
 };
 
+/** Variance / mean of counts (null when the mean is 0 or there are fewer than 2 counts). */
+export function dispersion(counts){
+ if(counts.length<2)return null;const m=counts.reduce((a,v)=>a+v,0)/counts.length;if(!m)return null;
+ return round(counts.reduce((a,v)=>a+(v-m)**2,0)/counts.length/m);
+}
+
 /**
  * Counts by class, records per fixed window, windows without any record, and consecutive repeats of a class.
  * Window statistics use full windows only (years 0..horizon split into windows of `windowYears`); the years after the
@@ -130,13 +136,13 @@ export const RECORD_GROUPS={
  */
 export function chronicleMeasures(history,horizon,windowYears=ANALYSIS.windowYears){
  const byClass={},windows=Math.floor((horizon+1)/windowYears),all=Array(windows).fill(0),important=Array(windows).fill(0),civil=Array(windows).fill(0);
- let repeats=0,prev=null;const civilSet=new Set();
+ let repeats=0,prev=null;const civilSet=new Set(),civilYears=[];
  for(const r of history){
   if(r.year>horizon)throw Error('a record after the horizon '+r.id);
   const c=recordClass(r);byClass[c]=(byClass[c]??0)+1;
   const w=Math.floor(r.year/windowYears),full=w<windows;if(full){all[w]++;if(r.important)important[w]++;}
   // "civilization" records: the annual event draw of story/engine (they have a kind and no land object)
-  if(r.kind&&!r.buildingId&&!r.publicSpaceId&&!/^(legacy-|building-|housing-|public-space-)/.test(r.kind)){if(full)civil[w]++;civilSet.add(r.kind);}
+  if(r.kind&&!r.buildingId&&!r.publicSpaceId&&!/^(legacy-|building-|housing-|public-space-)/.test(r.kind)){if(full)civil[w]++;civilSet.add(r.kind);civilYears.push(r.year);}
   if(c===prev)repeats++;prev=c;
  }
  const groups=Object.fromEntries(Object.entries(RECORD_GROUPS).map(([g,ks])=>[g,ks.reduce((s,k)=>s+(byClass[k]??0),0)]));
@@ -144,7 +150,11 @@ export function chronicleMeasures(history,horizon,windowYears=ANALYSIS.windowYea
   unclassified:Object.entries(byClass).filter(([k])=>k.startsWith('unclassified:')).reduce((s,[,v])=>s+v,0),
   perWindow:{all:distribution(all),important:distribution(important),civilization:distribution(civil)},
   emptyWindows:all.filter(v=>v===0).length,windowsWithoutCivilizationRecord:civil.filter(v=>v===0).length,windows,partialWindowYears:horizon+1-windows*windowYears,
-  distinctCivilizationKinds:civilSet.size,consecutiveSameClass:repeats};
+  distinctCivilizationKinds:civilSet.size,consecutiveSameClass:repeats,
+  // timing of the civilization events: gaps between them, and variance / mean of the full-window counts
+  // (a fixed yearly probability p gives binomial counts: variance / mean = 1 - p; clustering gives more than 1)
+  civilizationGaps:distribution(civilYears.slice(1).map((y,i)=>y-civilYears[i])),civilizationYearsWithEvent:new Set(civilYears).size,
+  civilizationWindowDispersion:dispersion(civil)};
 }
 
 /** Institutions (CivilizationMemory) from the memory log: actions, re-formations and lifespans (censored when active). */
@@ -184,4 +194,28 @@ export function allocateSeeds({tuning,acceptance,limit=200000}){
  }
  for(const b of BIOME_KINDS)if(out[b].tuning.length<tuning||out[b].acceptance.length<acceptance)throw Error('not enough '+b+' seeds below '+limit);
  return {rule:'ascending-stable-alternate-v1',scannedUpTo:scanned,transitionSkipped:transition,biomes:out};
+}
+
+// ---- annual economy (D1b; from the read-only interaction tap of the production world) ----
+const runs=flags=>{const out=[];let n=0;for(const f of flags){if(f)n++;else if(n){out.push(n);n=0;}}if(n)out.push(n);return out;};
+/**
+ * The confirmed annual economy of one world, from its captures in year order (one per confirmed year). A shortage year
+ * is a year the economy's own counter `shortageYears` is above 0 (coverage below 0.90 that year); runs are consecutive
+ * shortage years (a run still open at the last year is counted as it stands). Nothing is filled in for a missing year.
+ */
+export function economyMeasures(captures){
+ const districts=captures[0]?.economy.districts.length??0,routes=captures[0]?.traded.length??0;
+ const district=i=>{const short=captures.map(c=>c.economy.districts[i].shortageYears>0),r=runs(short);
+  return {shortageYears:short.filter(Boolean).length,shortageRuns:distribution(r),runsOfThreeOrMore:r.filter(n=>n>=3).length,longestShortageRun:Math.max(0,...r),
+   coverage:distribution(captures.map(c=>c.economy.districts[i].coverage).filter(v=>v!==null)),
+   harvest:distribution(captures.map(c=>c.economy.harvest[i])),importsTotal:round(captures.reduce((a,c)=>a+c.economy.imports[i],0)),
+   discardedTotal:round(captures.reduce((a,c)=>a+c.economy.discarded[i],0)),reserveEnd:round(captures.at(-1)?.economy.districts[i].reserve)};};
+ const route=r=>{const traded=captures.map(c=>c.traded[r]>0),t=runs(traded);
+  return {yearsWithTrade:traded.filter(Boolean).length,tradedTotal:round(captures.reduce((a,c)=>a+c.traded[r],0)),longestTradeRun:Math.max(0,...t),tradeRuns:t.length,
+   blockedYears:captures.filter(c=>c.routes[r].blocked).length};};
+ const moves=captures.flatMap(c=>c.moves);
+ return {years:captures.length,firstYear:captures[0]?.year??null,lastYear:captures.at(-1)?.year??null,
+  districts:Array.from({length:districts},(_,i)=>district(i)),routes:Array.from({length:routes},(_,r)=>route(r)),
+  moves:{betweenDistricts:moves.filter(m=>m.from<districts).length,settledFromOutside:moves.filter(m=>m.from>=districts).length,
+   peopleMoved:moves.filter(m=>m.from<districts).reduce((a,m)=>a+m.amount,0)}};
 }
