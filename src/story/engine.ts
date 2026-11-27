@@ -12,6 +12,7 @@ import {facilityHousingConflicts,facilityCivicConflicts,existingGround} from '..
 import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import {checkCoupledModifier} from './coupled-economy-policy-internal.js';
+import {checkEventPolicyInternal} from './event-policy-d2a-review.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, createMetricLedger, type ConfirmedMetrics, type ObservationLedger } from './observations.js';
 import { createRegionalEconomy, regionalHarvestFactors, tradeYearsFor, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
@@ -35,6 +36,8 @@ export interface ReviewLandProgression {
  readonly captureCoupledReceiptInternal?:CoupledReceiptObserverInternal;
  /** Issue #35 D3-a: read-only interaction tap for the architecture layer (frozen copies, nothing persisted). */
  readonly observeInteractionInternal?:InteractionObserverInternal;
+ /** Issue #40 D2a: review-only event policy (story/event-policy-d2a-review). Production never passes it. */
+ readonly eventPolicyInternal?:import('./event-policy-d2a-review.js').EventPolicyInternal;
  readonly coupledEconomy?:()=>import('./coupled-economy-policy-internal.js').CoupledAnnualModifier;
  placeFacility:(state:CivilizationState,siteIndex:number,candidate:Readonly<import('./settlement-history.js').Building>)=>
   {status:'clear';x:number;y:number}|{status:'hold'};
@@ -409,8 +412,14 @@ export function step(s:CivilizationState,land?:ReviewLandProgression){migrateCiv
  s.cohesion=clamp(s.cohesion+(s.food<30?-.25:.035)-(s.population>50000?.035:0),0,100);
  if(rng.next()<.018+legacyStrength(s,'archive')/5000)s.knowledge=clamp(s.knowledge+.55,0,100);if(rng.next()<.016)s.exchange=clamp(s.exchange+.4,0,100);
  // A hazard is sampled conditionally; this is an explicitly illustrative fiction, not empirical calibration.
- if(rng.next()<(s.year<30?.12:.19)){
-  const eligible=rules.map(rule=>({rule,weight:(turningPoints.includes(rule)&&s.lastKind[rule.kind]!==undefined?0:rule.weight(s))*(s.year-(s.lastKind[rule.kind]??-100)>55?1:0.015)})).filter(x=>x.weight>0);const sum=eligible.reduce((a,x)=>a+x.weight,0);let draw=rng.next()*sum;const selected=eligible.find(x=>(draw-=x.weight)<=0)?.rule??eligible[eligible.length-1]?.rule;
+ // Issue #40 D2a: a review-only event policy (never passed by production) changes only the eligible candidates and the
+ // yearly probability; the RNG draws stay the same. Without it, this is production's draw unchanged.
+ const policy=land?.eventPolicyInternal;if(policy!==undefined)checkEventPolicyInternal(policy);
+ const facts=policy?.facts(s),probability=policy?policy.drawProbability(s):(s.year<30?.12:.19);
+ if(policy&&!(probability>=0&&probability<=1))throw Error('event policy: draw probability out of range');
+ if(rng.next()<probability){
+  const candidates=policy?rules.filter(rule=>policy.eligible(rule.kind,facts!)):rules;
+  const eligible=candidates.map(rule=>({rule,weight:(turningPoints.includes(rule)&&s.lastKind[rule.kind]!==undefined?0:rule.weight(s))*(s.year-(s.lastKind[rule.kind]??-100)>55?1:0.015)})).filter(x=>x.weight>0);const sum=eligible.reduce((a,x)=>a+x.weight,0);let draw=rng.next()*sum;const selected=eligible.find(x=>(draw-=x.weight)<=0)?.rule??eligible[eligible.length-1]?.rule;
   if(selected){
    const beforePopulation=s.population;const beforeFood=s.food;
    const [title,body,causes]=selected.apply(s,rng);
@@ -428,4 +437,6 @@ export function step(s:CivilizationState,land?:ReviewLandProgression){migrateCiv
  if(!s.pending)finishYear(s,land);s.rngState=rng.state;return s;
 }
 export function advance(s:CivilizationState,years:number,land?:ReviewLandProgression){if(!Number.isInteger(years)||years<0||years>10000)throw Error('Invalid years');for(let i=0;i<years&&!s.pending;i++)step(s,land);return s;}
+/** Issue #40 D2a: the kinds of the yearly event draw (read-only; used to check that every kind has a requirement). */
+export function civilizationEventKindsInternal():readonly string[]{return rules.map(rule=>rule.kind);}
 export function clone(s:CivilizationState):CivilizationState{return JSON.parse(JSON.stringify(s)) as CivilizationState;}

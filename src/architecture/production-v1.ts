@@ -291,17 +291,17 @@ function next(previous:ArchitectureProductionWorld,terrain:TerrainProductionWorl
  * `observe` (Issue #40 D1b) is an optional read-only tap for audits: it receives each confirmed year's frozen
  * capture after the architecture layer has taken it. The world advanced is identical with or without it.
  */
-export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={},observe?:(capture:InteractionCaptureInternal)=>void):Promise<ArchitectureProductionWorld>{
+export async function advanceArchitectureWorld(world:ArchitectureProductionWorld,years:number,choices:'stop'|'automatic'='stop',options:{readonly stopAtNewRecord?:boolean}={},observe?:(capture:InteractionCaptureInternal)=>void,eventPolicy?:import('../story/event-policy-d2a-review.js').EventPolicyInternal):Promise<ArchitectureProductionWorld>{
  knownArchitectureWorld(world);if(observe!==undefined&&typeof observe!=='function')fail('invalid observer');const captures:InteractionCaptureInternal[]=[];
  const {advanceTerrainProductionWorld}=await progression();
- const result=next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options,c=>{captures.push(c);}),captures);
+ const result=next(world,await advanceTerrainProductionWorld(world.terrain,years,choices,options,c=>{captures.push(c);},eventPolicy),captures);
  if(observe)for(const c of captures)observe(c);
  return result;
 }
-export async function chooseArchitectureWorld(world:ArchitectureProductionWorld,index:number|'random'):Promise<ArchitectureProductionWorld>{
+export async function chooseArchitectureWorld(world:ArchitectureProductionWorld,index:number|'random',eventPolicy?:import('../story/event-policy-d2a-review.js').EventPolicyInternal):Promise<ArchitectureProductionWorld>{
  knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
  const {chooseTerrainProductionWorld}=await progression();
- return next(world,await chooseTerrainProductionWorld(world.terrain,index,undefined,c=>{captures.push(c);}),captures);
+ return next(world,await chooseTerrainProductionWorld(world.terrain,index,undefined,c=>{captures.push(c);},eventPolicy),captures);
 }
 
 // ---- persistence (v9 envelope over a complete native v8 packet) ----

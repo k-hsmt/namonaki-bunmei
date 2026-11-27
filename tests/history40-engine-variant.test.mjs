@@ -10,7 +10,7 @@ import {patchEngineSource,loadEngineVariant,DRAW_VARIANTS,PRODUCTION_DRAW} from 
 test('engine copy: exactly one draw expression is replaced; anything else fails closed', () => {
  const src=`import { a } from './x.js';\nif (${PRODUCTION_DRAW}) {}`;
  const out=patchEngineSource(src,'/tmp/d');
- assert.match(out,/rng\.next\(\) < __history40\.drawRate\(s\)/);assert.ok(!out.includes(PRODUCTION_DRAW));
+ assert.match(out,/: __history40\.drawRate\(s\)/);assert.ok(!out.includes(PRODUCTION_DRAW));
  assert.match(out,/from 'file:\/\/\/tmp\/d\/x\.js'/);
  assert.throws(()=>patchEngineSource('no draw here'),/found 0 times/);
  assert.throws(()=>patchEngineSource(`${PRODUCTION_DRAW};${PRODUCTION_DRAW}`),/found 2 times/);

@@ -151,7 +151,7 @@ export function chooseAutomaticallyGeneratedFacilityReview(input:GeneratedFacili
 }
 
 /** Production terrain owns a separate land boundary, sharing only the private batch mechanics. */
-export function createTerrainProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal,terrainAt:TerrainReviewProvider,observeInteraction?:InteractionObserverInternal){
+export function createTerrainProductionFacilityBatch(input:GeneratedFacilityReview,extension:GeneratedLandReviewExtension,prepare:()=>CoupledAnnualModifier,captureCoupledReceiptInternal:CoupledReceiptObserverInternal,terrainAt:TerrainReviewProvider,observeInteraction?:InteractionObserverInternal,eventPolicy?:import('./event-policy-d2a-review.js').EventPolicyInternal){
  const review=mutableCopy(input,'terrain-production');bindTerrainReviewInternal(review,terrainAt);const base=policyFor(review,extension);
- return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'terrain-production-v1',coupledEconomy:prepare,...(observeInteraction?{observeInteractionInternal:observeInteraction}:{})},prepare);
+ return batchFor(review,{...base,captureCoupledReceiptInternal,mode:'terrain-production-v1',coupledEconomy:prepare,...(observeInteraction?{observeInteractionInternal:observeInteraction}:{}),...(eventPolicy?{eventPolicyInternal:eventPolicy}:{})},prepare);
 }

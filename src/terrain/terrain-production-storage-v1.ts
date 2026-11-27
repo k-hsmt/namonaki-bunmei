@@ -5,6 +5,7 @@ import {terrainProductionWireInternal,type TerrainProductionSave} from './terrai
 import {terrainProductionMaxBytes} from './terrain-production-contract-v1.js';
 import {knownTerrainProductionWorldInternal,ownTerrainProductionPacketInternal} from './terrain-production-owned-internal.js';
 import type {TerrainProductionWorld} from './terrain-production-types-v1.js';
+import {reviewOnlyWorldKeyInternal} from '../story/event-policy-d2a-review.js';
 export async function prepareTerrainProductionSave(world:TerrainProductionWorld):Promise<TerrainProductionSave>{
- knownTerrainProductionWorldInternal(world);const payload=freezeReview(terrainProductionWireInternal(world)),packet={...payload,payloadHash:await terrainRevisionHash(payload)};if(new TextEncoder().encode(JSON.stringify(packet)).length>terrainProductionMaxBytes)throw Error('Terrain production exceeds 16MiB');return ownTerrainProductionPacketInternal(packet,world);
+ knownTerrainProductionWorldInternal(world);if(reviewOnlyWorldKeyInternal(world)!==undefined)throw Error('A world advanced with a review-only event policy cannot be saved');const payload=freezeReview(terrainProductionWireInternal(world)),packet={...payload,payloadHash:await terrainRevisionHash(payload)};if(new TextEncoder().encode(JSON.stringify(packet)).length>terrainProductionMaxBytes)throw Error('Terrain production exceeds 16MiB');return ownTerrainProductionPacketInternal(packet,world);
 }

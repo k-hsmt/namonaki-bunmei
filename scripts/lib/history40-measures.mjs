@@ -134,6 +134,8 @@ export function dispersion(counts){
  * Window statistics use full windows only (years 0..horizon split into windows of `windowYears`); the years after the
  * last full window are counted in the totals and reported as `partialWindowYears`, not as a short, sparse window.
  */
+/** Records of the yearly civilization event draw (story/engine): they have a kind and no land object. */
+export const isCivilizationEvent=r=>!!r.kind&&!r.buildingId&&!r.publicSpaceId&&!/^(legacy-|building-|housing-|public-space-)/.test(r.kind);
 export function chronicleMeasures(history,horizon,windowYears=ANALYSIS.windowYears){
  const byClass={},windows=Math.floor((horizon+1)/windowYears),all=Array(windows).fill(0),important=Array(windows).fill(0),civil=Array(windows).fill(0);
  let repeats=0,prev=null;const civilSet=new Set(),civilYears=[];
@@ -142,7 +144,7 @@ export function chronicleMeasures(history,horizon,windowYears=ANALYSIS.windowYea
   const c=recordClass(r);byClass[c]=(byClass[c]??0)+1;
   const w=Math.floor(r.year/windowYears),full=w<windows;if(full){all[w]++;if(r.important)important[w]++;}
   // "civilization" records: the annual event draw of story/engine (they have a kind and no land object)
-  if(r.kind&&!r.buildingId&&!r.publicSpaceId&&!/^(legacy-|building-|housing-|public-space-)/.test(r.kind)){if(full)civil[w]++;civilSet.add(r.kind);civilYears.push(r.year);}
+  if(isCivilizationEvent(r)){if(full)civil[w]++;civilSet.add(r.kind);civilYears.push(r.year);}
   if(c===prev)repeats++;prev=c;
  }
  const groups=Object.fromEntries(Object.entries(RECORD_GROUPS).map(([g,ks])=>[g,ks.reduce((s,k)=>s+(byClass[k]??0),0)]));
@@ -218,4 +220,26 @@ export function economyMeasures(captures){
   districts:Array.from({length:districts},(_,i)=>district(i)),routes:Array.from({length:routes},(_,r)=>route(r)),
   moves:{betweenDistricts:moves.filter(m=>m.from<districts).length,settledFromOutside:moves.filter(m=>m.from>=districts).length,
    peopleMoved:moves.filter(m=>m.from<districts).reduce((a,m)=>a+m.amount,0)}};
+}
+
+// ---- D2a: chains, quiet eras and recorded hardship ----
+/**
+ * Timing of the civilization events (years in order, at most one per year): the longest run of consecutive years with an
+ * event, the years inside runs of 5 or more, the most events in any 10 consecutive years, the longest gap, the gaps of
+ * 20 and 30 years or more, and the 100-year windows (full windows from year 0) with 8 events or fewer.
+ */
+export function eventTiming(years,horizon){
+ const set=new Set(years),ys=[...set].sort((a,b)=>a-b);let longestRun=0,run=0,inLongRuns=0,maxIn10=0;
+ for(let y=1;y<=horizon;y++){if(set.has(y)){run++;}else{if(run>=5)inLongRuns+=run;run=0;}longestRun=Math.max(longestRun,run);}
+ if(run>=5)inLongRuns+=run;
+ for(let i=0,j=0;i<ys.length;i++){while(ys[i]-ys[j]>=10)j++;maxIn10=Math.max(maxIn10,i-j+1);}
+ const gaps=ys.slice(1).map((y,i)=>y-ys[i]),windows=Math.floor((horizon+1)/100);
+ const perWindow=Array(windows).fill(0);for(const y of ys)if(Math.floor(y/100)<windows)perWindow[Math.floor(y/100)]++;
+ return {yearsWithEvent:ys.length,longestRun,yearsInRunsOfFive:inLongRuns,maxInTenYears:maxIn10,longestGap:Math.max(0,...gaps),
+  gapsOf20:gaps.filter(g=>g>=20).length,gapsOf30:gaps.filter(g=>g>=30).length,quietWindows:perWindow.filter(n=>n<=8).length,windows};
+}
+/** Recorded hardship: confirmed years with food or cohesion below 40 (the #29 ledger); share, longest run, runs of 50+ years. */
+export function hardshipRuns(food,cohesion){
+ const flags=food.map((f,i)=>f<40||cohesion[i]<40),r=runs(flags);
+ return {share:flags.length?round(flags.filter(Boolean).length/flags.length):null,longestRun:Math.max(0,...r),runsOf50:r.filter(n=>n>=50).length};
 }

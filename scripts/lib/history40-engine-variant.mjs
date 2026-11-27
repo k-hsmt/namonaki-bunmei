@@ -13,8 +13,9 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import path from 'node:path';
 
 const DIST=fileURLToPath(new URL('../../dist/story/',import.meta.url));
-export const PRODUCTION_DRAW='rng.next() < (s.year < 30 ? .12 : .19)';
-export const DRAW_PATCH=Object.freeze({find:PRODUCTION_DRAW,replace:'rng.next() < __history40.drawRate(s)'});
+// The production probability (when no review-only event policy is passed). D2a moved it into one expression of step().
+export const PRODUCTION_DRAW='probability = policy ? policy.drawProbability(s) : (s.year < 30 ? .12 : .19)';
+export const DRAW_PATCH=Object.freeze({find:PRODUCTION_DRAW,replace:'probability = policy ? policy.drawProbability(s) : __history40.drawRate(s)'});
 
 /**
  * The copy's source: production with each patch's `find` replaced by its `replace` (each must occur exactly once) and

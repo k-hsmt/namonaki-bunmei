@@ -126,3 +126,18 @@ test('economyMeasures: shortage years and runs from the economy counter, trade r
  assert.deepEqual(r.moves,{betweenDistricts:1,settledFromOutside:1,peopleMoved:5});
  assert.equal(r.districts[1].importsTotal,5);
 });
+
+test('eventTiming: runs of consecutive years, the densest 10 years, gaps and quiet 100-year windows', async () => {
+ const {eventTiming}=await import('../scripts/lib/history40-measures.mjs');
+ const r=eventTiming([3,4,5,6,7,8,40,41,90,150],199);
+ assert.equal(r.longestRun,6);assert.equal(r.yearsInRunsOfFive,6);assert.equal(r.maxInTenYears,6);
+ assert.equal(r.longestGap,60);assert.equal(r.gapsOf20,3);assert.equal(r.gapsOf30,3);
+ assert.deepEqual([r.windows,r.quietWindows,r.yearsWithEvent],[2,1,10]);// 0-99 has 9 events, 100-199 has 1
+ assert.equal(eventTiming([],99).longestGap,0);
+});
+
+test('hardshipRuns: confirmed years with food or cohesion below 40', async () => {
+ const {hardshipRuns}=await import('../scripts/lib/history40-measures.mjs');
+ const r=hardshipRuns([50,30,30,50,50],[50,50,50,39,60]);
+ assert.deepEqual(r,{share:.6,longestRun:3,runsOf50:0});
+});
