@@ -72,6 +72,21 @@ jobs:
           name: terrain-record-capacity
           path: artifacts/terrain31-record/capacity-audit.json
           if-no-files-found: error
+      # Issue 40 D1a baseline trial, quick set (3 worlds to year 300). The preliminary trial (21 worlds to year 1000)
+      # runs locally: node scripts/audit-issue40-d1a.mjs (see docs/issue40-d1a-baseline.md).
+      - name: Issue 40 D1a history baseline trial (quick)
+        if: needs.scope.outputs.mode == 'full'
+        run: node scripts/audit-issue40-d1a.mjs
+        timeout-minutes: 5
+        env:
+          HISTORY40_D1A_QUICK: '1'
+          REVIEW_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && needs.scope.outputs.mode == 'full' }}
+        with:
+          name: history40-d1a-baseline
+          path: artifacts/history40-d1a/report.json
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: ${{ always() && needs.scope.outputs.mode == 'full' }}
         with:
