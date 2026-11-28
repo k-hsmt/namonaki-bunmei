@@ -47,7 +47,10 @@ export async function advanceReviewWorld(world:ArchitectureProductionWorld,years
  observe?:{readonly draw?:(r:EventDrawReceipt)=>void;readonly economy?:(c:InteractionCaptureInternal)=>void}):Promise<ArchitectureProductionWorld> {
  const log=logOf(world);if(!Number.isSafeInteger(years)||years<1)fail('invalid years');
  const result=await advanceArchitectureWorld(world,years,choices,{},observe?.economy,policyOf(log.policy,observe?.draw));
- return result===world?world:next(result,log,['advance',years,choices]);
+ // the years actually run (a 'stop' advance ends at the first branch): replaying them stops at the same branch, and the
+ // save's bound on years counts the history, not what was asked for
+ const ran=result.terrain.review.state.year-world.terrain.review.state.year;
+ return result===world?world:next(result,log,['advance',ran,choices]);
 }
 export async function chooseReviewWorld(world:ArchitectureProductionWorld,index:number|'random',
  observe?:{readonly economy?:(c:InteractionCaptureInternal)=>void}):Promise<ArchitectureProductionWorld> {

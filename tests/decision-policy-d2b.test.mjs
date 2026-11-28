@@ -80,3 +80,14 @@ test('review save: a pending branch saves and restores exactly; tampering and th
  await assert.rejects(decodeWorldSave(json));
  await assert.rejects(prepareArchitectureSave(pending),/cannot be saved/);
 });
+
+test('review save: an advance that stops at a branch records the years it ran, not the years asked for', async () => {
+ let w=await createReviewWorld(4,POLICY);
+ // ask for the rest of a long horizon at every branch: the requests add up far beyond the history
+ while(w.terrain.review.state.year<1500){w=w.terrain.review.state.pending?await chooseReviewWorld(w,'random'):await advanceReviewWorld(w,9000-w.terrain.review.state.year,'stop');if(w.terrain.review.state.year>=1500&&w.terrain.review.state.pending)break;}
+ const save=await prepareReviewSave(w);
+ const ran=save.operations.filter(o=>o[0]==='advance').reduce((a,o)=>a+o[1],0);
+ assert.equal(ran,w.terrain.review.state.year,'the advances add up to the year reached');
+ const restored=await restoreReviewSave(JSON.parse(JSON.stringify(save)));
+ assert.equal(JSON.stringify(restored.terrain.review.state),JSON.stringify(w.terrain.review.state));
+});
