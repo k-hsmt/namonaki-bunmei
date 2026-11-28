@@ -40,7 +40,8 @@ async function run(c,policy,each=()=>{}){
  const captures=[];let world=await createReviewWorld(c.seed,policy);
  while(world.terrain.review.state.year<HORIZON||world.terrain.review.state.pending){
   const s0=world.terrain.review.state;
-  if(s0.pending){world=await chooseReviewWorld(world,'random',{economy:cap=>captures.push(cap)});continue;}
+  // a branch pending in a year finishes that year when chosen: the year's checks run then
+  if(s0.pending){world=await chooseReviewWorld(world,'random',{economy:cap=>captures.push(cap)});if(!world.terrain.review.state.pending&&world.terrain.review.state.year%500===0)each(world.terrain.review.state);continue;}
   const to=Math.min(HORIZON,(Math.floor(s0.year/500)+1)*500);
   world=await advanceReviewWorld(world,to-s0.year,'stop',{economy:cap=>captures.push(cap)});
   if(!world.terrain.review.state.pending)each(world.terrain.review.state);
