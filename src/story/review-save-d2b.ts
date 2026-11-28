@@ -10,15 +10,18 @@
  * new world under the same policy and accepts the save only when the replayed history has the same hash, the same year
  * and the same pending state: nothing is redrawn differently and nothing missing is inferred. The rule is deterministic,
  * so the replay reproduces the saved history exactly; a tampered save (operations, hash, unknown fields) is rejected.
+ * Issue #40 D2c: with episodes, the typed episode history is part of the hashed state and is checked on save and load.
  * Restoring costs a replay (about 7 s per 5000 years in Node): acceptable for review, not a production design.
  */
 import {createNewArchitectureWorld} from './new-world.js';
 import {advanceArchitectureWorld,chooseArchitectureWorld,type ArchitectureProductionWorld} from '../architecture/production-v1.js';
 import {createEventPolicyD2a,EVENT_POLICY_D2A_ID,type EventDrawReceipt,type EventPolicyInternal} from './event-policy-d2a-review.js';
 import type {InteractionCaptureInternal} from './economy-observer.js';
+import {checkEpisodeHistory} from './episode-d2c-review.js';
+import {EPISODE_PROBE_D2C} from './episode-probe-d2c-review.js';
 
 export const REVIEW_SAVE_FORMAT='namonaki-review-save' as const;
-export const REVIEW_POLICIES=['hardship-linked','hardship-linked+decisions-d2b'] as const;
+export const REVIEW_POLICIES=['hardship-linked','hardship-linked+decisions-d2b','hardship-linked+decisions-d2b+episodes-probe-d2c'] as const;
 export type ReviewPolicyName=typeof REVIEW_POLICIES[number];
 export type ReviewOperation=readonly ['advance',number,'stop'|'automatic']|readonly ['choose',number|'random'];
 export interface ReviewSave {
@@ -29,7 +32,7 @@ interface Log {readonly seed:number;readonly policy:ReviewPolicyName;readonly op
 const logs=new WeakMap<ArchitectureProductionWorld,Log>();
 const fail=(m:string):never=>{throw Error('review save: '+m);};
 const policyOf=(name:ReviewPolicyName,observeDraw?:(r:EventDrawReceipt)=>void):EventPolicyInternal=>
- createEventPolicyD2a('hardship-linked',{...(observeDraw?{observeDraw}:{}),decisions:name==='hardship-linked+decisions-d2b'});
+ createEventPolicyD2a('hardship-linked',{...(observeDraw?{observeDraw}:{}),decisions:name!=='hardship-linked',...(name==='hardship-linked+decisions-d2b+episodes-probe-d2c'?{episodes:EPISODE_PROBE_D2C}:{})});
 const logOf=(world:ArchitectureProductionWorld)=>logs.get(world)??fail('not a review world made by this module');
 const next=(world:ArchitectureProductionWorld,log:Log,op:ReviewOperation)=>{logs.set(world,{...log,operations:[...log.operations,op]});return world;};
 
@@ -56,7 +59,7 @@ async function historyHash(world:ArchitectureProductionWorld):Promise<string> {
  return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 export async function prepareReviewSave(world:ArchitectureProductionWorld):Promise<ReviewSave> {
- const log=logOf(world),state=world.terrain.review.state;
+ const log=logOf(world),state=world.terrain.review.state;checkEpisodeHistory(state);
  return Object.freeze({format:REVIEW_SAVE_FORMAT,schemaVersion:1,ruleId:EVENT_POLICY_D2A_ID,policy:log.policy,seed:log.seed,
   operations:Object.freeze(log.operations.map(op=>Object.freeze([...op]) as ReviewOperation)),year:state.year,pending:!!state.pending,historySha256:await historyHash(world)});
 }
@@ -84,5 +87,6 @@ export async function restoreReviewSave(raw:unknown):Promise<ArchitectureProduct
  const state=world.terrain.review.state;
  if(state.year!==d.year||!!state.pending!==d.pending)fail('the replayed history does not reach the saved year');
  if(await historyHash(world)!==d.historySha256)fail('the replayed history differs from the saved one');
+ checkEpisodeHistory(state);
  return world;
 }

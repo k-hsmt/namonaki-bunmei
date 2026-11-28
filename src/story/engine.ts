@@ -13,6 +13,7 @@ import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import {checkCoupledModifier} from './coupled-economy-policy-internal.js';
 import {checkEventPolicyInternal} from './event-policy-d2a-review.js';
+import {commitEpisodeYear} from './episode-d2c-review.js';
 import {DECISION_CATALOG,DECISION_POLICY_D2B_ID,proposeReviewDecision,autonomousWeights,weightedIndex} from './decision-policy-d2b-review.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, createMetricLedger, type ConfirmedMetrics, type ObservationLedger } from './observations.js';
@@ -30,7 +31,7 @@ export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'counc
 export interface Legacy {kind:LegacyKind; established:number; strength:number; lastChanged:number; origin:string;}
 export type MemoryLog = {year:number;kind:LegacyKind;action:'formed'|'strengthened'|'weakened'|'lost';reason:string;strength:number;established:number};
 export interface CivilizationMemory {legacies:Partial<Record<LegacyKind,Legacy>>;log:MemoryLog[];}
-export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHistory; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string;templateId?:string;actionId?:string;chooser?:'people'|'observer'}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
+export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHistory; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string;templateId?:string;actionId?:string;chooser?:'people'|'observer'}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; episodes?:import('./episode-d2c-review.js').EpisodeStore; }
 /** Explicit land-only extension for independent generated-world trials.
  * Omitted by every existing game/legacy caller. Never inferred from a save version.
  */
@@ -266,6 +267,8 @@ function finishYear(s:CivilizationState,land?:ReviewLandProgression):void {
  }
  commitObservation(ledger,s.year,confirmedMetrics(s));
  if(s.year%10===0)s.samples.push({year:s.year,population:s.population});
+ // Issue #40 D2c: review-only episodes are committed once, after the year's ledgers (production never passes them).
+ const episodes=land?.eventPolicyInternal?.episodes;if(episodes!==undefined)commitEpisodeYear(s,episodes);
 }
 export function lastObservedYear(s:CivilizationState):number {
  return s.observation?.lastYear??s.observation?.legacy?.year??s.year;
