@@ -94,9 +94,14 @@ async function roundTrip(c){
  }
  // trade episodes are active in few years: without a branch during one, save in the first year one is active
  if(!world){
-  world=await advanceReviewWorld(await createReviewWorld(c.seed,POLICY),SAVE_AFTER,'automatic');
-  while(!world.terrain.review.state.episodes.active.trade&&world.terrain.review.state.year<HORIZON)world=await advanceReviewWorld(world,1,'automatic');
-  if(!world.terrain.review.state.episodes.active.trade){check(false,`${c.id}: no year with an active episode after ${SAVE_AFTER}`);return {status:'none'};}
+  // the year is read from the episodes of the same world run on; the save then holds two advances, not one per year
+  const base=await advanceReviewWorld(await createReviewWorld(c.seed,POLICY),SAVE_AFTER,'automatic');
+  const ahead=(await advanceReviewWorld(base,HORIZON-SAVE_AFTER,'automatic')).terrain.review.state;
+  const e=episodesAt(ahead,HORIZON).find(e=>(e.endedYear??HORIZON+1)>SAVE_AFTER&&e.startedYear<HORIZON);
+  if(!e){check(false,`${c.id}: no year with an active episode after ${SAVE_AFTER}`);return {status:'none'};}
+  const year=Math.max(SAVE_AFTER,e.startedYear);
+  world=year>SAVE_AFTER?await advanceReviewWorld(base,year-SAVE_AFTER,'automatic'):base;
+  if(!world.terrain.review.state.episodes.active.trade){check(false,`${c.id}: no active episode in ${year}`);return {status:'none'};}
  }
  const s=world.terrain.review.state;check(s.episodes.committedThrough===(s.pending?s.year-1:s.year),`${c.id}: the committed year is wrong`);
  let t=performance.now();const save=await prepareReviewSave(world),json=JSON.stringify(save);const saveMs=ms(t);
