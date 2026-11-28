@@ -130,12 +130,15 @@ export interface EventPolicyInternal {
  readonly drawProbability:(s:CivilizationState)=>number;
  /** Review-only audit tap: one frozen receipt per drawn-or-not year. */
  readonly observeDraw?:(receipt:EventDrawReceipt)=>void;
+ /** Issue #40 D2b: issue-based branches and the people's own choice (story/decision-policy-d2b-review). */
+ readonly decisions?:boolean;
 }
 const policies=new WeakSet<object>();
-export function createEventPolicyD2a(setting:EventPolicySetting,options:{readonly observeDraw?:(receipt:EventDrawReceipt)=>void}={}):EventPolicyInternal {
+export function createEventPolicyD2a(setting:EventPolicySetting,options:{readonly observeDraw?:(receipt:EventDrawReceipt)=>void;readonly decisions?:boolean}={}):EventPolicyInternal {
+ if(options.decisions!==undefined&&typeof options.decisions!=='boolean')throw Error('event policy: invalid decisions option');
  if(!EVENT_POLICY_SETTINGS.includes(setting))throw Error('event policy: unknown setting');
  if(options.observeDraw!==undefined&&typeof options.observeDraw!=='function')throw Error('event policy: invalid draw observer');
- const policy=Object.freeze({ruleId:EVENT_POLICY_D2A_ID,setting,facts:confirmedEventFacts,...(options.observeDraw?{observeDraw:options.observeDraw}:{}),
+ const policy=Object.freeze({ruleId:EVENT_POLICY_D2A_ID,setting,facts:confirmedEventFacts,...(options.observeDraw?{observeDraw:options.observeDraw}:{}),...(options.decisions?{decisions:true}:{}),
   eligible:(kind:string,facts:ConfirmedEventFacts)=>{const r=EVENT_REQUIREMENTS[kind];if(r===undefined)throw Error('event policy: no requirement for '+kind);return meetsRequirement(r,facts);},
   drawProbability:DRAW_PROBABILITY[setting]});
  policies.add(policy);return policy;
@@ -143,7 +146,7 @@ export function createEventPolicyD2a(setting:EventPolicySetting,options:{readonl
 /** Only policies made here are accepted (a look-alike object is rejected). Returns its key. */
 export function checkEventPolicyInternal(policy:unknown):string {
  if(!policy||typeof policy!=='object'||!policies.has(policy))throw Error('event policy: use createEventPolicyD2a');
- const p=policy as EventPolicyInternal;return p.ruleId+':'+p.setting;
+ const p=policy as EventPolicyInternal;return p.ruleId+':'+p.setting+(p.decisions?'+decisions-d2b':'');
 }
 
 // ---- review-only worlds ----

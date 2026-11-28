@@ -13,6 +13,7 @@ import type {HousingHistory} from './housing-history.js';
 import { hash01, SeededRng } from '../engine/rng.js';
 import {checkCoupledModifier} from './coupled-economy-policy-internal.js';
 import {checkEventPolicyInternal} from './event-policy-d2a-review.js';
+import {DECISION_CATALOG,DECISION_POLICY_D2B_ID,proposeReviewDecision,autonomousWeights,weightedIndex} from './decision-policy-d2b-review.js';
 import { changePopulation, initialPopulation, populationTotal, regions } from './population.js';
 import { commitObservation, createMetricLedger, type ConfirmedMetrics, type ObservationLedger } from './observations.js';
 import { createRegionalEconomy, regionalHarvestFactors, tradeYearsFor, updateRegionalEconomy, type RegionalEconomy } from './regional-economy.js';
@@ -22,12 +23,14 @@ export type Trait = '川沿いの農耕'|'高原の放牧'|'沿岸の漁撈'|'�
 export type Dimension = 'population'|'food'|'cohesion'|'knowledge'|'exchange'|'culture';
 export interface RecordEntry { id:string; year:number; tag:string; title:string; body:string; causes:string[]; kind?:string; buildingId?:string; publicSpaceId?:string; relatedIds?:string[]; important?:boolean; }
 export interface Choice { label:string; description:string; impacts:Partial<Record<Dimension,number>>; consequence:string; }
-export interface Decision { id:string; year:number; question:string; context:string; options:Choice[]; }
+export interface Decision { id:string; year:number; question:string; context:string; options:Choice[];
+ /** Issue #40 D2b: review-only (story/decision-policy-d2b-review). Never present in production. */
+ review?:import('./decision-policy-d2b-review.js').ReviewDecision; }
 export type LegacyKind = 'granary'|'waterworks'|'trade_network'|'archive'|'council'|'care'|'migration'|'fracture';
 export interface Legacy {kind:LegacyKind; established:number; strength:number; lastChanged:number; origin:string;}
 export type MemoryLog = {year:number;kind:LegacyKind;action:'formed'|'strengthened'|'weakened'|'lost';reason:string;strength:number;established:number};
 export interface CivilizationMemory {legacies:Partial<Record<LegacyKind,Legacy>>;log:MemoryLog[];}
-export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHistory; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
+export interface CivilizationState { version:2|3|4; publicSpaces?:PublicSpaceHistory; housing?:HousingHistory & {readonly schemaVersion:1}; observation?:ObservationLedger; economy?:RegionalEconomy; society?:Society; memory?:CivilizationMemory; seed:number; rngState:number; year:number; name:string; homeland:string; trait:Trait; population:number; food:number; cohesion:number; knowledge:number; exchange:number; culture:number; drought:number; epidemic:number; lastKind:Record<string,number>; history:RecordEntry[]; pending:Decision|null; decisions:{year:number;label:string;templateId?:string;actionId?:string;chooser?:'people'|'observer'}[]; samples:{year:number;population:number}[]; lastDecisionId?:number; }
 /** Explicit land-only extension for independent generated-world trials.
  * Omitted by every existing game/legacy caller. Never inferred from a save version.
  */
@@ -316,6 +319,9 @@ export function legacySummary(s:CivilizationState):{kind:LegacyKind;name:string;
 }
 export function chooseAutomatically(s:CivilizationState,land?:ReviewLandProgression):number {
  if(!s.pending)throw Error('No choice pending');
+ // Issue #40 D2b: a review branch already holds the people's own choice (drawn when it was presented): no new draw.
+ const review=s.pending.review;
+ if(review){if(!land?.eventPolicyInternal?.decisions)throw Error('A review branch needs its review policy');choose(s,review.autonomousIndex,'auto',land);return review.autonomousIndex;}
  const rng=new SeededRng(s.rngState);const i=rng.int(0,s.pending.options.length-1);
  s.rngState=rng.state;choose(s,i,'auto',land);return i;
 }
@@ -392,7 +398,14 @@ const everydayVariants:{kind:string;tag:string;title:string;body:string;causes:s
 for(const e of everydayVariants){rules.push({kind:e.kind,tag:e.tag,weight:e.weight,apply:s=>{for(const k of ['food','cohesion','culture','exchange','knowledge'] as const){const n=e[k];if(n!==undefined)bump(s,k,n);}return [e.title,e.body,e.causes];}});}
 rules.push(...turningPoints);
 function generateDecision(s:CivilizationState,r:SeededRng){let index=r.int(0,decisionTemplates.length-1);if(index===s.lastDecisionId)index=(index+1+r.int(0,decisionTemplates.length-2))%decisionTemplates.length;s.lastDecisionId=index;const t=decisionTemplates[index]!;s.pending={id:`choice-${s.year}`,year:s.year,question:t.question,context:`世界暦${s.year}年。${s.name}は${s.homeland}で暮らしている。どの道も、未来を約束するものではない。`,options:t.options};}
-export function choose(s:CivilizationState,index:number,source:'manual'|'auto'='manual',land?:ReviewLandProgression){if(!s.pending)throw Error('No choice pending');const option=s.pending.options[index];if(!option)throw Error('Invalid choice'); migrateCivilization(s); for(const [key,val] of Object.entries(option.impacts))bump(s,key as Dimension,val!);s.decisions.push({year:s.year,label:option.label});entry(s,'選択',option.label,option.consequence,[source==='auto'?'偶然に委ねられた選択':'観察者が選んだ一度きりの分岐'],true);
+export function choose(s:CivilizationState,index:number,source:'manual'|'auto'='manual',land?:ReviewLandProgression){if(!s.pending)throw Error('No choice pending');const option=s.pending.options[index];if(!option)throw Error('Invalid choice'); migrateCivilization(s);
+ const review=s.pending.review;if(review&&!land?.eventPolicyInternal?.decisions)throw Error('A review branch needs its review policy');
+ for(const [key,val] of Object.entries(option.impacts))bump(s,key as Dimension,val!);
+ if(review){
+  // Issue #40 D2b: the same action is processed the same way whoever chose it; only the record of the chooser differs.
+  s.decisions.push({year:s.year,label:option.label,templateId:review.templateId,actionId:review.actionIds[index]!,chooser:source==='auto'?'people':'observer'});
+  entry(s,'選択',option.label,option.consequence,[source==='auto'?'人々の判断に委ねられた選択':'観察者が選んだ一度きりの分岐'],true,review.sources.length?[...review.sources]:undefined);
+ }else{s.decisions.push({year:s.year,label:option.label});entry(s,'選択',option.label,option.consequence,[source==='auto'?'偶然に委ねられた選択':'観察者が選んだ一度きりの分岐'],true);}
  const label=option.label;
  if(/蓄え|共同で分かち合う/.test(label))remember(s,'granary',18,`世界暦${s.year}年の選択から備蓄を共有する習慣が深まった。`);
  if(/水路|橋|堤|再建/.test(label))remember(s,'waterworks',18,'共同作業の経験が次の世代へ伝わった。');
@@ -435,8 +448,17 @@ export function step(s:CivilizationState,land?:ReviewLandProgression){migrateCiv
  }
  if(receipt)policy!.observeDraw!(Object.freeze({...receipt,inputs:Object.freeze(receipt.inputs)}));
  // Prompt about once a century, no more than 1 in 85 years.
+ if(policy?.decisions){
+  // Issue #40 D2b: a branch only for a confirmed issue (no yearly lottery); the people's own choice is drawn once, now.
+  const proposal=proposeReviewDecision(s);
+  if(proposal){const t=decisionTemplates[proposal.templateIndex]!,e=DECISION_CATALOG[proposal.templateIndex]!,weights=autonomousWeights(s,proposal.templateIndex);
+   s.lastDecisionId=proposal.templateIndex;
+   s.pending={id:`choice-${s.year}`,year:s.year,question:t.question,context:`世界暦${s.year}年。${s.name}は${s.homeland}で暮らしている。どの道も、未来を約束するものではない。`,options:t.options,
+    review:{ruleId:DECISION_POLICY_D2B_ID,templateId:e.templateId,actionIds:[...e.actionIds],sources:[...proposal.facts.sources],evidence:[...proposal.facts.evidence],weights,autonomousIndex:weightedIndex(rng.next(),weights)}};}
+ }else{
  const last=s.decisions.length?s.decisions[s.decisions.length-1]!.year:0;
  if(s.year>=60&&s.year-last>=85&&rng.next()<.012)generateDecision(s,rng);
+ }
  if(!s.pending)finishYear(s,land);s.rngState=rng.state;return s;
 }
 export function advance(s:CivilizationState,years:number,land?:ReviewLandProgression){if(!Number.isInteger(years)||years<0||years>10000)throw Error('Invalid years');for(let i=0;i<years&&!s.pending;i++)step(s,land);return s;}

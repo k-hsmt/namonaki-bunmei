@@ -298,10 +298,13 @@ export async function advanceArchitectureWorld(world:ArchitectureProductionWorld
  if(observe)for(const c of captures)observe(c);
  return result;
 }
-export async function chooseArchitectureWorld(world:ArchitectureProductionWorld,index:number|'random',eventPolicy?:import('../story/event-policy-d2a-review.js').EventPolicyInternal):Promise<ArchitectureProductionWorld>{
+export async function chooseArchitectureWorld(world:ArchitectureProductionWorld,index:number|'random',eventPolicy?:import('../story/event-policy-d2a-review.js').EventPolicyInternal,observe?:(capture:InteractionCaptureInternal)=>void):Promise<ArchitectureProductionWorld>{
+ if(observe!==undefined&&typeof observe!=='function')fail('invalid observer');
  knownArchitectureWorld(world);const captures:InteractionCaptureInternal[]=[];
  const {chooseTerrainProductionWorld}=await progression();
- return next(world,await chooseTerrainProductionWorld(world.terrain,index,undefined,c=>{captures.push(c);},eventPolicy),captures);
+ const result=next(world,await chooseTerrainProductionWorld(world.terrain,index,undefined,c=>{captures.push(c);},eventPolicy),captures);
+ if(observe)for(const c of captures)observe(c);
+ return result;
 }
 
 // ---- persistence (v9 envelope over a complete native v8 packet) ----

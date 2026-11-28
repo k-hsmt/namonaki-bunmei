@@ -67,7 +67,10 @@ function annualKernelSessionInternal(input:GeneratedBridgeReview,options:Generat
  }
  const commit=(phase:import('../story/generated-land-batch-internal.js').LandPhaseReceipt)=>{
   const draws=boundedRngDraws(phase.rngBefore,phase.rngAfter,phase.phase==='step'?64:phase.phase==='manual-choice'?0:1);
-  if(phase.phase==='step'?draws<6:phase.phase==='automatic-choice'?draws!==1:draws!==0)throw Error('Unexpected annual RNG consumption');
+  // Issue #40 D2b: under the review decision policy the people's choice was drawn when the branch was presented, so an
+  // automatic choice draws nothing (like a manual one). Production (no policy) keeps exactly one draw.
+  const automaticDraws=trial?.eventPolicy?.decisions?0:1;
+  if(phase.phase==='step'?draws<6:phase.phase==='automatic-choice'?draws!==automaticDraws:draws!==0)throw Error('Unexpected annual RNG consumption');
   totalDraws+=draws;if(totalDraws>1000000)throw Error('Annual RNG batch exceeds bound');
   const ecologyBefore=through,record=()=>phases.push(freezeReviewWriterDataInternal({...phase,draws,ecologyBefore,ecologyAfter:through}));
   if(phase.confirmedBefore!==through)throw Error('Ecology did not commit before next phase');
