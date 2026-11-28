@@ -1,19 +1,18 @@
 /**
- * Issue #40 D2c: trial of the common episode frame (review-only), D0 §4.1 / §8 / §12 D2c.
+ * Issue #40 D3a: trial of the food system on the episode frame (review-only), D0 §4.2 / §12 D3a.
  *
- *   npm run build && node scripts/audit-issue40-d2c.mjs   →  artifacts/history40-d2c/report.json
- *   Env: HISTORY40_D2C_QUICK=1 (2 worlds to year 1000).
+ *   npm run build && node scripts/audit-issue40-d3a.mjs   →  artifacts/history40-d3a/report.json
+ *   Env: HISTORY40_D3A_QUICK=1 (2 worlds to year 1000).
  *
- * The 70 tuning worlds to year 5000 under hardship-linked + decisions-d2b + the episode probe (probe-d2c), branch by
+ * The 70 tuning worlds to year 5000 under hardship-linked + decisions-d2b + the food system (food-d3a), branch by
  * branch, every branch left to the people (autonomous observation). Per world:
  *  - the whole typed history is rebuilt and checked every 1000 years and at the end (checkEpisodeHistory);
- *  - the episodes observed in year 2500 must be the same when read again in year 5000 (later years never change them);
- *  - every transition is re-checked against what it cites, independently of the frame: a start cites shortage records
- *    of its own year, a reassessment the records of a new district's shortage, a resolution 5 years of coverage >= 0.90
- *    in the economy captured over those years;
+ *  - the episodes observed in year 2500 must be the same when read again in year 5000;
+ *  - every transition is re-checked against its sources by scripts/lib/history40-food.mjs (written apart from the
+ *    definition), using the chronicle, the decisions and the economy captured each year;
  *  - the first world of each biome is also run without episodes (D2b): the civilization and the architecture ledger must
- *    be the same (episodes write nothing else), and is saved at its first branch after 2500 with an active episode,
- *    restored, and continued both ways for 500 more years.
+ *    be the same (the food system applies no effect), and is saved at its first branch after 2500 with an active food
+ *    episode, restored, and continued both ways for 500 more years.
  * Exits 1 when a check fails.
  */
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -25,10 +24,12 @@ import {lastObservedYear} from '../dist/story/engine.js';
 import {checkEpisodeHistory,episodesAt} from '../dist/story/episode-d2c-review.js';
 import {createReviewWorld,advanceReviewWorld,chooseReviewWorld,prepareReviewSave,restoreReviewSave} from '../dist/story/review-save-d2b.js';
 import {MEASURE_ID,allocateSeeds,distribution} from './lib/history40-measures.mjs';
+import {recheckFoodEpisodes} from './lib/history40-food.mjs';
+import {FOOD_EPISODE_D3A} from '../dist/story/episode-food-d3a-review.js';
 
-const out='artifacts/history40-d2c',quick=process.env.HISTORY40_D2C_QUICK==='1';
+const out='artifacts/history40-d3a',quick=process.env.HISTORY40_D3A_QUICK==='1';
 const HORIZON=quick?1000:5000,PER_BIOME=quick?1:10,BIOMES=quick?['temperate_forest','tundra']:BIOME_KINDS,OBSERVE=quick?500:2500,SAVE_AFTER=quick?500:2500,SAVE_CONTINUE=quick?700:3000;
-const POLICY='hardship-linked+decisions-d2b+episodes-probe-d2c',WITHOUT='hardship-linked+decisions-d2b';
+const POLICY='hardship-linked+decisions-d2b+episodes-food-d3a',WITHOUT='hardship-linked+decisions-d2b';
 const failures=[],check=(ok,m)=>{if(!ok){failures.push(m);if(failures.length<=50)console.error('FAIL',m);}return ok;};
 const sha=s=>createHash('sha256').update(s).digest('hex'),ms=t=>Math.round(performance.now()-t);
 const started=performance.now(),startedAt=new Date().toISOString();
@@ -49,30 +50,22 @@ async function run(c,policy,each=()=>{}){
  return {world,captures};
 }
 
-const SHORTAGE=/の食糧不足が続く$/;
-/** Re-checks each transition against what it cites (independently of the frame's own checks). */
-function recheck(c,s,captures){
- const records=new Map(s.history.map(r=>[r.id,r])),byYear=new Map(captures.map(x=>[x.year,x]));
- for(const t of s.episodes?.transitions??[]){
-  const at=`${c.id} ${t.id} ${t.kind}@${t.year}`,cited=t.evidence.filter(e=>e.type==='record').map(e=>records.get(e.id));
-  if(t.kind==='started'||t.kind==='reassessed'){
-   check(cited.length>0&&cited.every(r=>r&&r.year===t.year&&SHORTAGE.test(r.title)),`${at}: does not cite this year's shortage records`);
-  }else if(t.kind==='resolved'){
-   // each capture holds that year's coverage: the 5 years up to the resolution must all be 0.90 or more
-   const years=[0,1,2,3,4].map(i=>byYear.get(t.year-i)?.economy?.districts);
-   check(years.every(ds=>ds&&ds.length>0&&ds.every(d=>d.coverage!==null&&d.coverage>=.9)),`${at}: coverage of the 5 years does not support the resolution`);
-  }else check(false,`${at}: the probe never makes this transition`);
- }
-}
+function recheck(c,s,captures){for(const p of recheckFoodEpisodes(s,captures))check(false,`${c.id} ${p}`);}
 
 function measures(s){
- const episodes=episodesAt(s,s.episodes.committedThrough),ended=episodes.filter(e=>e.endedYear!==null);
+ const episodes=episodesAt(s,s.episodes.committedThrough),ts=s.episodes.transitions,ended=episodes.filter(e=>e.endedYear!==null);
+ const count=f=>ts.filter(f).length,responded=episodes.filter(e=>e.transitions.some(t=>t.kind==='response-started'));
  const recurrences=episodes.slice(1).map((e,i)=>episodes[i].endedYear===null?null:e.startedYear-episodes[i].endedYear).filter(x=>x!==null);
  const activeYears=episodes.reduce((a,e)=>a+((e.endedYear??HORIZON)-e.startedYear),0);
- return {episodes:episodes.length,resolved:ended.length,activeAtHorizon:episodes.length-ended.length,transitions:s.episodes.transitions.length,
-  reassessed:s.episodes.transitions.filter(t=>t.kind==='reassessed').length,firstStart:episodes[0]?.startedYear??null,
-  durations:distribution(ended.map(e=>e.endedYear-e.startedYear)),longestActive:Math.max(0,...episodes.map(e=>(e.endedYear??HORIZON)-e.startedYear)),
-  quietBeforeRecurrence:distribution(recurrences),activeShare:+(activeYears/HORIZON).toFixed(3),storeBytes:JSON.stringify(s.episodes).length};
+ const responses={};for(const t of ts)if(t.kind==='response-started'||t.kind==='response-changed'){const k=t.kind==='response-changed'?t.reason.replace(/^to-/,''):t.reason;responses[k]=(responses[k]??0)+1;}
+ const origins={shortage:0,famine:0};for(const e of episodes){const r=e.transitions[0].evidence.map(x=>s.history.find(h=>h.id===x.id));if(r.some(x=>x?.kind==='famine'))origins.famine++;if(r.some(x=>x&&/の食糧不足が続く$/.test(x.title)))origins.shortage++;}
+ return {episodes:episodes.length,resolved:episodes.filter(e=>e.status==='resolved').length,abandoned:episodes.filter(e=>e.status==='abandoned').length,activeAtHorizon:episodes.length-ended.length,
+  withResponse:responded.length,resolvedWithoutResponse:episodes.filter(e=>e.status==='resolved'&&!e.transitions.some(t=>t.kind.startsWith('response'))).length,
+  responses,failures:count(t=>t.kind==='response-failed'),changes:count(t=>t.kind==='response-changed'),
+  spread:count(t=>t.reason==='shortage-spread'),famines:count(t=>t.reason==='famine'),recovering:count(t=>t.reason==='supply-recovering'),relapses:count(t=>t.reason==='supply-relapsed'),
+  origins,transitions:ts.length,firstStart:episodes[0]?.startedYear??null,durations:distribution(ended.map(e=>e.endedYear-e.startedYear)),
+  longestActive:Math.max(0,...episodes.map(e=>(e.endedYear??HORIZON)-e.startedYear)),quietBeforeRecurrence:distribution(recurrences),
+  activeShare:+(activeYears/HORIZON).toFixed(3),storeBytes:JSON.stringify(s.episodes).length};
 }
 
 const identity=w=>{const {episodes,...rest}=w.terrain.review.state;return sha(JSON.stringify({state:rest,architecture:w.architecture}));};
@@ -111,20 +104,24 @@ for(const c of cases){
   check(captures.length===HORIZON,`${c.id}: economy not captured once per year`);
   check(observed!==null&&JSON.stringify(episodesAt(s,OBSERVE))===observed,`${c.id}: the episodes of ${OBSERVE} changed later`);
   recheck(c,s,captures);
-  row.d2c={status:'ok',historyChecks:checks,...measures(s)};
+  row.d3a={status:'ok',historyChecks:checks,...measures(s)};
   if(c.rank===0){
    const without=(await run(c,WITHOUT)).world;
    row.sameWorldWithoutEpisodes=check(identity(world)===identity(without),`${c.id}: episodes changed the world`);
    try{row.roundTrip=await roundTrip(c);}catch(e){check(false,`${c.id} round trip: ${e.message}`);row.roundTrip={status:'failed',error:String(e.message)};}
   }
- }catch(e){check(false,`${c.id}: ${e.message}`);row.d2c={status:'failed',error:String(e.message)};}
- worlds.push(row);console.log(c.id,'seed',c.seed,ms(t)+'ms','episodes',row.d2c.episodes??'-','active',row.d2c.activeAtHorizon??'-',row.roundTrip?JSON.stringify(row.roundTrip):'');
+ }catch(e){check(false,`${c.id}: ${e.message}`);row.d3a={status:'failed',error:String(e.message)};}
+ worlds.push(row);console.log(c.id,'seed',c.seed,ms(t)+'ms','episodes',row.d3a.episodes??'-','active',row.d3a.activeAtHorizon??'-',row.roundTrip?JSON.stringify(row.roundTrip):'');
 }
 
-const ok=worlds.filter(w=>w.d2c.status==='ok').map(w=>w.d2c),pick=f=>distribution(ok.map(f));
-const results={issue:40,stage:'D2c',measureId:MEASURE_ID,quick,horizon:HORIZON,policy:POLICY,cases:cases.map(c=>({id:c.id,biome:c.biome,seed:c.seed})),
- summary:{worlds:worlds.length,episodes:pick(m=>m.episodes),resolved:pick(m=>m.resolved),activeAtHorizon:pick(m=>m.activeAtHorizon),transitions:pick(m=>m.transitions),
-  reassessed:pick(m=>m.reassessed),firstStart:pick(m=>m.firstStart),durationMedian:pick(m=>m.durations.median),longestActive:pick(m=>m.longestActive),
+const ok=worlds.filter(w=>w.d3a.status==='ok').map(w=>w.d3a),pick=f=>distribution(ok.map(f));
+const results={issue:40,stage:'D3a',measureId:MEASURE_ID,quick,horizon:HORIZON,policy:POLICY,thresholds:FOOD_EPISODE_D3A,cases:cases.map(c=>({id:c.id,biome:c.biome,seed:c.seed})),
+ summary:{worlds:worlds.length,episodes:pick(m=>m.episodes),resolved:pick(m=>m.resolved),abandoned:pick(m=>m.abandoned),activeAtHorizon:pick(m=>m.activeAtHorizon),
+  withResponse:pick(m=>m.withResponse),resolvedWithoutResponse:pick(m=>m.resolvedWithoutResponse),failures:pick(m=>m.failures),changes:pick(m=>m.changes),
+  spread:pick(m=>m.spread),famines:pick(m=>m.famines),relapses:pick(m=>m.relapses),transitions:pick(m=>m.transitions),
+  firstStart:pick(m=>m.firstStart),durationMedian:pick(m=>m.durations.median),longestActive:pick(m=>m.longestActive),
+  responses:Object.fromEntries([...new Set(ok.flatMap(m=>Object.keys(m.responses)))].sort().map(k=>[k,ok.reduce((a,m)=>a+(m.responses[k]??0),0)])),
+  origins:{shortage:ok.reduce((a,m)=>a+m.origins.shortage,0),famine:ok.reduce((a,m)=>a+m.origins.famine,0)},
   quietBeforeRecurrenceMedian:pick(m=>m.quietBeforeRecurrence.median),activeShare:pick(m=>m.activeShare),storeBytes:pick(m=>m.storeBytes),
   sameWorldWithoutEpisodes:worlds.filter(w=>'sameWorldWithoutEpisodes' in w).map(w=>({id:w.id,same:w.sameWorldWithoutEpisodes})),
   roundTrips:worlds.filter(w=>w.roundTrip).map(w=>({id:w.id,...w.roundTrip}))},
@@ -134,5 +131,5 @@ const resultsJson=JSON.stringify(results,(k,v)=>k==='loadMs'||k==='saveMs'?undef
 const runtime={startedAt,finishedAt:new Date().toISOString(),totalMs:ms(started),commit,dirtyWorktree:dirty,node:process.version,platform:`${os.platform()} ${os.release()} ${os.arch()}`,cpu:os.cpus()[0]?.model??null};
 await mkdir(out,{recursive:true});
 await writeFile(`${out}/report.json`,JSON.stringify({status:failures.length?'FAILED':'PASSED',resultsSha256:sha(resultsJson),runtime,results},null,1)+'\n');
-console.log(JSON.stringify({type:'issue40-d2c',status:failures.length?'FAILED':'PASSED',failures:failures.length,worlds:worlds.length,resultsSha256:sha(resultsJson),totalMs:runtime.totalMs,out}));
+console.log(JSON.stringify({type:'issue40-d3a',status:failures.length?'FAILED':'PASSED',failures:failures.length,worlds:worlds.length,resultsSha256:sha(resultsJson),totalMs:runtime.totalMs,out}));
 if(failures.length)process.exitCode=1;

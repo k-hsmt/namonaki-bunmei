@@ -95,7 +95,7 @@ test('episodes: the whole typed history is rebuilt and tampering is rejected', (
 });
 
 test('episodes on a real world: the world is unchanged, the past stays as observed, a pending save with an active episode round-trips', async () => {
- const POLICY='hardship-linked+decisions-d2b+episodes-probe-d2c';
+ const POLICY='hardship-linked+decisions-d2b+episodes-food-d3a';
  const a=await advanceReviewWorld(await createReviewWorld(6,POLICY),1200),b=await advanceReviewWorld(await createReviewWorld(6,'hardship-linked+decisions-d2b'),1200);
  const {episodes,...rest}=a.terrain.review.state;
  assert.equal(JSON.stringify(rest),JSON.stringify(b.terrain.review.state));assert.equal(JSON.stringify(a.architecture),JSON.stringify(b.architecture));
