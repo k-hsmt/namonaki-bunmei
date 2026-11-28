@@ -19,9 +19,10 @@ import {createEventPolicyD2a,EVENT_POLICY_D2A_ID,type EventDrawReceipt,type Even
 import type {InteractionCaptureInternal} from './economy-observer.js';
 import {checkEpisodeHistory} from './episode-d2c-review.js';
 import {EPISODE_FOOD_D3A} from './episode-food-d3a-review.js';
+import {EPISODE_TRADE_D3B} from './episode-trade-d3b-review.js';
 
 export const REVIEW_SAVE_FORMAT='namonaki-review-save' as const;
-export const REVIEW_POLICIES=['hardship-linked','hardship-linked+decisions-d2b','hardship-linked+decisions-d2b+episodes-food-d3a'] as const;
+export const REVIEW_POLICIES=['hardship-linked','hardship-linked+decisions-d2b','hardship-linked+decisions-d2b+episodes-food-d3a','hardship-linked+decisions-d2b+episodes-trade-d3b'] as const;
 export type ReviewPolicyName=typeof REVIEW_POLICIES[number];
 export type ReviewOperation=readonly ['advance',number,'stop'|'automatic']|readonly ['choose',number|'random'];
 export interface ReviewSave {
@@ -32,7 +33,7 @@ interface Log {readonly seed:number;readonly policy:ReviewPolicyName;readonly op
 const logs=new WeakMap<ArchitectureProductionWorld,Log>();
 const fail=(m:string):never=>{throw Error('review save: '+m);};
 const policyOf=(name:ReviewPolicyName,observeDraw?:(r:EventDrawReceipt)=>void):EventPolicyInternal=>
- createEventPolicyD2a('hardship-linked',{...(observeDraw?{observeDraw}:{}),decisions:name!=='hardship-linked',...(name==='hardship-linked+decisions-d2b+episodes-food-d3a'?{episodes:EPISODE_FOOD_D3A}:{})});
+ createEventPolicyD2a('hardship-linked',{...(observeDraw?{observeDraw}:{}),decisions:name!=='hardship-linked',...(name==='hardship-linked+decisions-d2b+episodes-food-d3a'?{episodes:EPISODE_FOOD_D3A}:name==='hardship-linked+decisions-d2b+episodes-trade-d3b'?{episodes:EPISODE_TRADE_D3B}:{})});
 const logOf=(world:ArchitectureProductionWorld)=>logs.get(world)??fail('not a review world made by this module');
 const next=(world:ArchitectureProductionWorld,log:Log,op:ReviewOperation)=>{logs.set(world,{...log,operations:[...log.operations,op]});return world;};
 
