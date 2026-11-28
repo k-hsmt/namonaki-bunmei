@@ -417,9 +417,11 @@ export function step(s:CivilizationState,land?:ReviewLandProgression){migrateCiv
  const policy=land?.eventPolicyInternal;if(policy!==undefined)checkEventPolicyInternal(policy);
  const facts=policy?.facts(s),probability=policy?policy.drawProbability(s):(s.year<30?.12:.19);
  if(policy&&!(probability>=0&&probability<=1))throw Error('event policy: draw probability out of range');
+ const receipt=policy?.observeDraw?{year:s.year,probability,inputs:{food:s.food,cohesion:s.cohesion,drought:s.drought,epidemic:s.epidemic},facts:facts!,drawn:false,candidates:0,selected:null as string|null}:undefined;
  if(rng.next()<probability){
   const candidates=policy?rules.filter(rule=>policy.eligible(rule.kind,facts!)):rules;
   const eligible=candidates.map(rule=>({rule,weight:(turningPoints.includes(rule)&&s.lastKind[rule.kind]!==undefined?0:rule.weight(s))*(s.year-(s.lastKind[rule.kind]??-100)>55?1:0.015)})).filter(x=>x.weight>0);const sum=eligible.reduce((a,x)=>a+x.weight,0);let draw=rng.next()*sum;const selected=eligible.find(x=>(draw-=x.weight)<=0)?.rule??eligible[eligible.length-1]?.rule;
+  if(receipt){receipt.drawn=true;receipt.candidates=eligible.length;receipt.selected=selected?.kind??null;}
   if(selected){
    const beforePopulation=s.population;const beforeFood=s.food;
    const [title,body,causes]=selected.apply(s,rng);
@@ -431,6 +433,7 @@ export function step(s:CivilizationState,land?:ReviewLandProgression){migrateCiv
    recordLegacy(s,selected.kind,title);
   }
  }
+ if(receipt)policy!.observeDraw!(Object.freeze({...receipt,inputs:Object.freeze(receipt.inputs)}));
  // Prompt about once a century, no more than 1 in 85 years.
  const last=s.decisions.length?s.decisions[s.decisions.length-1]!.year:0;
  if(s.year>=60&&s.year-last>=85&&rng.next()<.012)generateDecision(s,rng);

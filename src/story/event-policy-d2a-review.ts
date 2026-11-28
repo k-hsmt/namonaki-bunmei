@@ -18,7 +18,8 @@ import {siteAt,type SettlementHistory} from './settlement-history.js';
 import type {CivilizationState} from './engine.js';
 
 export const EVENT_POLICY_D2A_ID='civilization-events-d2a-review' as const;
-export const EVENT_POLICY_SETTINGS=['eligibility-only','hardship-linked','momentum','combined'] as const;
+/** D2a Human review: hardship-linked adopted (0.07 + 0.40 × hardship; final coefficients in D4c). The others were not adopted. */
+export const EVENT_POLICY_SETTINGS=['hardship-linked'] as const;
 export type EventPolicySetting=typeof EVENT_POLICY_SETTINGS[number];
 
 /** The confirmed facts the requirements read. */
@@ -27,29 +28,49 @@ export interface ConfirmedEventFacts {
  readonly inhabitedSites:number;readonly uninhabitedSite:boolean;readonly townOrLarger:boolean;
  readonly marketStanding:boolean;readonly riverMarketStanding:boolean;readonly granaryStanding:boolean;
  readonly councilSites:number;readonly splitCommunity:boolean;readonly riverInhabited:boolean;readonly coastInhabited:boolean;
+ readonly communalWork:boolean;readonly archivePractice:boolean;
  readonly districtShortage:boolean;readonly recentTrade:boolean;readonly pastDisease:boolean;readonly pastConflict:boolean;
- readonly drought:boolean;
+ readonly pastRecordEvent:boolean;readonly drought:boolean;
 }
-export type EventRequirement='uninhabited-site'|'town'|'market'|'river-market'|'granary'|'council-two-sites'|'two-inhabited-sites'|
- 'split-community'|'river-inhabited'|'coast-inhabited'|'district-shortage'|'drought'|'recent-trade'|'past-disease'|'past-conflict'|'none';
+export type EventRequirement='town'|'market'|'river-market'|'granary'|'council-two-sites'|'two-inhabited-sites'|'communal-work'|
+ 'split-community'|'river-inhabited'|'coast-inhabited'|'district-shortage'|'drought'|'recent-trade'|'past-disease'|'past-conflict'|
+ 'past-record-activity'|'suspended'|'none';
 
 /** Requirement of every production event kind (a kind missing here is an error, not an eligible candidate). */
 export const EVENT_REQUIREMENTS:Readonly<Record<string,EventRequirement>>=Object.freeze({
- decline:'uninhabited-site',abandon:'uninhabited-site',rebirth:'uninhabited-site',
+ decline:'suspended',abandon:'suspended',rebirth:'suspended',cold:'suspended',well:'suspended',storm:'suspended',
  first_city:'town',market:'market',first_port:'river-market',first_granary:'granary',
- first_confederation:'council-two-sites',council:'two-inhabited-sites',split:'split-community',first_fragment:'split-community',
+ first_confederation:'council-two-sites',council:'two-inhabited-sites',tax:'communal-work',split:'split-community',first_fragment:'split-community',
  flood:'river-inhabited',irrigation:'river-inhabited',dike:'river-inhabited',fish:'river-inhabited',fishing_ban:'river-inhabited',ferry:'river-inhabited',
  navigation:'coast-inhabited',famine:'district-shortage',drought:'drought',isolation:'recent-trade',healing:'past-disease',reconciliation:'past-conflict',
- earthquake:'none',storm:'none',eruption:'none',harvest:'none',disease:'none',migration:'none',arrival:'none',trade:'none',
+ first_library:'past-record-activity',
+ earthquake:'none',eruption:'none',harvest:'none',disease:'none',migration:'none',arrival:'none',trade:'none',
  language:'none',ritual:'none',song:'none',craft:'none',writing:'none',dispute:'none',fire:'none',garden:'none',forest:'none',peace:'none',
- salt:'none',pottery:'none',midwife:'none',well:'none',new_crops:'none',marriage:'none',cold:'none',funeral:'none',tax:'none',
+ salt:'none',pottery:'none',midwife:'none',new_crops:'none',marriage:'none',funeral:'none',
  pilgrim:'none',apprentice:'none',storyteller:'none',landslide:'none',artisan:'none',
- first_archive:'none',first_terrace:'none',first_library:'none',
+ first_archive:'none',first_terrace:'none',
+});
+/** Kinds held back because the current model cannot confirm what their text states (never inferred; D2a Human review). */
+export const SUSPENDED_EVENTS:Readonly<Record<string,{readonly reason:string;readonly revisit:string}>>=Object.freeze({
+ decline:{reason:'衰退の実際の状態遷移を根拠にする再設計が必要',revisit:'D4b'},
+ abandon:{reason:'地区の無人化の実際の状態遷移を根拠にする再設計が必要',revisit:'D4b'},
+ rebirth:{reason:'再定住の実際の状態遷移を根拠にする再設計が必要',revisit:'D4b'},
+ cold:{reason:'文が述べる空き家の発生を確認できない',revisit:'空き家を確定するモデルの後'},
+ well:{reason:'井戸の建設を確定するモデルがない',revisit:'井戸を確定するモデルの後'},
+ storm:{reason:'自然現象と実際の被害（住まいの喪失）を区別し、喪失を事前に検証できない',revisit:'D3c'},
+});
+/** Where the fact each requirement reads comes from, and how a finished history re-checks it. */
+export const REQUIREMENT_SOURCES:Readonly<Record<Exclude<EventRequirement,'suspended'|'none'>,string>>=Object.freeze({
+ town:'settlement-ledger','market':'settlement-ledger','river-market':'settlement-ledger',granary:'settlement-ledger',
+ 'council-two-sites':'settlement-ledger','two-inhabited-sites':'settlement-ledger','communal-work':'settlement-ledger',
+ 'split-community':'settlement-ledger','river-inhabited':'settlement-ledger','coast-inhabited':'settlement-ledger',
+ 'district-shortage':'economy','recent-trade':'economy','past-disease':'chronicle','past-conflict':'chronicle+settlement-ledger',
+ 'past-record-activity':'chronicle+settlement-ledger',drought:'basic-state (draw receipt only)',
 });
 
 const standing=(site:ReturnType<typeof siteAt>,kind:string)=>!!site?.buildings.some(b=>b.kind===kind&&b.condition!=='ruined');
 export type LedgerEventFacts=Pick<ConfirmedEventFacts,'ledgerYear'|'inhabitedSites'|'uninhabitedSite'|'townOrLarger'|'marketStanding'|
- 'riverMarketStanding'|'granaryStanding'|'councilSites'|'splitCommunity'|'riverInhabited'|'coastInhabited'>;
+ 'riverMarketStanding'|'granaryStanding'|'councilSites'|'splitCommunity'|'riverInhabited'|'coastInhabited'|'communalWork'|'archivePractice'>;
 /** The settlement-ledger facts as confirmed at the end of `year` (pure; also used to audit a finished history). */
 export function ledgerEventFactsAt(history:SettlementHistory,year:number):LedgerEventFacts {
  const sites=[0,1,2].map(i=>siteAt(history,i,year)),inhabited=sites.filter(v=>v?.inhabited);
@@ -57,7 +78,10 @@ export function ledgerEventFactsAt(history:SettlementHistory,year:number):Ledger
   townOrLarger:inhabited.some(v=>v!.scale>=2),marketStanding:sites.some(v=>standing(v,'market')),riverMarketStanding:standing(sites[0],'market'),
   granaryStanding:sites.some(v=>standing(v,'granary')),
   councilSites:sites.filter(v=>v?.practices.some(p=>p.kind==='council'&&p.active)).length,
-  splitCommunity:sites.some(v=>v&&v.communityId!=='founding-community'),riverInhabited:!!sites[0]?.inhabited,coastInhabited:!!sites[2]?.inhabited};
+  splitCommunity:sites.some(v=>v&&v.communityId!=='founding-community'),riverInhabited:!!sites[0]?.inhabited,coastInhabited:!!sites[2]?.inhabited,
+  // communal work or an institution for it: a council or communal-store practice, or a standing meeting hall
+  communalWork:sites.some(v=>v&&(v.practices.some(p=>(p.kind==='council'||p.kind==='granary')&&p.active)||standing(v,'hall'))),
+  archivePractice:sites.some(v=>v?.practices.some(p=>p.kind==='archive'&&p.active))};
 }
 /** Facts for this year's draw: ledgers as confirmed at the end of year - 1, counters of this year's basic state. */
 export function confirmedEventFacts(s:CivilizationState):ConfirmedEventFacts {
@@ -66,19 +90,21 @@ export function confirmedEventFacts(s:CivilizationState):ConfirmedEventFacts {
  if(ledger.lastYear!==year)throw Error('event policy: facts must be read from the previous confirmed year');
  const f=ledgerEventFactsAt(ledger.sites,year);
  return {...f,districtShortage:!!s.economy?.districts.some(d=>d.shortageYears>0),recentTrade:!!s.economy?.routes.some(r=>r.tradeYears.some(Boolean)),
-  pastDisease:s.lastKind.disease!==undefined,pastConflict:s.lastKind.dispute!==undefined||f.splitCommunity,drought:s.drought>0};
+  pastDisease:s.lastKind.disease!==undefined,pastConflict:s.lastKind.dispute!==undefined||f.splitCommunity,
+  pastRecordEvent:s.lastKind.first_archive!==undefined||s.lastKind.writing!==undefined,drought:s.drought>0};
 }
 /** Requirements read from the settlement ledger alone (auditable afterwards from a finished history). */
-export const LEDGER_REQUIREMENTS:readonly EventRequirement[]=Object.freeze(['uninhabited-site','town','market','river-market','granary',
- 'council-two-sites','two-inhabited-sites','split-community','river-inhabited','coast-inhabited']);
+export const LEDGER_REQUIREMENTS:readonly EventRequirement[]=Object.freeze(['town','market','river-market','granary',
+ 'council-two-sites','two-inhabited-sites','communal-work','split-community','river-inhabited','coast-inhabited']);
 
 export function meetsRequirement(requirement:EventRequirement,f:ConfirmedEventFacts):boolean {
  switch(requirement){
-  case 'uninhabited-site':return f.uninhabitedSite;case 'town':return f.townOrLarger;case 'market':return f.marketStanding;
+  case 'town':return f.townOrLarger;case 'market':return f.marketStanding;
   case 'river-market':return f.riverMarketStanding;case 'granary':return f.granaryStanding;case 'council-two-sites':return f.councilSites>=2;
-  case 'two-inhabited-sites':return f.inhabitedSites>=2;case 'split-community':return f.splitCommunity;case 'river-inhabited':return f.riverInhabited;
+  case 'two-inhabited-sites':return f.inhabitedSites>=2;case 'communal-work':return f.communalWork;case 'split-community':return f.splitCommunity;case 'river-inhabited':return f.riverInhabited;
   case 'coast-inhabited':return f.coastInhabited;case 'district-shortage':return f.districtShortage;case 'drought':return f.drought;
-  case 'recent-trade':return f.recentTrade;case 'past-disease':return f.pastDisease;case 'past-conflict':return f.pastConflict;case 'none':return true;
+  case 'recent-trade':return f.recentTrade;case 'past-disease':return f.pastDisease;case 'past-conflict':return f.pastConflict;
+  case 'past-record-activity':return f.pastRecordEvent||f.archivePractice;case 'suspended':return false;case 'none':return true;
  }
 }
 
@@ -86,29 +112,30 @@ export function meetsRequirement(requirement:EventRequirement,f:ConfirmedEventFa
 export function hardship(s:CivilizationState):number {
  return ((s.food<40?1:s.food<55?.5:0)+(s.cohesion<40?1:s.cohesion<55?.5:0)+(s.drought>2?1:s.drought>0?.5:0)+(s.epidemic>0?1:0))/4;
 }
-/** 0..1, 1 right after an event: exp(-(years since the last event)/6); 0 before any event. */
-export function momentum(s:CivilizationState):number {
- const years=Object.values(s.lastKind);if(!years.length)return 0;
- return Math.exp(-(s.year-Math.max(...years))/6);
-}
-/** The yearly draw probability of each setting (candidates to compare; not adopted, Human decision Q3). */
+/** The yearly draw probability (adopted: hardship-linked, D2a Human review). */
 export const DRAW_PROBABILITY:Readonly<Record<EventPolicySetting,(s:CivilizationState)=>number>>=Object.freeze({
- 'eligibility-only':s=>s.year<30?.12:.19,
  'hardship-linked':s=>.07+.40*hardship(s),
- momentum:s=>.09+.30*momentum(s),
- combined:s=>.05+.25*hardship(s)+.20*momentum(s),
 });
 
+/** One year's draw, as the policy saw it (review-only audit; never persisted). */
+export interface EventDrawReceipt {
+ readonly year:number;readonly probability:number;
+ readonly inputs:{readonly food:number;readonly cohesion:number;readonly drought:number;readonly epidemic:number};
+ readonly facts:ConfirmedEventFacts;readonly drawn:boolean;readonly candidates:number;readonly selected:string|null;
+}
 export interface EventPolicyInternal {
  readonly ruleId:typeof EVENT_POLICY_D2A_ID;readonly setting:EventPolicySetting;
  readonly facts:(s:CivilizationState)=>ConfirmedEventFacts;
  readonly eligible:(kind:string,facts:ConfirmedEventFacts)=>boolean;
  readonly drawProbability:(s:CivilizationState)=>number;
+ /** Review-only audit tap: one frozen receipt per drawn-or-not year. */
+ readonly observeDraw?:(receipt:EventDrawReceipt)=>void;
 }
 const policies=new WeakSet<object>();
-export function createEventPolicyD2a(setting:EventPolicySetting):EventPolicyInternal {
+export function createEventPolicyD2a(setting:EventPolicySetting,options:{readonly observeDraw?:(receipt:EventDrawReceipt)=>void}={}):EventPolicyInternal {
  if(!EVENT_POLICY_SETTINGS.includes(setting))throw Error('event policy: unknown setting');
- const policy=Object.freeze({ruleId:EVENT_POLICY_D2A_ID,setting,facts:confirmedEventFacts,
+ if(options.observeDraw!==undefined&&typeof options.observeDraw!=='function')throw Error('event policy: invalid draw observer');
+ const policy=Object.freeze({ruleId:EVENT_POLICY_D2A_ID,setting,facts:confirmedEventFacts,...(options.observeDraw?{observeDraw:options.observeDraw}:{}),
   eligible:(kind:string,facts:ConfirmedEventFacts)=>{const r=EVENT_REQUIREMENTS[kind];if(r===undefined)throw Error('event policy: no requirement for '+kind);return meetsRequirement(r,facts);},
   drawProbability:DRAW_PROBABILITY[setting]});
  policies.add(policy);return policy;
